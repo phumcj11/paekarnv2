@@ -10,6 +10,7 @@ use App\Core\View;
 use App\Models\Property;
 use App\Support\PropertyBookingCapabilities;
 use App\Services\AdminApprovalNotifyService;
+use App\Services\PropertyLineService;
 
 class PropertyController extends Controller
 {
@@ -206,12 +207,39 @@ class PropertyController extends Controller
             if ($cover) $update['cover_image'] = $cover;
         } catch (\Throwable $e) { Session::flash('error', $e->getMessage()); back(); }
 
+        // LINE OA per-property fields
+        if (Database::tableHasColumn('properties', 'line_messaging_enabled')) {
+            $update['line_messaging_enabled']    = isset($_POST['line_messaging_enabled']) ? 1 : 0;
+            $update['line_channel_access_token'] = trim((string)($_POST['line_channel_access_token'] ?? '')) ?: null;
+            $update['line_channel_secret']       = trim((string)($_POST['line_channel_secret'] ?? '')) ?: null;
+        }
+
         Property::update($id, $update);
         Property::syncPropertyAmenities($id, $_POST['amenities'] ?? []);
         Property::recalcMinPrice($id);
 
         Session::flash('success', 'บันทึกการเปลี่ยนแปลงเรียบร้อย');
         redirect(url('/owner/properties/' . $id . '/edit'));
+    }
+
+    /** POST /owner/properties/{id}/line-test — test push ไป LINE User ID */
+    public function lineTest(int $id): void
+    {
+        $property = $this->findOwn($id);
+        if (!$property) { $this->json(['ok' => false, 'message' => 'ไม่พบที่พัก'], 403); }
+
+        $lineUserId = trim((string)($_POST['line_user_id'] ?? ''));
+        if (!$lineUserId) { $this->json(['ok' => false, 'message' => 'กรุณากรอก LINE User ID']); }
+
+        $ok = PropertyLineService::push($id, $lineUserId, [[
+            'type' => 'text',
+            'text' => "ทดสอบ LINE OA ของแพ/ที่พัก: {$property['name']}\nส่งจากระบบ Paekarn.com ✅",
+        ]]);
+
+        $this->json([
+            'ok'      => $ok,
+            'message' => $ok ? 'ส่งสำเร็จ! เช็ค LINE ของคุณได้เลย' : 'ส่งไม่สำเร็จ — ตรวจสอบ Token และ User ID อีกครั้ง',
+        ]);
     }
 
     public function delete(int $id): void

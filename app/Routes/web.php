@@ -23,6 +23,7 @@ use App\Controllers\ActivityCheckoutController;
 use App\Controllers\PromptPayQrController;
 use App\Controllers\TrackOrderController;
 use App\Controllers\CompareController;
+use App\Controllers\BookingConfirmationController;
 
 return function (Router $r): void {
     $r->get('/robots.txt',   [SeoController::class, 'robots']);
@@ -63,6 +64,7 @@ return function (Router $r): void {
     $r->get('/booking/create/{property_id:[0-9]+}', [BookingController::class, 'create']);
     $r->post('/booking',                            [BookingController::class, 'store'])->middleware('csrf');
     $r->get('/booking/success/{code}',              [BookingController::class, 'success']);
+    $r->get('/booking/confirmation/{code}',         [BookingConfirmationController::class, 'show']);
 
     // ---------- Blog ----------
     $r->get('/blog',          [BlogController::class, 'index']);
@@ -123,7 +125,8 @@ return function (Router $r): void {
     $r->get('/line/login',         [LineController::class, 'login'])->middleware('auth');
     $r->get('/line/callback',      [LineController::class, 'callback']);
     $r->get('/line/unlink',        [LineController::class, 'unlink'])->middleware('auth');
-    $r->post('/line/webhook',      [LineController::class, 'webhook']);
+    $r->post('/line/webhook',                           [LineController::class, 'webhook']);
+    $r->post('/line/property/{id:[0-9]+}/webhook',      [LineController::class, 'propertyWebhook']);
 
     // ---------- Static ----------
     $r->get('/about',         function () { \App\Core\View::render('static/about'); });

@@ -638,4 +638,89 @@ $bookingCaps = $property
   </div>
 </div>
 <?php endif; ?>
+
+<?php if (\App\Core\Database::tableHasColumn('properties', 'line_messaging_enabled') && $isEdit): ?>
+<div x-data="lineOASettings()" x-init="init()" class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+  <h4 class="font-bold flex items-center gap-2 mb-3">
+    <svg class="w-5 h-5 text-[#06C755]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
+    LINE Messaging API (OA ต่อที่พัก)
+  </h4>
+
+  <label class="flex items-center gap-3 mb-4 cursor-pointer">
+    <input type="checkbox" form="propertyForm" name="line_messaging_enabled" value="1"
+           <?= !empty($property['line_messaging_enabled']) ? 'checked' : '' ?>
+           x-model="enabled" class="rounded accent-[#06C755]">
+    <span class="text-sm font-semibold text-slate-700">เปิดใช้ LINE OA สำหรับที่พักนี้</span>
+  </label>
+
+  <div x-show="enabled" x-cloak class="space-y-3">
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Channel Access Token</label>
+      <input type="text" form="propertyForm" name="line_channel_access_token"
+             value="<?= e($property['line_channel_access_token'] ?? '') ?>"
+             placeholder="Channel Access Token จาก LINE Developers"
+             class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Channel Secret</label>
+      <input type="text" form="propertyForm" name="line_channel_secret"
+             value="<?= e($property['line_channel_secret'] ?? '') ?>"
+             placeholder="Channel Secret (สำหรับ webhook)"
+             class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
+    </div>
+    <div class="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
+      <div class="font-semibold text-slate-600">Webhook URL สำหรับใส่ใน LINE Developers:</div>
+      <code class="text-primary-700 select-all break-all"><?= url('/line/property/' . (int)$property['id'] . '/webhook') ?></code>
+    </div>
+
+    <!-- Test push -->
+    <div class="border-t border-slate-100 pt-3">
+      <div class="text-xs font-semibold text-slate-600 mb-2">ทดสอบส่ง (ใส่ LINE User ID ของตัวเอง)</div>
+      <div class="flex gap-2">
+        <input type="text" x-model="testUid" placeholder="Uxxxxxxxxxxxxxxxxxx"
+               class="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 outline-none">
+        <button type="button" @click="testPush()" :disabled="pushing"
+                class="px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+          <span x-show="!pushing">ส่ง</span><span x-show="pushing">...</span>
+        </button>
+      </div>
+      <div x-show="testResult" x-text="testResult"
+           :class="testOk ? 'text-emerald-600' : 'text-rose-600'"
+           class="text-xs mt-1.5"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function lineOASettings() {
+  return {
+    enabled: <?= !empty($property['line_messaging_enabled']) ? 'true' : 'false' ?>,
+    testUid: '',
+    pushing: false,
+    testResult: '',
+    testOk: false,
+
+    init() {},
+
+    async testPush() {
+      if (!this.testUid.trim()) { this.testResult = 'กรุณากรอก LINE User ID'; this.testOk = false; return; }
+      this.pushing = true;
+      this.testResult = '';
+      try {
+        const fd = new FormData();
+        fd.append('_token', document.querySelector('[name="_token"]')?.value ?? '');
+        fd.append('property_id', '<?= (int)$property['id'] ?>');
+        fd.append('line_user_id', this.testUid.trim());
+        const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-test') ?>', {method:'POST', body:fd});
+        const j = await r.json();
+        this.testOk = j.ok;
+        this.testResult = j.message ?? (j.ok ? 'ส่งสำเร็จ!' : 'ส่งไม่สำเร็จ');
+      } catch(e) { this.testOk = false; this.testResult = 'เกิดข้อผิดพลาด'; }
+      this.pushing = false;
+    },
+  };
+}
+</script>
+<?php endif; ?>
+
 </div>

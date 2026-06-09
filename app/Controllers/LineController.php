@@ -8,6 +8,7 @@ use App\Core\Session;
 use App\Models\User;
 use App\Services\AIService;
 use App\Services\LineService;
+use App\Services\PropertyLineService;
 
 class LineController extends Controller
 {
@@ -130,5 +131,84 @@ class LineController extends Controller
         }
 
         echo json_encode(['ok' => true]);
+    }
+
+    /**
+     * POST /line/property/{id}/webhook
+     * Per-property LINE OA webhook — จับ follow/message events และบันทึก property_line_contacts
+     */
+    public function propertyWebhook(int $id): void
+    {
+        $rawBody = file_get_contents('php://input') ?: '';
+        $sig     = $_SERVER['HTTP_X_LINE_SIGNATURE'] ?? null;
+        $sigOk   = PropertyLineService::verifySignature($id, $rawBody, $sig);
+
+        if (!$sigOk) {
+            http_response_code(401);
+            echo json_encode(['ok' => false]);
+            return;
+        }
+
+        $data = json_decode($rawBody, true);
+        if (!is_array($data)) {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        foreach ($data['events'] ?? [] as $event) {
+            $type       = $event['type'] ?? '';
+            $lineUserId = $event['source']['userId'] ?? null;
+            if (!$lineUserId) continue;
+
+            if ($type === 'follow') {
+                self::upsertContact($id, $lineUserId, null, null, null, 'follow');
+            } elseif ($type === 'unfollow') {
+                Database::update(
+                    'property_line_contacts',
+                    ['unfollowed_at' => date('Y-m-d H:i:s'), 'last_seen_at' => date('Y-m-d H:i:s')],
+                    'property_id = :p AND line_user_id = :l',
+                    ['p' => $id, 'l' => $lineUserId]
+                );
+            } elseif ($type === 'message') {
+                self::upsertContact($id, $lineUserId, null, null, null, 'message');
+            }
+        }
+
+        echo json_encode(['ok' => true]);
+    }
+
+    private static function upsertContact(
+        int $propertyId,
+        string $lineUserId,
+        ?string $displayName,
+        ?string $pictureUrl,
+        ?string $followedAt,
+        string $eventType
+    ): void {
+        $existing = Database::fetch(
+            "SELECT id FROM property_line_contacts WHERE property_id = :p AND line_user_id = :l LIMIT 1",
+            ['p' => $propertyId, 'l' => $lineUserId]
+        );
+        $now = date('Y-m-d H:i:s');
+
+        if ($existing) {
+            $upd = ['last_seen_at' => $now];
+            if ($eventType === 'follow') {
+                $upd['followed_at']   = $now;
+                $upd['unfollowed_at'] = null;
+            }
+            if ($displayName !== null) $upd['display_name'] = $displayName;
+            if ($pictureUrl  !== null) $upd['picture_url']  = $pictureUrl;
+            Database::update('property_line_contacts', $upd, 'id = :i', ['i' => $existing['id']]);
+        } else {
+            Database::insert('property_line_contacts', [
+                'property_id'   => $propertyId,
+                'line_user_id'  => $lineUserId,
+                'display_name'  => $displayName,
+                'picture_url'   => $pictureUrl,
+                'followed_at'   => $eventType === 'follow' ? $now : null,
+                'last_seen_at'  => $now,
+            ]);
+        }
     }
 }

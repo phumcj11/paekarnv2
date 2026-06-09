@@ -39,6 +39,7 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/delete',          [PropertyController::class, 'delete'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/images',          [PropertyController::class, 'uploadImage'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/images/{img:[0-9]+}/delete', [PropertyController::class, 'deleteImage'])->middleware('csrf');
+        $r->post('/properties/{id:[0-9]+}/line-test',       [PropertyController::class, 'lineTest'])->middleware('csrf');
 
         // Units: nested CRUD + ทางลัดจากเมนู
         $r->get('/units', [UnitController::class, 'hub']);
@@ -56,6 +57,9 @@ return function (Router $r): void {
 
         // Bookings
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
+        $r->get('/bookings/create',                [OwnerBooking::class, 'create']);
+        $r->get('/api/line-contacts',              [OwnerBooking::class, 'lineContacts']);
+        $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');
         $r->get('/bookings/{id:[0-9]+}',           [OwnerBooking::class, 'show']);
         $r->post('/bookings/{id:[0-9]+}/status',   [OwnerBooking::class, 'updateStatus'])->middleware('csrf');
         $r->post('/bookings/{id:[0-9]+}/payment',  [OwnerBooking::class, 'verifyPayment'])->middleware('csrf');

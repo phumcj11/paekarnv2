@@ -5,7 +5,9 @@ use App\Core\Database;
 use App\Models\Booking;
 use App\Models\Coupon;
 use App\Models\PropertyUnit;
+use App\Services\BookingConfirmationService;
 use App\Services\NotificationService;
+use App\Services\PropertyLineService;
 
 class BookingService
 {
@@ -74,6 +76,41 @@ class BookingService
         } catch (\Throwable $e) { /* never block booking */ }
 
         return $bookingId;
+    }
+
+    /**
+     * ยืนยันการจองและแจ้งเตือน: อัปเดต status → confirmed,
+     * ออกใบยืนยัน, push ไปลูกค้าผ่าน property LINE OA (ถ้ามี).
+     */
+    public static function confirmAndNotify(int $bookingId, bool $sendToGuest = true): bool
+    {
+        Database::update('bookings', ['status' => 'confirmed'], 'id = :i', ['i' => $bookingId]);
+
+        try {
+            $b = Database::fetch(
+                "SELECT b.*, p.name AS pname FROM bookings b
+                 JOIN properties p ON p.id = b.property_id
+                 WHERE b.id = :i", ['i' => $bookingId]
+            );
+            if (!$b) return true;
+
+            // Notify owner (in-app + LINE Paekarn)
+            NotificationService::sendToPropertyOwner(
+                (int)$b['property_id'],
+                'booking_confirmed',
+                'การจองได้รับการยืนยัน',
+                sprintf('การจอง #%s (%s) ยืนยันแล้ว', $b['code'], $b['pname']),
+                '/owner/bookings/' . $bookingId,
+                ['booking_id' => $bookingId, 'code' => $b['code']]
+            );
+
+            // Push ลูกค้าผ่าน property LINE OA
+            if ($sendToGuest && !empty($b['guest_line_user_id'])) {
+                PropertyLineService::sendBookingConfirmation($bookingId);
+            }
+        } catch (\Throwable) { /* never block */ }
+
+        return true;
     }
 
     /**

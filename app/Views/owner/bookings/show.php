@@ -51,7 +51,13 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
         <div><div class="text-xs text-slate-500">เบอร์โทร</div><div class="font-semibold"><a href="tel:<?= e($b['guest_phone']) ?>" class="text-accent-700"><?= e($b['guest_phone']) ?></a></div></div>
         <div><div class="text-xs text-slate-500">อีเมล</div><div class="font-semibold"><?= e($b['guest_email'] ?: '-') ?></div></div>
       </div>
-      <div class="mt-3 flex gap-2">
+      <?php if (!empty($b['guest_line_user_id'])): ?>
+      <div class="mt-3 p-2.5 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2 text-xs text-teal-800">
+        <svg class="w-4 h-4 text-[#06C755] shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
+        <span class="font-mono"><?= e($b['guest_line_user_id']) ?></span>
+      </div>
+      <?php endif; ?>
+      <div class="mt-3 flex gap-2 flex-wrap">
         <a href="tel:<?= e($b['guest_phone']) ?>" class="px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5"><i data-lucide="phone" class="w-4 h-4"></i> โทรหาลูกค้า</a>
         <?php if ($b['guest_email']): ?>
           <a href="mailto:<?= e($b['guest_email']) ?>" class="px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-lg text-sm inline-flex items-center gap-1.5"><i data-lucide="mail" class="w-4 h-4"></i> ส่งอีเมล</a>
@@ -118,6 +124,12 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
       <form method="post" action="<?= url('/owner/bookings/' . $b['id'] . '/status') ?>" class="space-y-2">
         <?= csrf() ?>
         <?php if ($b['status'] === 'pending'): ?>
+          <?php if (!empty($b['guest_line_user_id'])): ?>
+          <label class="flex items-start gap-2 mb-2 cursor-pointer">
+            <input type="checkbox" name="send_line_confirm" value="1" checked class="mt-0.5 rounded accent-teal-500">
+            <span class="text-xs text-teal-700 font-medium">ส่งใบยืนยันให้ลูกค้าทาง LINE ด้วย</span>
+          </label>
+          <?php endif; ?>
           <button name="status" value="confirmed" class="w-full py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> ยืนยันการจอง</button>
           <button name="status" value="rejected" onclick="return confirm('ปฏิเสธการจองนี้?')" class="w-full py-2 bg-rose-500 text-white rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2"><i data-lucide="x-circle" class="w-4 h-4"></i> ปฏิเสธ</button>
         <?php elseif ($b['status'] === 'confirmed'): ?>
@@ -129,6 +141,14 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
           <p class="text-xs text-slate-500 text-center">การจองนี้ปิดสถานะแล้ว</p>
         <?php endif; ?>
       </form>
+      <?php if (in_array($b['status'], ['confirmed','completed'], true)):
+        $confirmLink = \App\Services\BookingConfirmationService::publicUrl($b);
+      ?>
+      <a href="<?= e($confirmLink) ?>" target="_blank"
+         class="mt-3 w-full py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 transition">
+        <i data-lucide="file-text" class="w-4 h-4"></i> ดูใบยืนยันการจอง
+      </a>
+      <?php endif; ?>
     </div>
 
     <?php if ($b['coupon_code_used']): ?>

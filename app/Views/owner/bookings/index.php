@@ -27,11 +27,16 @@
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft">
   <div class="p-4 border-b border-slate-100 flex flex-wrap gap-3 items-center justify-between">
     <h3 class="font-bold flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5 text-accent-600"></i> รายการจอง <?= $status ? "($status)" : '' ?></h3>
+    <div class="flex items-center gap-2 flex-wrap">
+    <a href="<?= url('/owner/bookings/create') ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold rounded-lg shadow transition">
+      <i data-lucide="plus" class="w-4 h-4"></i> บันทึกการจอง
+    </a>
     <form method="get" class="flex items-center gap-2">
       <input type="hidden" name="status" value="<?= e($status) ?>">
       <input type="text" name="q" value="<?= e($q) ?>" placeholder="ค้นหารหัส/ชื่อ/เบอร์" class="px-3 py-1.5 rounded-lg border border-slate-300 text-sm w-48">
       <button class="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm">ค้นหา</button>
     </form>
+    </div>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
