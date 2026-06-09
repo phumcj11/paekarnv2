@@ -78,6 +78,11 @@ jobs:
             mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
             chown -R pcj:pcj "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
 
+            echo "=== run DB migrations ==="
+            if [ -f "$APP/scripts/migrate_owner_manual_booking.sh" ]; then
+              bash "$APP/scripts/migrate_owner_manual_booking.sh" || echo "WARN: migrate_owner_manual_booking failed (may already be applied)"
+            fi
+
             echo "=== cleanup ==="
             rm -rf "$SRC"
 
