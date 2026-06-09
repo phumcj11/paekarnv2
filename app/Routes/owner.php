@@ -18,6 +18,10 @@ return function (Router $r): void {
     // Auth (no middleware)
     $r->get('/owner/login',     [AuthController::class, 'showOwnerLogin']);
     $r->post('/owner/login',    [AuthController::class, 'ownerLogin'])->middleware('csrf');
+    $r->get('/owner/forgot-password',  [AuthController::class, 'showOwnerForgotPassword']);
+    $r->post('/owner/forgot-password', [AuthController::class, 'ownerForgotPassword'])->middleware('csrf');
+    $r->get('/owner/reset-password',   [AuthController::class, 'showOwnerResetPassword']);
+    $r->post('/owner/reset-password',  [AuthController::class, 'ownerResetPassword'])->middleware('csrf');
     $r->get('/owner/register',  [AuthController::class, 'showOwnerRegister']);
     $r->post('/owner/register', [AuthController::class, 'ownerRegister'])->middleware('csrf');
 

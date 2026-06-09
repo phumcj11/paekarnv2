@@ -8,7 +8,9 @@ use App\Core\LoginThrottle;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Models\AuditLog;
+use App\Models\PasswordResetToken;
 use App\Models\User;
+use App\Services\PasswordResetMailService;
 
 class AuthController extends Controller
 {
@@ -173,6 +175,85 @@ class AuthController extends Controller
         AuditLog::record('owner_login_success', ['email' => $data['email'], 'user_id' => (int)$user['id']]);
         Session::flash('success', 'เข้าสู่ระบบเจ้าของกิจการสำเร็จ');
         redirect(url('/owner'));
+    }
+
+    public function showOwnerForgotPassword(): void
+    {
+        $this->view('auth/owner_forgot_password', [], null);
+    }
+
+    public function ownerForgotPassword(): void
+    {
+        $data = $this->validate(['email' => 'required|email']);
+
+        $locked = LoginThrottle::lockedMessage('owner_forgot', $data['email']);
+        if ($locked !== null) {
+            Session::flash('error', $locked);
+            Session::withOld(['email' => $data['email']]);
+            back();
+        }
+
+        $user = User::findByEmail($data['email']);
+        if ($user && $user['status'] === 'active' && in_array($user['role'], ['owner', 'admin'], true)) {
+            try {
+                $token = PasswordResetToken::create((int)$user['id']);
+                PasswordResetMailService::sendOwnerReset(
+                    (string)$user['email'],
+                    (string)($user['name'] ?? ''),
+                    $token
+                );
+                AuditLog::record('owner_password_reset_requested', ['email' => $data['email'], 'user_id' => (int)$user['id']]);
+            } catch (\Throwable $e) {
+                // ไม่เปิดเผยว่าล้มเหลว
+            }
+        }
+
+        LoginThrottle::hitFailure('owner_forgot', $data['email']);
+
+        Session::flash('success', 'หากอีเมลนี้อยู่ในระบบ เราจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้ภายในไม่กี่นาที กรุณาตรวจสอบกล่องจดหมาย (รวมถึง Spam)');
+        redirect(url('/owner/login'));
+    }
+
+    public function showOwnerResetPassword(): void
+    {
+        $token = trim((string)($_GET['token'] ?? ''));
+        if ($token === '' || !PasswordResetToken::findValid($token)) {
+            Session::flash('error', 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอลิงก์ใหม่');
+            redirect(url('/owner/forgot-password'));
+        }
+        $this->view('auth/owner_reset_password', ['token' => $token], null);
+    }
+
+    public function ownerResetPassword(): void
+    {
+        $data = $this->validate([
+            'token'            => 'required',
+            'password'         => 'required|min:8',
+            'password_confirm' => 'required|same:password',
+        ]);
+
+        $row = PasswordResetToken::findValid($data['token']);
+        if (!$row) {
+            Session::flash('error', 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว');
+            redirect(url('/owner/forgot-password'));
+        }
+
+        $user = User::find((int)$row['user_id']);
+        if (!$user || $user['status'] !== 'active' || !in_array($user['role'], ['owner', 'admin'], true)) {
+            Session::flash('error', 'ไม่พบบัญชีที่เกี่ยวข้อง');
+            redirect(url('/owner/forgot-password'));
+        }
+
+        Database::update('users', [
+            'password' => password_hash($data['password'], PASSWORD_BCRYPT),
+        ], 'id = :id', ['id' => (int)$user['id']]);
+
+        PasswordResetToken::markUsed((int)$row['id']);
+        LoginThrottle::clear('owner_login', (string)$user['email']);
+        AuditLog::record('owner_password_reset_done', ['user_id' => (int)$user['id']]);
+
+        Session::flash('success', 'ตั้งรหัสผ่านใหม่สำเร็จแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
+        redirect(url('/owner/login'));
     }
 
     public function showOwnerRegister(): void
