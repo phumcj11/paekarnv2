@@ -262,21 +262,31 @@ class PropertyController extends Controller
         $botId   = (string)($bot['data']['basicId'] ?? $bot['data']['userId'] ?? '');
 
         $profile = PropertyLineService::userProfile($id, $lineUserId, $tokenOverride);
-        if (!$profile['ok']) {
-            $hint = $profile['code'] === 404
-                ? "Token นี้เป็นของ OA «{$botName}» ({$botId}) — ลูกค้าต้อง Add Friend OA นี้ก่อน (ไม่ใช่ OA อื่น)"
-                : 'ดึงโปรไฟล์ลูกค้าไม่ได้ (HTTP ' . $profile['code'] . ')';
-            $this->json(['ok' => false, 'message' => $hint]);
-        }
-
         $guestName = (string)($profile['data']['displayName'] ?? $lineUserId);
+        $profileWarn = '';
+        if (!$profile['ok']) {
+            $known = Database::fetch(
+                "SELECT id FROM property_line_contacts WHERE property_id = :p AND line_user_id = :l AND unfollowed_at IS NULL LIMIT 1",
+                ['p' => $id, 'l' => $lineUserId]
+            );
+            if ($profile['code'] === 404 && !$known) {
+                $this->json([
+                    'ok'      => false,
+                    'message' => "Token เป็นของ OA «{$botName}» ({$botId}) แล้ว — แต่ลูกค้ายังไม่ได้ Add Friend OA นี้\n"
+                        . "ให้มือถือ Add Friend {$botId} ({$botName}) → ทักข้อความ 1 ครั้ง → เลือกจาก dropdown แล้วส่งทดสอบอีกครั้ง",
+                ]);
+            }
+            if ($profile['code'] !== 404 || !$known) {
+                $profileWarn = $profile['code'] === 404 ? ' (โปรไฟล์ไม่พบ แต่ลองส่งต่อ)' : '';
+            }
+        }
 
         $result = PropertyLineService::pushResult($id, $lineUserId, [[
             'type' => 'text',
             'text' => "ทดสอบ LINE OA ของแพ/ที่พัก: {$property['name']}\nส่งจากระบบ Paekarn.com ✅",
         ]], $tokenOverride);
 
-        $message = "ส่งสำเร็จ! ถึง {$guestName} ผ่าน OA «{$botName}» — เช็ค LINE ได้เลย";
+        $message = "ส่งสำเร็จ! ถึง {$guestName} ผ่าน OA «{$botName}» — เช็ค LINE ได้เลย{$profileWarn}";
         if (!$result['ok']) {
             $lineErr = PropertyLineService::parseLineError($result['detail']);
             $message = match ($result['code']) {
