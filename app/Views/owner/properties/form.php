@@ -603,12 +603,13 @@ $bookingCaps = $property
         <div class="text-xs font-semibold text-slate-600 mb-1">ทดสอบส่ง (LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
         <p class="text-xs text-slate-500 mb-2">คัดลอกจาก URL แชท chat.line.biz — ส่วนหลัง <code class="bg-slate-100 px-1 rounded">/chat/</code> เช่น <code class="bg-slate-100 px-1 rounded text-[10px]">Ucdeefc0f94d61852570d94808a708423</code></p>
         <?php if (!empty($lineContacts ?? [])): ?>
+        <p class="text-xs text-emerald-700 mb-1">Webhook ทำงานแล้ว — พบ <?= count($lineContacts) ?> คน (ทักข้อความใหม่แล้วรีเฟรชหน้านี้)</p>
         <div class="flex gap-2 mb-2">
           <select @change="if($event.target.value){ testUid=$event.target.value; $event.target.value=''; }"
                   class="flex-1 px-2 py-1.5 rounded-lg border border-slate-300 text-xs">
-            <option value="">— เลือกจากลูกค้าที่ทัก OA แล้ว —</option>
+            <option value="">— เลือกจากลูกค้าที่ทัก OA แล้ว (<?= count($lineContacts) ?>) —</option>
             <?php foreach (($lineContacts ?? []) as $lc): ?>
-            <option value="<?= e($lc['line_user_id']) ?>"><?= e($lc['display_name'] ?: $lc['line_user_id']) ?></option>
+            <option value="<?= e($lc['line_user_id']) ?>"><?= e(($lc['display_name'] ? $lc['display_name'] . ' — ' : '') . $lc['line_user_id']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>

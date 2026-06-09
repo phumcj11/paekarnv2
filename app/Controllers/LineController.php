@@ -144,9 +144,14 @@ class LineController extends Controller
         $sigOk   = PropertyLineService::verifySignature($id, $rawBody, $sig);
 
         if (!$sigOk) {
+            error_log("[Paekarn] property webhook #{$id} signature FAIL");
             http_response_code(401);
             echo json_encode(['ok' => false]);
             return;
+        }
+
+        if (Database::tableHasColumn('properties', 'line_webhook_verified')) {
+            Database::update('properties', ['line_webhook_verified' => 1], 'id = :i', ['i' => $id]);
         }
 
         $data = json_decode($rawBody, true);
@@ -160,17 +165,25 @@ class LineController extends Controller
             $lineUserId = $event['source']['userId'] ?? null;
             if (!$lineUserId) continue;
 
-            if ($type === 'follow') {
-                self::upsertContact($id, $lineUserId, null, null, null, 'follow');
-            } elseif ($type === 'unfollow') {
+            if ($type === 'unfollow') {
                 Database::update(
                     'property_line_contacts',
                     ['unfollowed_at' => date('Y-m-d H:i:s'), 'last_seen_at' => date('Y-m-d H:i:s')],
                     'property_id = :p AND line_user_id = :l',
                     ['p' => $id, 'l' => $lineUserId]
                 );
-            } elseif ($type === 'message') {
-                self::upsertContact($id, $lineUserId, null, null, null, 'message');
+            } elseif ($type === 'follow' || $type === 'message') {
+                $profile = PropertyLineService::userProfile($id, $lineUserId);
+                $displayName = $profile['ok'] ? ($profile['data']['displayName'] ?? null) : null;
+                $pictureUrl  = $profile['ok'] ? ($profile['data']['pictureUrl'] ?? null) : null;
+                self::upsertContact(
+                    $id,
+                    $lineUserId,
+                    $displayName,
+                    $pictureUrl,
+                    null,
+                    $type === 'follow' ? 'follow' : 'message'
+                );
             }
         }
 
