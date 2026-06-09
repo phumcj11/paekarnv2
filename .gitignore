@@ -1,0 +1,38 @@
+# Environment / Secrets
+/app/Config/database.local.php
+.env
+.env.*
+
+# Uploads (user content)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Storage (logs, cache, backups)
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+!/storage/cache/.gitkeep
+!/storage/cache/login_throttle/.gitkeep
+/storage/backups/*
+!/storage/backups/.gitkeep
+
+# Front-end built output (build on server)
+/public/assets/css/app.css
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Composer
+/vendor/
+composer.lock
+
+# Front-end dependencies (install on server)
+/node_modules/
+
+# SQL dumps
+*.sql

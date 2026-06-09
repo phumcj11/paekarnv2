@@ -1,0 +1,23 @@
+# =============================================================================
+# Root .htaccess  —  redirect ทุก request ไปที่ public/index.php
+# (สำหรับ XAMPP local ที่วางไว้ใต้ htdocs)
+# =============================================================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ถ้ามีไฟล์/โฟลเดอร์อยู่จริง (เช่น public/assets/...) ให้เข้าได้ตามปกติ
+    RewriteCond %{REQUEST_URI} !^/paekan_v1/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # ส่งทุก request ที่ไม่ใช่ /public/ ไปยัง /public/<path>
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# กัน listing ไฟล์
+Options -Indexes
+
+# กันการเข้าถึงไฟล์ลับ
+<FilesMatch "(^\.|composer\.(json|lock)|README\.md)">
+    Require all denied
+</FilesMatch>

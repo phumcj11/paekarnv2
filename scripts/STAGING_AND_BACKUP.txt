@@ -1,0 +1,18 @@
+Staging & backup (แพกาญ Paekan v1)
+
+STAGING
+- ใช้โฟลเดอร์หรือโดเมนย่อยแยกจาก production (เช่น staging.example.com)
+- ชุด config DB และค่า app.env = production เท่านั้นบน production — staging ใช้ฐานข้อมูลคัดลอกหรือ schema เดียวกันโดยไม่มีข้อมูลจริงของลูกค้า
+- หลัง merge feature ให้ทดสอบ: เข้าแอดมิน, เจ้าของแพ, flow จอง/คูปองที่เกี่ยวข้อง
+- หากมี CDN/cache layer ให้ purge เฉพาะ production เท่านั้น
+
+BACKUP
+- รัน migration SQL (ถ้ามี) / snapshot schema — เก็บไฟล์ SQL เป็นประจำ
+- ตัวอย่างสคริปต์ Windows: scripts/mysqldump-backup-example.bat — คัดลอกแก้ USER/PASS/DB แล้วตั้ง Task Scheduler
+- เก็บ backup นอกเซิร์ฟเวอร์หลัก (object storage หรือเครื่องอื่น) และทดสอบ restore เป็นระยะ
+
+AUDIT LOG
+- หลังรัน database/migration_audit_logs.sql ระบบจะบันทึกเหตุการณ์บางส่วนในตาราง audit_logs
+
+LOGIN THROTTLE
+- จำกัดความถี่ล็อกอินผิดใน storage/cache/login_throttle — โฟลเดอร์ต้องเขียนได้โดย PHP

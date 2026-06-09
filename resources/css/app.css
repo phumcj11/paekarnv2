@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hero ค้นหาที่พัก — gradient มาจาก @apply ในไฟล์นี้เท่านั้น เพื่อให้รวมใน bundle เสมอ (แก้กรณี PHP ประกบสตริง → JIT ไม่เห็นหรือโฮสต์ใช้ app.css เก่า = พื้นขาว เทียบ text-white) */
+@layer components {
+  .paekan-listing-hero {
+    position: relative;
+    overflow: hidden;
+    @apply text-white bg-gradient-to-br;
+  }
+
+  .paekan-listing-hero--default {
+    @apply from-primary-800 via-primary-700 to-forest-700;
+  }
+
+  .paekan-listing-hero--pool {
+    @apply from-sky-700 via-cyan-700 to-emerald-700;
+  }
+
+  .paekan-listing-hero--camping {
+    @apply from-emerald-800 via-lime-700 to-amber-700;
+  }
+
+  /* คลิป/วิดีโอใน carousel — class ชัดเจน ไม่พึ่ง arbitrary Tailwind */
+  .review-video-card {
+    flex-shrink: 0;
+  }
+
+  .review-video-card__media {
+    position: relative;
+    width: 100%;
+  }
+
+  .review-video-card--portrait {
+    width: 280px;
+  }
+
+  .review-video-card--portrait .review-video-card__media {
+    aspect-ratio: 9 / 16;
+  }
+
+  .review-video-card--landscape {
+    width: 360px;
+  }
+
+  .review-video-card--landscape .review-video-card__media {
+    aspect-ratio: 16 / 9;
+  }
+
+  /* การ์ดรายการมือถือ — รูปเต็มความสูงการ์ดเสมอ (spacer + absolute cover) */
+  .paekan-hcard-photo {
+    position: relative;
+    flex: 0 0 8.5rem;
+    width: 8.5rem;
+    min-width: 8.5rem;
+    max-width: 8.5rem;
+    align-self: stretch;
+    overflow: hidden;
+    background-color: #f1f5f9;
+    border-right: 1px solid #f1f5f9;
+  }
+
+  @media (min-width: 375px) {
+    .paekan-hcard-photo {
+      flex: 0 0 10rem;
+      width: 10rem;
+      min-width: 10rem;
+      max-width: 10rem;
+    }
+  }
+
+  @media (min-width: 430px) {
+    .paekan-hcard-photo {
+      flex: 0 0 12rem;
+      width: 12rem;
+      min-width: 12rem;
+      max-width: 12rem;
+    }
+  }
+
+  .paekan-hcard-photo::before {
+    content: "";
+    display: block;
+    width: 100%;
+    min-height: 11rem;
+  }
+
+  .paekan-hcard-photo__img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    -o-object-fit: cover;
+       object-fit: cover;
+    -o-object-position: center;
+       object-position: center;
+  }
+}
