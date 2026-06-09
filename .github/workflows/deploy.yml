@@ -19,6 +19,9 @@ jobs:
             APP=/home/pcj/domains/paekarn.com/paekarnv2
             PUBLIC_HTML=/home/pcj/domains/paekarn.com/public_html
 
+            echo "=== safe directory ==="
+            git config --global --add safe.directory $APP
+
             echo "=== git pull ==="
             cd $APP && git pull origin main
 
