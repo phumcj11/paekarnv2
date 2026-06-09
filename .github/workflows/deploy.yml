@@ -65,14 +65,14 @@ jobs:
               "$APP/public/" "$PUBLIC_HTML/"
 
             echo "=== ensure public_html/index.php points to paekarnv2 ==="
-            cat > "$PUBLIC_HTML/index.php" <<'PHPEOF'
-<?php
-declare(strict_types=1);
-define('APP_BASE', '/home/pcj/domains/paekarn.com/paekarnv2');
-require_once APP_BASE . '/app/Core/Application.php';
-\App\Core\Application::boot(APP_BASE);
-\App\Core\Application::run();
-PHPEOF
+            {
+              echo '<?php'
+              echo 'declare(strict_types=1);'
+              echo "define('APP_BASE', '/home/pcj/domains/paekarn.com/paekarnv2');"
+              echo "require_once APP_BASE . '/app/Core/Application.php';"
+              echo '\App\Core\Application::boot(APP_BASE);'
+              echo '\App\Core\Application::run();'
+            } > "$PUBLIC_HTML/index.php"
 
             echo "=== permissions ==="
             mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
