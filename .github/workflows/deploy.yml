@@ -8,32 +8,68 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Build CSS
+        run: npm ci && npm run build:css
+
+      - name: Prepare deploy bundle
+        run: |
+          mkdir -p deploy
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='public/uploads/' \
+            --exclude='storage/' \
+            --exclude='.env' \
+            --exclude='scripts/dump_safe.sql' \
+            ./ deploy/
+
+      - name: Upload to VPS
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 600 -D /dev/stdin ~/.ssh/deploy_key <<< "$SSH_KEY"
+          ssh-keyscan -H 119.59.102.235 >> ~/.ssh/known_hosts 2>/dev/null || true
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            deploy/ root@119.59.102.235:/tmp/paekarn-deploy-src/
+
+      - name: Install on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 119.59.102.235
           username: root
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
           script: |
             set -e
             APP=/home/pcj/domains/paekarn.com/paekarnv2
             PUBLIC_HTML=/home/pcj/domains/paekarn.com/public_html
+            SRC=/tmp/paekarn-deploy-src
 
-            echo "=== safe directory ==="
-            git config --global --add safe.directory $APP
+            echo "=== sync app files ==="
+            rsync -av \
+              --exclude='public/uploads/' \
+              --exclude='app/Config/database.php' \
+              "$SRC/" "$APP/"
 
-            echo "=== git pull ==="
-            cd $APP && git pull origin main
+            echo "=== sync public_html ==="
+            rsync -av --exclude='uploads/' --exclude='.htaccess' \
+              "$APP/public/" "$PUBLIC_HTML/"
 
-            echo "=== build CSS ==="
-            npm run build:css
+            echo "=== permissions ==="
+            mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
+            chown -R pcj:pcj "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
 
-            echo "=== sync public/ -> public_html/ ==="
-            rsync -av --exclude='.htaccess' --exclude='uploads/' $APP/public/ $PUBLIC_HTML/
-
-            echo "=== fix permissions ==="
-            chown -R pcj:pcj $PUBLIC_HTML
-            chown -R pcj:pcj $APP/storage $APP/public/uploads
+            echo "=== cleanup ==="
+            rm -rf "$SRC"
 
             echo "=== Deploy complete ==="
             date
