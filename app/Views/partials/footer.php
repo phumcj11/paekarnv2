@@ -57,9 +57,9 @@ $line     = Setting::get('line_oa', '@paekan');
         <li class="flex items-center gap-2"><i data-lucide="message-circle" class="w-4 h-4"></i>LINE: <?= e($line) ?></li>
       </ul>
       <div class="flex items-center gap-3 mt-4">
-        <a class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><i data-lucide="facebook" class="w-4 h-4"></i></a>
-        <a class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><i data-lucide="instagram" class="w-4 h-4"></i></a>
-        <a class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><i data-lucide="youtube" class="w-4 h-4"></i></a>
+        <a href="#" aria-label="Facebook" class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><?php \App\Core\View::partial('partials/brand-icon', ['name' => 'facebook']); ?></a>
+        <a href="#" aria-label="Instagram" class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><?php \App\Core\View::partial('partials/brand-icon', ['name' => 'instagram']); ?></a>
+        <a href="#" aria-label="YouTube" class="w-9 h-9 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><?php \App\Core\View::partial('partials/brand-icon', ['name' => 'youtube']); ?></a>
       </div>
     </div>
   </div>

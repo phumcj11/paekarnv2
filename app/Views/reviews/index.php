@@ -74,7 +74,7 @@ $hasPortrait     = $portraitVideos !== [];
 
 
 
-        <i data-lucide="youtube" class="w-4 h-4"></i> วิดีโอรีวิว
+        <?php \App\Core\View::partial('partials/brand-icon', ['name' => 'youtube']); ?> วิดีโอรีวิว
 
 
 
@@ -114,7 +114,7 @@ $hasPortrait     = $portraitVideos !== [];
 
 
 
-        <i data-lucide="facebook" class="w-4 h-4"></i> โพสต์ Facebook
+        <?php \App\Core\View::partial('partials/brand-icon', ['name' => 'facebook']); ?> โพสต์ Facebook
 
 
 
