@@ -600,9 +600,21 @@ $bookingCaps = $property
 
       <!-- Test push -->
       <div class="border-t border-slate-100 pt-3">
-        <div class="text-xs font-semibold text-slate-600 mb-2">ทดสอบส่ง (ใส่ LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
+        <div class="text-xs font-semibold text-slate-600 mb-1">ทดสอบส่ง (LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
+        <p class="text-xs text-slate-500 mb-2">คัดลอกจาก URL แชท chat.line.biz — ส่วนหลัง <code class="bg-slate-100 px-1 rounded">/chat/</code> เช่น <code class="bg-slate-100 px-1 rounded text-[10px]">Ucdeefc0f94d61852570d94808a708423</code></p>
+        <?php if (!empty($lineContacts ?? [])): ?>
+        <div class="flex gap-2 mb-2">
+          <select @change="if($event.target.value){ testUid=$event.target.value; $event.target.value=''; }"
+                  class="flex-1 px-2 py-1.5 rounded-lg border border-slate-300 text-xs">
+            <option value="">— เลือกจากลูกค้าที่ทัก OA แล้ว —</option>
+            <?php foreach (($lineContacts ?? []) as $lc): ?>
+            <option value="<?= e($lc['line_user_id']) ?>"><?= e($lc['display_name'] ?: $lc['line_user_id']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <?php endif; ?>
         <div class="flex gap-2">
-          <input type="text" x-model="testUid" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          <input type="text" x-model="testUid" @paste="onPasteUid($event)" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                  class="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 outline-none">
           <button type="button" @click="testPush()" :disabled="pushing"
                   class="px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
@@ -625,6 +637,14 @@ $bookingCaps = $property
       testResult: '',
       testOk: false,
       init() {},
+      onPasteUid(e) {
+        const text = (e.clipboardData?.getData('text') || '').trim();
+        const m = text.match(/\/chat\/(U[0-9a-f]{32})/i) || text.match(/(U[0-9a-f]{32})/i);
+        if (m) {
+          e.preventDefault();
+          this.testUid = m[1];
+        }
+      },
       async testPush() {
         const uid = this.testUid.trim();
         if (!uid) { this.testResult = 'กรุณากรอก LINE User ID'; this.testOk = false; return; }

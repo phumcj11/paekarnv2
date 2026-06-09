@@ -129,11 +129,20 @@ class PropertyController extends Controller
             ['id' => $id]
         );
         $units  = Database::fetchAll("SELECT * FROM property_units WHERE property_id = :id ORDER BY sort_order, id", ['id' => $id]);
+        $lineContacts = Database::tableHasColumn('properties', 'line_messaging_enabled')
+            ? Database::fetchAll(
+                "SELECT line_user_id, display_name, last_seen_at FROM property_line_contacts
+                 WHERE property_id = :id AND unfollowed_at IS NULL
+                 ORDER BY last_seen_at DESC LIMIT 50",
+                ['id' => $id]
+              )
+            : [];
 
         View::render('owner/properties/form', [
             'page_title' => 'แก้ไข: ' . $property['name'],
             'property' => $property, 'amenities' => $amenities,
             'selectedAmenities' => $selected, 'images' => $images, 'units' => $units,
+            'lineContacts' => $lineContacts,
         ], 'layouts/owner');
     }
 
