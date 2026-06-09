@@ -659,6 +659,8 @@ $bookingCaps = $property
           const fd = new FormData();
           fd.append('_csrf', document.querySelector('#propertyForm [name="_csrf"]')?.value ?? '');
           fd.append('line_user_id', uid);
+          const tokEl = document.querySelector('#propertyForm [name="line_channel_access_token"]');
+          if (tokEl?.value) fd.append('line_channel_access_token', tokEl.value);
           const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-test') ?>', {method:'POST', body:fd});
           const j = await r.json().catch(() => null);
           if (!j) {

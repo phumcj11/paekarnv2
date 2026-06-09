@@ -246,19 +246,47 @@ class PropertyController extends Controller
         $lineUserId = trim((string)($_POST['line_user_id'] ?? ''));
         if (!$lineUserId) { $this->json(['ok' => false, 'message' => 'กรุณากรอก LINE User ID']); }
 
+        $tokenOverride = trim((string)($_POST['line_channel_access_token'] ?? '')) ?: null;
+
+        $bot = PropertyLineService::botInfo($id, $tokenOverride);
+        if (!$bot['ok']) {
+            $this->json([
+                'ok'      => false,
+                'message'   => $bot['code'] === 401
+                    ? 'Channel Access Token ไม่ถูกต้องหรือหมดอายุ — ไป LINE Developers กด Issue Token ใหม่'
+                    : 'ตรวจสอบ Token ไม่ผ่าน (HTTP ' . $bot['code'] . ')',
+            ]);
+        }
+
+        $botName = (string)($bot['data']['displayName'] ?? '');
+        $botId   = (string)($bot['data']['basicId'] ?? $bot['data']['userId'] ?? '');
+
+        $profile = PropertyLineService::userProfile($id, $lineUserId, $tokenOverride);
+        if (!$profile['ok']) {
+            $hint = $profile['code'] === 404
+                ? "Token นี้เป็นของ OA «{$botName}» ({$botId}) — ลูกค้าต้อง Add Friend OA นี้ก่อน (ไม่ใช่ OA อื่น)"
+                : 'ดึงโปรไฟล์ลูกค้าไม่ได้ (HTTP ' . $profile['code'] . ')';
+            $this->json(['ok' => false, 'message' => $hint]);
+        }
+
+        $guestName = (string)($profile['data']['displayName'] ?? $lineUserId);
+
         $result = PropertyLineService::pushResult($id, $lineUserId, [[
             'type' => 'text',
             'text' => "ทดสอบ LINE OA ของแพ/ที่พัก: {$property['name']}\nส่งจากระบบ Paekarn.com ✅",
-        ]]);
+        ]], $tokenOverride);
 
-        $message = 'ส่งสำเร็จ! เช็ค LINE ของคุณได้เลย';
+        $message = "ส่งสำเร็จ! ถึง {$guestName} ผ่าน OA «{$botName}» — เช็ค LINE ได้เลย";
         if (!$result['ok']) {
+            $lineErr = PropertyLineService::parseLineError($result['detail']);
             $message = match ($result['code']) {
-                401     => 'Channel Access Token ไม่ถูกต้องหรือหมดอายุ — ไป LINE Developers กด Issue Token ใหม่ แล้วบันทึกอีกครั้ง',
-                400     => 'ส่งไม่ได้ — มือถือต้อง Add Friend LINE OA ของแพนี้ก่อน หรือ User ID ไม่ตรงกับ OA นี้',
-                403     => 'Token ไม่มีสิทธิ์ส่งข้อความ — ตรวจสอบว่าเป็น Messaging API Channel ของ OA นี้',
+                401     => 'Channel Access Token หมดอายุ — Issue Token ใหม่แล้วบันทึก',
+                400     => $lineErr !== ''
+                    ? "ส่งไม่ได้: {$lineErr} (OA: {$botName})"
+                    : "ส่งไม่ได้ — Token ของ «{$botName}» อาจไม่ตรงกับ OA ที่ลูกค้า Add Friend",
+                403     => 'Token ไม่มีสิทธิ์ส่งข้อความ',
                 0       => $result['detail'],
-                default => 'ส่งไม่สำเร็จ (HTTP ' . $result['code'] . ') — ตรวจสอบ Token และ User ID',
+                default => 'ส่งไม่สำเร็จ (HTTP ' . $result['code'] . ')' . ($lineErr ? " — {$lineErr}" : ''),
             };
         }
 

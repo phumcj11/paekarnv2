@@ -19,10 +19,44 @@ class PropertyLineService
         return self::pushResult($propertyId, $lineUserId, $messages)['ok'];
     }
 
-    /** @return array{ok:bool,code:int,detail:string} */
-    public static function pushResult(int $propertyId, string $lineUserId, array $messages): array
+    /** @return array{ok:bool,code:int,detail:string,data?:array} */
+    public static function botInfo(int $propertyId, ?string $tokenOverride = null): array
     {
-        $token = self::token($propertyId);
+        $token = self::resolveToken($propertyId, $tokenOverride);
+        if (!$token) {
+            return ['ok' => false, 'code' => 0, 'detail' => 'ไม่มี Channel Access Token'];
+        }
+        $res = self::get('https://api.line.me/v2/bot/info', $token);
+        $data = json_decode($res['body'], true);
+        return [
+            'ok'     => $res['code'] === 200,
+            'code'   => $res['code'],
+            'detail' => $res['body'],
+            'data'   => is_array($data) ? $data : [],
+        ];
+    }
+
+    /** @return array{ok:bool,code:int,detail:string,data?:array} */
+    public static function userProfile(int $propertyId, string $lineUserId, ?string $tokenOverride = null): array
+    {
+        $token = self::resolveToken($propertyId, $tokenOverride);
+        if (!$token) {
+            return ['ok' => false, 'code' => 0, 'detail' => 'ไม่มี Channel Access Token'];
+        }
+        $res = self::get('https://api.line.me/v2/bot/profile/' . rawurlencode($lineUserId), $token);
+        $data = json_decode($res['body'], true);
+        return [
+            'ok'     => $res['code'] === 200,
+            'code'   => $res['code'],
+            'detail' => $res['body'],
+            'data'   => is_array($data) ? $data : [],
+        ];
+    }
+
+    /** @return array{ok:bool,code:int,detail:string} */
+    public static function pushResult(int $propertyId, string $lineUserId, array $messages, ?string $tokenOverride = null): array
+    {
+        $token = self::resolveToken($propertyId, $tokenOverride);
         if (!$token) {
             return ['ok' => false, 'code' => 0, 'detail' => 'ยังไม่ได้เปิดใช้ LINE OA หรือยังไม่ได้บันทึก Channel Access Token'];
         }
@@ -171,6 +205,22 @@ class PropertyLineService
         return $tok ?: null;
     }
 
+    private static function resolveToken(int $propertyId, ?string $override = null): ?string
+    {
+        $ov = trim((string)$override);
+        if ($ov !== '') return $ov;
+        return self::token($propertyId);
+    }
+
+    public static function parseLineError(string $body): string
+    {
+        $data = json_decode($body, true);
+        if (is_array($data) && !empty($data['message'])) {
+            return (string)$data['message'];
+        }
+        return '';
+    }
+
     private static function flexRow(string $label, string $value): array
     {
         return [
@@ -192,6 +242,22 @@ class PropertyLineService
                 'wrap'  => true,
             ]],
         ];
+    }
+
+    /** @return array{code:int,body:string} */
+    private static function get(string $url, string $token): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        ]);
+        $response = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ['code' => $code, 'body' => is_string($response) ? $response : ''];
     }
 
     /** @return array{code:int,body:string} */
