@@ -9,10 +9,9 @@ set -e
 DOMAIN="paekarn.com"
 APP_DIR="/var/www/paekarn"
 GITHUB_REPO="https://github.com/phumcj11/paekarnv2.git"
-DB_NAME="paekarn_db"
-DB_USER="paekarn"
-# เปลี่ยน DB_PASS ก่อนรัน!
-DB_PASS="CHANGE_THIS_PASSWORD"
+DB_NAME="pcj_paekarn"
+DB_USER="pcj_paekarn"
+DB_PASS="uwRjK/szPYSUVtUhfuY8"
 
 echo "============================================"
 echo " paekarn.com VPS Setup"
@@ -33,17 +32,10 @@ apt install -y \
   git curl unzip wget
 
 # -----------------------------------------------------------------------
-# 2) MySQL — สร้าง DB + user
+# 2) MySQL — DB + user สร้างโดย HostingLotus panel แล้ว ข้าม step นี้
 # -----------------------------------------------------------------------
-echo "[2/9] Setting up MySQL..."
-mysql -u root <<MYSQL
-CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`
-  DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL
-echo "    DB '${DB_NAME}' + user '${DB_USER}' ready."
+echo "[2/9] MySQL DB already created by HostingLotus panel — skipping."
+echo "    DB: ${DB_NAME}, User: ${DB_USER}"
 
 # -----------------------------------------------------------------------
 # 3) Clone repo จาก GitHub
@@ -165,8 +157,8 @@ echo "============================================"
 echo ""
 echo "NEXT STEPS:"
 echo ""
-echo "1) Import database:"
-echo "   mysql -u ${DB_USER} -p${DB_PASS} ${DB_NAME} < /tmp/paekarnv2_export.sql"
+echo "1) Import database (SCP dump file ขึ้น VPS ก่อน):"
+echo "   mysql -u ${DB_USER} -p'${DB_PASS}' ${DB_NAME} < /tmp/paekarnv2_export.sql"
 echo ""
 echo "2) Add this DEPLOY KEY to GitHub repo:"
 echo "   (Settings > Deploy keys > Add key — Read access)"
