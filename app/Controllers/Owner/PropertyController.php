@@ -207,11 +207,17 @@ class PropertyController extends Controller
             if ($cover) $update['cover_image'] = $cover;
         } catch (\Throwable $e) { Session::flash('error', $e->getMessage()); back(); }
 
-        // LINE OA per-property fields
-        if (Database::tableHasColumn('properties', 'line_messaging_enabled')) {
-            $update['line_messaging_enabled']    = isset($_POST['line_messaging_enabled']) ? 1 : 0;
-            $update['line_channel_access_token'] = trim((string)($_POST['line_channel_access_token'] ?? '')) ?: null;
-            $update['line_channel_secret']       = trim((string)($_POST['line_channel_secret'] ?? '')) ?: null;
+        // LINE OA per-property fields (ส่งมาจาก section ในฟอร์มแก้ไขที่พัก)
+        if (Database::tableHasColumn('properties', 'line_messaging_enabled') && isset($_POST['line_settings_sent'])) {
+            $update['line_messaging_enabled'] = isset($_POST['line_messaging_enabled']) ? 1 : 0;
+            if (array_key_exists('line_channel_access_token', $_POST)) {
+                $tok = trim((string)$_POST['line_channel_access_token']);
+                $update['line_channel_access_token'] = $tok !== '' ? $tok : null;
+            }
+            if (array_key_exists('line_channel_secret', $_POST)) {
+                $sec = trim((string)$_POST['line_channel_secret']);
+                $update['line_channel_secret'] = $sec !== '' ? $sec : null;
+            }
         }
 
         Property::update($id, $update);
