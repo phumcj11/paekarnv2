@@ -57,7 +57,7 @@ if (!function_exists('ad_active')) {
       ['/admin/customers',  'users',           'ลูกค้า'],
       ['/admin/reviews',    'message-circle',  'รีวิว'],
       ['/admin/review-videos', 'video',      'วิดีโอแนะนำ'],
-      ['/admin/review-facebook-posts', 'facebook', 'โพสต์ Facebook'],
+      ['/admin/review-facebook-posts', 'share-2', 'โพสต์ Facebook'],
       ['/admin/visitor-places', 'map-pin',   'ที่เที่ยว / POI'],
       ['/admin/activity-providers', 'handshake', 'ผู้ให้บริการกิจกรรม'],
       ['/admin/activity-products', 'map', 'กิจกรรม / บริการ'],

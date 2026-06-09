@@ -191,7 +191,11 @@ if ($xhsUrl !== '') {
         class="<?= e($link['gradient']) ?> flex items-center gap-4 w-full rounded-2xl px-5 py-4 text-white font-bold shadow-lg shadow-slate-900/15 hover:shadow-xl hover:shadow-slate-900/20 hover:scale-[1.02] active:scale-[0.99] transition duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-400/60">
 
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-          <i data-lucide="<?= e($link['icon']) ?>" class="w-6 h-6 text-white" aria-hidden="true"></i>
+          <?php if (in_array($link['icon'], ['facebook', 'instagram', 'youtube'], true)): ?>
+            <?php \App\Core\View::partial('partials/brand-icon', ['name' => $link['icon'], 'class' => 'w-6 h-6 text-white']); ?>
+          <?php else: ?>
+            <i data-lucide="<?= e($link['icon']) ?>" class="w-6 h-6 text-white" aria-hidden="true"></i>
+          <?php endif; ?>
         </span>
 
         <span class="flex-1 text-center text-[15px] sm:text-base drop-shadow-sm"><?= e($link['label']) ?></span>
