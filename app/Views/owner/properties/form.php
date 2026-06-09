@@ -600,9 +600,9 @@ $bookingCaps = $property
 
       <!-- Test push -->
       <div class="border-t border-slate-100 pt-3">
-        <div class="text-xs font-semibold text-slate-600 mb-2">ทดสอบส่ง (ใส่ LINE User ID ของตัวเอง — ต้องบันทึกก่อน)</div>
+        <div class="text-xs font-semibold text-slate-600 mb-2">ทดสอบส่ง (ใส่ LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
         <div class="flex gap-2">
-          <input type="text" x-model="testUid" placeholder="Uxxxxxxxxxxxxxxxxxx"
+          <input type="text" x-model="testUid" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                  class="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 outline-none">
           <button type="button" @click="testPush()" :disabled="pushing"
                   class="px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
@@ -626,18 +626,28 @@ $bookingCaps = $property
       testOk: false,
       init() {},
       async testPush() {
-        if (!this.testUid.trim()) { this.testResult = 'กรุณากรอก LINE User ID'; this.testOk = false; return; }
+        const uid = this.testUid.trim();
+        if (!uid) { this.testResult = 'กรุณากรอก LINE User ID'; this.testOk = false; return; }
+        if (!/^U[0-9a-f]{32}$/i.test(uid)) {
+          this.testResult = 'ต้องเป็น LINE User ID ขึ้นต้นด้วย U (ไม่ใช่ @username เช่น p.pankan)';
+          this.testOk = false;
+          return;
+        }
         this.pushing = true;
         this.testResult = '';
         try {
           const fd = new FormData();
-          fd.append('_token', document.querySelector('#propertyForm [name="_token"]')?.value ?? '');
-          fd.append('property_id', '<?= (int)$property['id'] ?>');
-          fd.append('line_user_id', this.testUid.trim());
+          fd.append('_csrf', document.querySelector('#propertyForm [name="_csrf"]')?.value ?? '');
+          fd.append('line_user_id', uid);
           const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-test') ?>', {method:'POST', body:fd});
-          const j = await r.json();
-          this.testOk = j.ok;
-          this.testResult = j.message ?? (j.ok ? 'ส่งสำเร็จ!' : 'ส่งไม่สำเร็จ');
+          const j = await r.json().catch(() => null);
+          if (!j) {
+            this.testOk = false;
+            this.testResult = r.status === 419 ? 'เซสชันหมดอายุ — รีเฟรชหน้าแล้วลองใหม่' : 'เกิดข้อผิดพลาด (HTTP ' + r.status + ')';
+          } else {
+            this.testOk = j.ok;
+            this.testResult = j.message ?? (j.ok ? 'ส่งสำเร็จ!' : 'ส่งไม่สำเร็จ');
+          }
         } catch(e) { this.testOk = false; this.testResult = 'เกิดข้อผิดพลาด'; }
         this.pushing = false;
       },
