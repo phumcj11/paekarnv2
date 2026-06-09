@@ -180,16 +180,26 @@ class Property extends Model
         if (!empty($f['q'])) {
             $like = '%' . $f['q'] . '%';
             // Native MySQL prepares (emulate_prepares=false) require unique named placeholders per occurrence.
-            $w1[] = '(p.name LIKE :q1_n OR p.description LIKE :q1_d OR p.zone LIKE :q1_z OR p.district LIKE :q1_di)';
-            $w2[] = '(p.name LIKE :q2_n OR p.description LIKE :q2_d OR p.zone LIKE :q2_z OR p.district LIKE :q2_di)';
-            $params['q1_n'] = $like;
-            $params['q1_d'] = $like;
-            $params['q1_z'] = $like;
-            $params['q1_di'] = $like;
-            $params['q2_n'] = $like;
-            $params['q2_d'] = $like;
-            $params['q2_z'] = $like;
-            $params['q2_di'] = $like;
+            $w1[] = '(p.name LIKE :q1_n OR p.description LIKE :q1_d OR p.zone LIKE :q1_z OR p.district LIKE :q1_di OR p.owner_intake LIKE :q1_oi)';
+            $w2[] = '(p.name LIKE :q2_n OR p.description LIKE :q2_d OR p.zone LIKE :q2_z OR p.district LIKE :q2_di OR p.owner_intake LIKE :q2_oi)';
+            $params['q1_n'] = $like; $params['q1_d'] = $like; $params['q1_z'] = $like; $params['q1_di'] = $like; $params['q1_oi'] = $like;
+            $params['q2_n'] = $like; $params['q2_d'] = $like; $params['q2_z'] = $like; $params['q2_di'] = $like; $params['q2_oi'] = $like;
+        }
+
+        // must_have: each keyword must match at least one text field (AND between keywords, OR across fields)
+        if (!empty($f['must_have']) && is_array($f['must_have'])) {
+            $mhCount = 0;
+            foreach (array_slice($f['must_have'], 0, 4) as $mhKw) {
+                $mhKw = trim((string)$mhKw);
+                if ($mhKw === '') continue;
+                $mhLike = '%' . $mhKw . '%';
+                $i = $mhCount;
+                $w1[] = "(p.name LIKE :mh{$i}_1a OR p.description LIKE :mh{$i}_1b OR p.owner_intake LIKE :mh{$i}_1c)";
+                $w2[] = "(p.name LIKE :mh{$i}_2a OR p.description LIKE :mh{$i}_2b OR p.owner_intake LIKE :mh{$i}_2c)";
+                $params["mh{$i}_1a"] = $mhLike; $params["mh{$i}_1b"] = $mhLike; $params["mh{$i}_1c"] = $mhLike;
+                $params["mh{$i}_2a"] = $mhLike; $params["mh{$i}_2b"] = $mhLike; $params["mh{$i}_2c"] = $mhLike;
+                $mhCount++;
+            }
         }
         if (!empty($f['zone'])) {
             $w1[] = 'p.zone = :zone1';

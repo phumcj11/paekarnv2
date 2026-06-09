@@ -98,3 +98,190 @@
        object-position: center;
   }
 }
+
+/* ============================================================
+   AI Smart Search — inline result panel  (.paekan-ai-result-panel)
+   ============================================================ */
+@layer components {
+  .paekan-ai-result-panel {
+    margin-top: 0.75rem;
+    margin-bottom: 1.5rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    box-shadow: 0 4px 24px -4px rgba(0,0,0,.10);
+    overflow: hidden;
+    animation: pai-fadein .2s ease;
+  }
+  @keyframes pai-fadein {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .pai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    background: linear-gradient(90deg,#0ea5e9 0%,#14b8a6 100%);
+    color: #fff;
+  }
+  .pai-summary {
+    font-size: .85rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .pai-close {
+    flex-shrink: 0;
+    background: rgba(255,255,255,.2);
+    border: none;
+    color: #fff;
+    border-radius: 50%;
+    width: 1.6rem;
+    height: 1.6rem;
+    cursor: pointer;
+    font-size: .75rem;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    transition: background .15s;
+  }
+  .pai-close:hover { background: rgba(255,255,255,.35); }
+
+  /* Horizontal scroll card row */
+  .pai-cards {
+    display: flex;
+    gap: .75rem;
+    overflow-x: auto;
+    padding: .875rem 1rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pai-cards::-webkit-scrollbar { height: 4px; }
+  .pai-cards::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+  .pai-card {
+    flex: 0 0 auto;
+    width: min(220px, 72vw);
+    border: 1px solid #e2e8f0;
+    border-radius: .75rem;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    scroll-snap-align: start;
+    transition: box-shadow .15s, transform .15s;
+    background: #fff;
+  }
+  .pai-card:hover {
+    box-shadow: 0 8px 24px -4px rgba(0,0,0,.14);
+    transform: translateY(-2px);
+  }
+
+  .pai-card-cover {
+    width: 100%;
+    aspect-ratio: 4/3;
+    -o-object-fit: cover;
+       object-fit: cover;
+    display: block;
+    background: #f1f5f9;
+  }
+  .pai-card-cover--placeholder {
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    background: #f0fdf4;
+  }
+
+  .pai-card-body {
+    padding: .625rem .75rem .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    flex: 1;
+  }
+  .pai-card-name {
+    font-size: .875rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #0f172a;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .pai-card-meta {
+    font-size: .72rem;
+    color: #64748b;
+  }
+  .pai-card-reason {
+    font-size: .75rem;
+    color: #0369a1;
+    font-style: italic;
+    line-height: 1.4;
+    margin-top: .125rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .pai-card-foot {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+    margin-top: auto;
+    padding-top: .375rem;
+  }
+  .pai-price {
+    font-weight: 700;
+    font-size: .8rem;
+    color: #0f172a;
+  }
+  .pai-price small { font-weight: 400; color: #64748b; font-size: .68rem; }
+  .pai-rating { font-size: .72rem; color: #92400e; }
+  .pai-badge-coupon {
+    font-size: .65rem;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: .25rem;
+    padding: .1rem .35rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pai-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #64748b;
+    font-size: .875rem;
+  }
+
+  .pai-footer {
+    padding: .625rem 1rem .875rem;
+    text-align: center;
+  }
+  .pai-btn-all {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: linear-gradient(90deg,#0ea5e9 0%,#14b8a6 100%);
+    color: #fff;
+    font-size: .825rem;
+    font-weight: 700;
+    padding: .5rem 1.25rem;
+    border-radius: 2rem;
+    text-decoration: none;
+    transition: opacity .15s;
+  }
+  .pai-btn-all:hover { opacity: .88; }
+  .pai-arrow { font-size: 1rem; line-height: 1; }
+
+  /* Desktop: wider cards */
+  @media (min-width: 768px) {
+    .pai-card { width: 200px; }
+    .pai-cards { padding: 1rem 1.25rem; gap: 1rem; }
+  }
+}

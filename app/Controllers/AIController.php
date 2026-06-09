@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\Session;
+use App\Models\Property;
 use App\Services\AIService;
 
 class AIController extends Controller
@@ -43,13 +44,112 @@ class AIController extends Controller
         $this->json(['ok' => true, 'reply' => $reply, 'session' => $sessionId]);
     }
 
-    /** POST /ai/smart-search — natural language → JSON filters */
+    /** POST /ai/smart-search — natural language → JSON filters + top_picks */
     public function smartSearch(): void
     {
         $q = trim((string)($this->input()['query'] ?? ''));
         if ($q === '') { $this->json(['ok' => false, 'error' => 'empty']); return; }
-        $filters = AIService::smartSearch($q);
-        $this->json(['ok' => true, 'filters' => $filters, 'redirect' => url('/properties?') . http_build_query($filters)]);
+
+        $filters     = AIService::smartSearch($q);
+        // Build redirect: strip non-PropertyController fields, append original query for display notice
+        $redirectFilters = $filters;
+        unset($redirectFilters['group_type'], $redirectFilters['must_have'], $redirectFilters['intent']);
+        $redirectUrl = url('/properties?') . http_build_query($redirectFilters) . '&_aiq=' . rawurlencode($q);
+
+        // Build search params: relax budget by 40% to widen candidate pool for AI ranking
+        $searchFilters = $filters;
+        unset($searchFilters['group_type'], $searchFilters['must_have'], $searchFilters['intent']);
+        if (!empty($searchFilters['budget_max'])) {
+            $searchFilters['budget_max'] = (int)($searchFilters['budget_max'] * 1.4);
+        }
+
+        $result     = Property::search($searchFilters, 1, 30);
+        $candidates = $result['rows'] ?? [];
+
+        $topPicks = [];
+        $summary  = '';
+
+        if (!empty($candidates)) {
+            $picks  = AIService::recommend($q, $candidates);
+            $propMap = [];
+            foreach ($candidates as $p) {
+                $pid = (int)$p['id'];
+                if (!isset($propMap[$pid])) $propMap[$pid] = $p;
+            }
+
+            foreach ($picks as $pick) {
+                $p = $propMap[$pick['id']] ?? null;
+                if (!$p) continue;
+                $coverPath = (string)($p['listing_unit_cover'] ?? $p['cover_image'] ?? '');
+                $topPicks[] = [
+                    'id'             => $pick['id'],
+                    'name'           => (string)($p['name'] ?? ''),
+                    'type'           => (string)($p['type'] ?? ''),
+                    'zone'           => (string)($p['zone'] ?? ''),
+                    'cover'          => upload_img($coverPath, 'thumb'),
+                    'url'            => url('/property/' . ($p['slug'] ?? '')),
+                    'min_price'      => (int)($p['listing_unit_price'] ?? $p['min_price'] ?? 0),
+                    'coupon_enabled' => (bool)($p['coupon_enabled'] ?? false),
+                    'rating_avg'     => round((float)($p['rating_avg'] ?? 0), 1),
+                    'reason'         => $pick['reason'],
+                ];
+            }
+
+            // Build human-readable summary
+            $parts = [];
+            if (!empty($filters['type'])) {
+                $tl = ['raft'=>'แพพัก','resort'=>'รีสอร์ท','homestay'=>'โฮมสเตย์','house'=>'บ้านพัก','pool_villa'=>'พูลวิลล่า','hotel'=>'โรงแรม','camping'=>'แคมป์ปิ้ง'];
+                $parts[] = $tl[$filters['type']] ?? $filters['type'];
+            }
+            if (!empty($filters['zone']))       $parts[] = 'โซน ' . $filters['zone'];
+            if (!empty($filters['guests']))     $parts[] = $filters['guests'] . ' คน';
+            if (!empty($filters['budget_max'])) $parts[] = 'งบไม่เกิน ฿' . number_format((int)$filters['budget_max']);
+            if (!empty($filters['coupon']))     $parts[] = 'ใช้คูปองได้';
+            if (!empty($filters['pet']))        $parts[] = 'พาสัตว์เลี้ยงได้';
+
+            $total   = (int)($result['total'] ?? count($candidates));
+            $summary = 'พบ ' . $total . ' รายการ' . ($parts ? ' · ' . implode(' · ', $parts) : '');
+        } else {
+            // Loosen: remove budget and try again
+            $looseFilters = $searchFilters;
+            unset($looseFilters['budget_max']);
+            $looseResult = Property::search($looseFilters, 1, 20);
+            $loosePicks  = $looseResult['rows'] ?? [];
+            if (!empty($loosePicks)) {
+                $picks = AIService::recommend($q . ' (ไม่จำกัดงบ)', $loosePicks);
+                $propMap = [];
+                foreach ($loosePicks as $p) { $pid = (int)$p['id']; if (!isset($propMap[$pid])) $propMap[$pid] = $p; }
+                foreach ($picks as $pick) {
+                    $p = $propMap[$pick['id']] ?? null;
+                    if (!$p) continue;
+                    $coverPath = (string)($p['listing_unit_cover'] ?? $p['cover_image'] ?? '');
+                    $topPicks[] = [
+                        'id'             => $pick['id'],
+                        'name'           => (string)($p['name'] ?? ''),
+                        'type'           => (string)($p['type'] ?? ''),
+                        'zone'           => (string)($p['zone'] ?? ''),
+                        'cover'          => upload_img($coverPath, 'thumb'),
+                        'url'            => url('/property/' . ($p['slug'] ?? '')),
+                        'min_price'      => (int)($p['listing_unit_price'] ?? $p['min_price'] ?? 0),
+                        'coupon_enabled' => (bool)($p['coupon_enabled'] ?? false),
+                        'rating_avg'     => round((float)($p['rating_avg'] ?? 0), 1),
+                        'reason'         => $pick['reason'],
+                    ];
+                }
+                $summary = 'ไม่พบในงบที่กำหนด — ลองดูตัวเลือกใกล้เคียง';
+                $redirectUrl = url('/properties?') . http_build_query($looseFilters);
+            } else {
+                $summary = 'ไม่พบที่พักตามเงื่อนไข ลองปรับคำค้นหา';
+            }
+        }
+
+        $this->json([
+            'ok'        => true,
+            'filters'   => $filters,
+            'redirect'  => $redirectUrl,
+            'summary'   => $summary,
+            'top_picks' => $topPicks,
+        ]);
     }
 
     /** POST /ai/generate — owner: generate property description */

@@ -334,17 +334,31 @@ function paekanMobileAiSearch() {
   return {
     query: '',
     busy: false,
+    result: null,   // {summary, top_picks, redirect}
     async run() {
       if (!this.query.trim()) return;
       this.busy = true;
+      this.result = null;
       try {
         const fd = new FormData();
         fd.append('query', this.query);
         const r = await fetch('<?= url('/ai/smart-search') ?>', { method: 'POST', body: fd });
         const j = await r.json();
-        if (j.ok && j.redirect) window.location.href = j.redirect;
+        if (j.ok) {
+          if (j.top_picks && j.top_picks.length > 0) {
+            this.result = j;
+          } else if (j.redirect) {
+            window.location.href = j.redirect;
+          }
+        }
       } catch (e) {}
       finally { this.busy = false; }
+    },
+    goAll() {
+      if (this.result && this.result.redirect) window.location.href = this.result.redirect;
+    },
+    fmtPrice(n) {
+      return n > 0 ? '฿' + Number(n).toLocaleString('th-TH') : '';
     },
   };
 }
@@ -754,6 +768,44 @@ function paekanDesktopHeroSearch() {
               </span>
             </button>
           </form>
+
+          <!-- AI inline results panel -->
+          <div x-show="result" x-cloak class="mt-2 -mx-3.5 -mb-3 border-t border-slate-100">
+            <!-- Summary bar -->
+            <div class="flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-r from-sky-500 to-teal-500">
+              <span class="text-[11px] font-bold text-white leading-tight" x-text="result && result.summary"></span>
+              <button type="button" @click="result=null" class="text-white/80 hover:text-white text-[11px] leading-none shrink-0 px-1">✕</button>
+            </div>
+            <!-- Property cards -->
+            <div class="flex gap-2.5 overflow-x-auto px-3 py-2.5 scroll-snap-x"
+                 style="-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory">
+              <template x-for="p in (result && result.top_picks || [])" :key="p.id">
+                <a :href="p.url" class="flex-none w-[min(180px,66vw)] rounded-xl border border-slate-200 overflow-hidden bg-white text-inherit no-underline scroll-snap-align-start hover:shadow-md transition-shadow">
+                  <img x-show="p.cover" :src="p.cover" :alt="p.name" class="w-full aspect-[4/3] object-cover block bg-slate-100" loading="lazy">
+                  <div x-show="!p.cover" class="w-full aspect-[4/3] bg-gradient-to-br from-teal-50 to-sky-100 grid place-items-center text-2xl">🏕️</div>
+                  <div class="px-2 pt-1.5 pb-2 space-y-0.5">
+                    <div class="text-[12px] font-extrabold text-slate-900 leading-tight line-clamp-1" x-text="p.name"></div>
+                    <div class="text-[10px] text-slate-500 line-clamp-1" x-text="p.zone"></div>
+                    <div class="text-[10px] text-sky-700 italic leading-tight line-clamp-2" x-text="'&quot;' + p.reason + '&quot;'"></div>
+                    <div class="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                      <span x-show="p.min_price > 0" class="text-[11px] font-bold text-slate-800"
+                            x-text="'฿' + Number(p.min_price).toLocaleString('th-TH')"></span>
+                      <span x-show="p.coupon_enabled" class="text-[9px] bg-amber-100 text-amber-700 font-bold rounded px-1 py-0.5">🎫 คูปอง</span>
+                      <span x-show="p.rating_avg > 0" class="text-[9px] text-amber-700">⭐ <span x-text="Number(p.rating_avg).toFixed(1)"></span></span>
+                    </div>
+                  </div>
+                </a>
+              </template>
+            </div>
+            <!-- See all button -->
+            <div x-show="result && result.redirect" class="px-3 pb-3">
+              <button type="button" @click="goAll()"
+                      class="w-full py-2 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-[12px] font-extrabold">
+                ดูผลทั้งหมด →
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

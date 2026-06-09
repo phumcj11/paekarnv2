@@ -105,26 +105,32 @@ class AIService
         return self::chatCompletion($messages, $temperature, $maxTokens);
     }
 
-    /** Smart Search: NL query → JSON filters */
+    /** Smart Search: NL query → JSON filters (extended) */
     public static function smartSearch(string $query): array
     {
         $instruction = <<<'P'
-You are a search filter extractor for แพกาญ.com (Thai accommodation site).
-Given a user's natural language Thai query, extract these filters as JSON:
+You are a search filter extractor for แพกาญ.com (Thai accommodation site in Kanchanaburi province).
+Extract filters from a natural language Thai query as JSON:
 {
-  "q": "optional concrete keywords likely in listing text (e.g. วิวภูเขา, Wi-Fi, สังขละ, karaoke). Omit or null if the query only specifies type, guests, zone, budget, pet, or coupon — do NOT repeat the full sentence here.",
+  "q": "concrete keywords likely in listing text (e.g. วิวภูเขา, Wi-Fi, คาราโอเกะ, สังขละ). Omit if query only specifies type/guests/zone/budget/pet/coupon.",
   "type": "raft|resort|homestay|house|pool_villa|hotel|camping|null",
-  "zone": "string or null",
+  "zone": "Thai zone/district name or null",
   "guests": integer or null,
   "budget_max": integer (per night THB) or null,
   "pet": true/false,
-  "coupon": true/false
+  "coupon": true/false,
+  "group_type": "couple|family|friends|group|null",
+  "must_have": ["concrete feature list e.g. สระว่ายน้ำ, คาราโอเกะ, บาร์บีคิว, ริมน้ำ, ครัว, WiFi — NO mood words"],
+  "intent": "find|recommend"
 }
-Rules for "q":
-- NEVER include mood/atmosphere/subjective words: เงียบ, ฟิน, สงบ, โรแมนติก, ส่วนตัว, บรรยากาศดี, ชิล, ผ่อนคลาย
-- When type=raft, omit ริมน้ำ/ริมแม่น้ำ/ลอยน้ำ — type=raft already implies riverside raft
-- Thai budget words: สามพัน=3000, ห้าพัน=5000, หมื่น=10000 (put in budget_max, not q)
-Respond ONLY with the JSON object. No explanation.
+Rules:
+- NEVER put mood/atmosphere words in q or must_have: เงียบ, ฟิน, สงบ, โรแมนติก, ส่วนตัว, บรรยากาศดี, ชิล, ผ่อนคลาย
+- When type=raft, omit ริมน้ำ/ริมแม่น้ำ/ลอยน้ำ from must_have — raft already implies riverside
+- Budget: สามพัน=3000, ห้าพัน=5000, หมื่น=10000 → budget_max
+- group_type: couple=คู่/ฮันนีมูน, family=ครอบครัว/พาเด็ก, friends=เพื่อน, group=หมู่คณะ/บริษัท
+- intent: "recommend" if user asks to suggest/help choose; "find" if filtering by criteria
+- must_have: only concrete features that could appear in a listing description
+Respond ONLY with the JSON object.
 P;
         if (!Setting::get('ai_enabled', '0') || !Setting::get('ai_api_key')) {
             return self::heuristicSearch($query);
@@ -165,6 +171,11 @@ P;
                 break;
             }
         }
+        // Detect group_type heuristically
+        if (preg_match('/(คู่|ฮันนีมูน|โรแมนติก)/u', $q))          $f['group_type'] = 'couple';
+        elseif (preg_match('/(ครอบครัว|พาเด็ก|พ่อแม่)/u', $q))     $f['group_type'] = 'family';
+        elseif (preg_match('/(หมู่คณะ|บริษัท|กรุ๊ป|ทีม)/u', $q))   $f['group_type'] = 'group';
+        elseif (preg_match('/(เพื่อน|แก๊ง)/u', $q))                 $f['group_type'] = 'friends';
         $f['q'] = $q;
 
         return self::normalizeSmartSearchFilters($f);
@@ -230,6 +241,15 @@ P;
             unset($f['q']);
         } else {
             $f['q'] = $stripped;
+        }
+
+        // Also strip must_have keywords from q
+        if (!empty($f['must_have']) && is_array($f['must_have'])) {
+            foreach ($f['must_have'] as $mw) {
+                if ($mw !== '') $f['q'] = str_ireplace($mw, ' ', $f['q'] ?? '');
+            }
+            $f['q'] = trim(preg_replace('/\s+/u', ' ', $f['q'] ?? '') ?? '');
+            if ($f['q'] === '') unset($f['q']);
         }
 
         return $f;
@@ -326,8 +346,96 @@ P;
         foreach (['guests','budget_max','budget_min'] as $k) if (!empty($f[$k]) && is_numeric($f[$k])) $out[$k] = (int)$f[$k];
         if (!empty($f['pet']))    $out['pet'] = 1;
         if (!empty($f['coupon'])) $out['coupon'] = 1;
+        // Pass through extended fields
+        foreach (['group_type','intent'] as $k) if (!empty($f[$k]) && is_string($f[$k])) $out[$k] = $f[$k];
+        if (!empty($f['must_have']) && is_array($f['must_have'])) {
+            $out['must_have'] = array_values(array_filter(array_map('strval', $f['must_have'])));
+        }
 
         return $out;
+    }
+
+    /**
+     * Recommend top properties from candidates based on user intent.
+     *
+     * @param array<int,array<string,mixed>> $candidates Property rows (max 20 used)
+     * @return array<int,array{id:int,reason:string}>
+     */
+    public static function recommend(string $query, array $candidates): array
+    {
+        if (empty($candidates)) return [];
+
+        $sample = array_slice($candidates, 0, 20);
+        $fallback = array_map(fn($p) => [
+            'id'     => (int)$p['id'],
+            'reason' => 'ที่พักยอดนิยมในกลุ่มนี้',
+        ], array_slice($sample, 0, 5));
+
+        if (!Setting::get('ai_enabled', '0') || !Setting::get('ai_api_key')) {
+            return $fallback;
+        }
+
+        // Build compact property list for LLM (keep tokens low)
+        $lines = [];
+        foreach ($sample as $p) {
+            $pid    = (int)$p['id'];
+            $name   = mb_substr((string)($p['name'] ?? ''), 0, 40);
+            $type   = (string)($p['type'] ?? '');
+            $zone   = (string)($p['zone'] ?? '');
+            $price  = (int)($p['listing_unit_price'] ?? $p['min_price'] ?? 0);
+            $coupon = (int)($p['coupon_enabled'] ?? 0) ? 'มีคูปอง' : '';
+            $rating = number_format((float)($p['rating_avg'] ?? 0), 1);
+            $capMax = (int)($p['_unit_cap_max'] ?? 0);
+
+            $parts = ["ID:{$pid}", $name, $type, $zone, "฿{$price}", "⭐{$rating}"];
+            if ($capMax > 0) $parts[] = "รองรับ{$capMax}คน";
+            if ($coupon)     $parts[] = $coupon;
+
+            // Include brief owner_intake highlights
+            $intake = $p['owner_intake'] ?? '';
+            if ($intake !== '' && $intake !== null) {
+                $data = is_array($intake) ? $intake : (json_decode((string)$intake, true) ?: []);
+                foreach (['group_packages','activities_pricing','whole_house_extra','day_trip_no_overnight'] as $k) {
+                    if (!empty($data[$k])) {
+                        $parts[] = mb_substr((string)$data[$k], 0, 40);
+                        break;
+                    }
+                }
+            }
+            $lines[] = implode('|', $parts);
+        }
+
+        $propBlock = implode("\n", $lines);
+        $sysMsg = "คุณเป็นผู้ช่วยแนะนำที่พักในกาญจนบุรี\n"
+            . "จากคำค้นหาและรายการที่พัก ให้เลือก 3-5 รายการที่เหมาะสมที่สุดและอธิบายสั้นๆ เป็นภาษาไทย\n"
+            . "ตอบเป็น JSON array เท่านั้น: [{\"id\":N,\"reason\":\"เหตุผลภาษาไทย 1 ประโยค\"},...]\n"
+            . "ใช้เฉพาะ ID จากรายการ เรียงจากแนะนำที่สุดไปน้อยสุด ห้ามเพิ่มข้อความนอก JSON";
+
+        $userMsg = "คำค้น: {$query}\n\nรายการที่พัก (ID|ชื่อ|ประเภท|โซน|ราคา/คืน|คะแนน|ข้อมูลเพิ่ม):\n{$propBlock}";
+
+        $resp = self::chatCompletion([
+            ['role' => 'system', 'content' => $sysMsg],
+            ['role' => 'user',   'content' => $userMsg],
+        ], 0.2, 700);
+
+        if (!$resp) return $fallback;
+
+        if (preg_match('/\[[\s\S]*?\]/u', $resp, $m)) {
+            $data = json_decode($m[0], true);
+            if (is_array($data)) {
+                $validIds = array_map(fn($p) => (int)$p['id'], $sample);
+                $out = [];
+                foreach ($data as $item) {
+                    if (!isset($item['id'], $item['reason'])) continue;
+                    if (!in_array((int)$item['id'], $validIds, true)) continue;
+                    $out[] = ['id' => (int)$item['id'], 'reason' => (string)$item['reason']];
+                    if (count($out) >= 5) break;
+                }
+                return $out ?: $fallback;
+            }
+        }
+
+        return $fallback;
     }
 
     /** Low-level chat completion API call */

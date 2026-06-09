@@ -1593,6 +1593,17 @@ function propertyMapSearch(rows) {
 
   <!-- ===== RESULTS ===== -->
   <div id="listing-results" class="lg:col-span-9" x-data="propertyMapSearch(<?= htmlspecialchars($mapRowsJson, ENT_QUOTES, 'UTF-8') ?>)" x-init="init()">
+    <?php $aiQuery = trim((string)($_GET['_aiq'] ?? '')); if ($aiQuery !== ''): ?>
+    <div class="mb-4 flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800"
+         x-data="{show:true}" x-show="show" x-cloak>
+      <i data-lucide="sparkles" class="h-4 w-4 shrink-0 text-sky-500"></i>
+      <span class="flex-1">AI ค้นหา: <strong class="font-semibold"><?= e($aiQuery) ?></strong></span>
+      <a href="<?= e(url('/properties')) ?>" class="text-xs font-medium text-sky-600 hover:underline shrink-0">ล้างผล</a>
+      <button type="button" @click="show=false" class="text-sky-400 hover:text-sky-700 shrink-0" aria-label="ปิด">
+        <i data-lucide="x" class="h-4 w-4"></i>
+      </button>
+    </div>
+    <?php endif; ?>
     <div class="mb-4">
       <!-- Mobile: [ย่อ/ละเอียด] ซ้าย | [รายการ/แผนที่] ขวา — แถวเดียว -->
       <div class="flex items-center justify-between gap-2 md:hidden mb-2">
