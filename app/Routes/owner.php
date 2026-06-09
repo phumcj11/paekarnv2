@@ -12,6 +12,7 @@ use App\Controllers\Owner\BookingController as OwnerBooking;
 use App\Controllers\Owner\CouponController as OwnerCoupon;
 use App\Controllers\Owner\ProfileController;
 use App\Controllers\Owner\MembershipController;
+use App\Controllers\Owner\ContentPlanController;
 
 return function (Router $r): void {
     // Auth (no middleware)
@@ -61,6 +62,13 @@ return function (Router $r): void {
         $r->post('/coupons/scan-resolve',    [OwnerCoupon::class, 'scanResolve'])->middleware('csrf');
         $r->post('/coupons/verify',          [OwnerCoupon::class, 'check'])->middleware('csrf');
         $r->post('/coupons/use',             [OwnerCoupon::class, 'markUsed'])->middleware('csrf');
+
+        // Content Planner
+        $r->get('/content-plans',                             [ContentPlanController::class, 'index']);
+        $r->post('/content-plans',                            [ContentPlanController::class, 'store'])->middleware('csrf');
+        $r->post('/content-plans/ai-generate',                [ContentPlanController::class, 'aiGenerate'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/update',         [ContentPlanController::class, 'update'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/delete',         [ContentPlanController::class, 'destroy'])->middleware('csrf');
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);
