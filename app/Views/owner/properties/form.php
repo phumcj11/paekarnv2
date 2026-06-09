@@ -71,7 +71,7 @@ $bookingCaps = $property
 <?php endif; ?>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-<form method="post" action="<?= $action ?>" enctype="multipart/form-data" class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
+<form id="propertyForm" method="post" action="<?= $action ?>" enctype="multipart/form-data" class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
   <?= csrf() ?>
 
   <div class="lg:col-span-2 space-y-4">
@@ -672,6 +672,10 @@ $bookingCaps = $property
       <div class="font-semibold text-slate-600">Webhook URL สำหรับใส่ใน LINE Developers:</div>
       <code class="text-primary-700 select-all break-all"><?= url('/line/property/' . (int)$property['id'] . '/webhook') ?></code>
     </div>
+
+    <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      หลังกรอก Token/Secret แล้ว ต้องกดปุ่ม <strong>บันทึก</strong> ที่แถบด้านขวาของฟอร์ม (ไม่ใช่ปุ่ม «ส่ง» ทดสอบด้านล่าง)
+    </p>
 
     <!-- Test push -->
     <div class="border-t border-slate-100 pt-3">
