@@ -16,15 +16,32 @@ class PropertyLineService
      */
     public static function push(int $propertyId, string $lineUserId, array $messages): bool
     {
+        return self::pushResult($propertyId, $lineUserId, $messages)['ok'];
+    }
+
+    /** @return array{ok:bool,code:int,detail:string} */
+    public static function pushResult(int $propertyId, string $lineUserId, array $messages): array
+    {
         $token = self::token($propertyId);
-        if (!$token || !$lineUserId) return false;
+        if (!$token) {
+            return ['ok' => false, 'code' => 0, 'detail' => 'ยังไม่ได้เปิดใช้ LINE OA หรือยังไม่ได้บันทึก Channel Access Token'];
+        }
+        if (!$lineUserId) {
+            return ['ok' => false, 'code' => 0, 'detail' => 'ไม่มี LINE User ID'];
+        }
 
         $body = json_encode([
             'to'       => $lineUserId,
             'messages' => $messages,
         ], JSON_UNESCAPED_UNICODE);
 
-        return self::post('https://api.line.me/v2/bot/message/push', $token, $body) === 200;
+        $res = self::post('https://api.line.me/v2/bot/message/push', $token, $body);
+
+        return [
+            'ok'     => $res['code'] === 200,
+            'code'   => $res['code'],
+            'detail' => $res['body'],
+        ];
     }
 
     /**
@@ -177,7 +194,8 @@ class PropertyLineService
         ];
     }
 
-    private static function post(string $url, string $token, string $body): int
+    /** @return array{code:int,body:string} */
+    private static function post(string $url, string $token, string $body): array
     {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -190,9 +208,10 @@ class PropertyLineService
             ],
             CURLOPT_POSTFIELDS => $body,
         ]);
-        curl_exec($ch);
+        $response = curl_exec($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        return $code;
+
+        return ['code' => $code, 'body' => is_string($response) ? $response : ''];
     }
 }

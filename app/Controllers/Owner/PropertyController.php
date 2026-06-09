@@ -237,14 +237,25 @@ class PropertyController extends Controller
         $lineUserId = trim((string)($_POST['line_user_id'] ?? ''));
         if (!$lineUserId) { $this->json(['ok' => false, 'message' => 'กรุณากรอก LINE User ID']); }
 
-        $ok = PropertyLineService::push($id, $lineUserId, [[
+        $result = PropertyLineService::pushResult($id, $lineUserId, [[
             'type' => 'text',
             'text' => "ทดสอบ LINE OA ของแพ/ที่พัก: {$property['name']}\nส่งจากระบบ Paekarn.com ✅",
         ]]);
 
+        $message = 'ส่งสำเร็จ! เช็ค LINE ของคุณได้เลย';
+        if (!$result['ok']) {
+            $message = match ($result['code']) {
+                401     => 'Channel Access Token ไม่ถูกต้องหรือหมดอายุ — ไป LINE Developers กด Issue Token ใหม่ แล้วบันทึกอีกครั้ง',
+                400     => 'ส่งไม่ได้ — มือถือต้อง Add Friend LINE OA ของแพนี้ก่อน หรือ User ID ไม่ตรงกับ OA นี้',
+                403     => 'Token ไม่มีสิทธิ์ส่งข้อความ — ตรวจสอบว่าเป็น Messaging API Channel ของ OA นี้',
+                0       => $result['detail'],
+                default => 'ส่งไม่สำเร็จ (HTTP ' . $result['code'] . ') — ตรวจสอบ Token และ User ID',
+            };
+        }
+
         $this->json([
-            'ok'      => $ok,
-            'message' => $ok ? 'ส่งสำเร็จ! เช็ค LINE ของคุณได้เลย' : 'ส่งไม่สำเร็จ — ตรวจสอบ Token และ User ID อีกครั้ง',
+            'ok'      => $result['ok'],
+            'message' => $message,
         ]);
     }
 
