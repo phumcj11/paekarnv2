@@ -271,7 +271,7 @@ class PropertyLineService
 
     /**
      * ตั้ง Rich Menu เป็น default ของ OA
-     * LINE API: POST https://api.line.me/v2/bot/richmenu/{richMenuId}/default
+     * LINE API: POST https://api.line.me/v2/bot/user/all/richmenu/{richMenuId}
      * @return array{ok:bool,code:int,detail:string}
      */
     public static function setDefaultRichMenu(int $propertyId, string $richMenuId): array
@@ -279,27 +279,34 @@ class PropertyLineService
         $token = self::token($propertyId);
         if (!$token) return ['ok' => false, 'code' => 0, 'detail' => 'ไม่มี token'];
 
-        $ch = curl_init("https://api.line.me/v2/bot/richmenu/{$richMenuId}/default");
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => 'POST',
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Content-Length: 0',
-                'Authorization: Bearer ' . $token,
-            ],
-        ]);
-        $body = (string)curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $url = "https://api.line.me/v2/bot/user/all/richmenu/{$richMenuId}";
 
-        if ($code === 200) {
-            Database::update('properties', ['line_rich_menu_id' => $richMenuId], 'id = :i', ['i' => $propertyId]);
-            return ['ok' => true, 'code' => 200, 'detail' => ''];
+        // LINE อาจต้องใช้เวลาสักครู่หลัง upload รูป — retry สูงสุด 3 ครั้ง
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            if ($attempt > 1) sleep(2);
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+            ]);
+            $body = (string)curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($code === 200) {
+                Database::update('properties', ['line_rich_menu_id' => $richMenuId], 'id = :i', ['i' => $propertyId]);
+                return ['ok' => true, 'code' => 200, 'detail' => ''];
+            }
+
+            error_log("[Paekarn] setDefaultRichMenu attempt={$attempt} property={$propertyId} HTTP {$code}: {$body}");
+
+            // retry เฉพาะ 404 (menu ยัง propagate ไม่ทัน)
+            if ($code !== 404) break;
         }
 
-        error_log("[Paekarn] setDefaultRichMenu FAIL property={$propertyId} HTTP {$code}: {$body}");
         return ['ok' => false, 'code' => $code, 'detail' => $body];
     }
 
@@ -320,7 +327,7 @@ class PropertyLineService
 
         // unlink default rich menu ของ channel
         // LINE API: DELETE https://api.line.me/v2/bot/user/all/richmenu
-        $ch = curl_init("https://api.line.me/v2/bot/richmenu/default");
+        $ch = curl_init("https://api.line.me/v2/bot/user/all/richmenu");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST  => 'DELETE',
