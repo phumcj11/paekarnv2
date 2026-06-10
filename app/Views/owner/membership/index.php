@@ -49,7 +49,19 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
             <?php if ($isVip): ?><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">VIP</span><?php endif; ?>
           </div>
           <div class="mt-2 text-2xl font-extrabold text-accent-700"><?= format_money($pl['price']) ?></div>
-          <div class="text-xs text-slate-600 mt-1"><?= $life ? 'ตลอดชีพ' : ($days ? "ระยะเวลา {$days} วัน" : '-') ?></div>
+          <?php
+            $durationLabel = '-';
+            if ($life) {
+                $durationLabel = 'ตลอดชีพ';
+            } elseif ($days) {
+                if ($days >= 360) $durationLabel = '12 เดือน';
+                elseif ($days >= 180) $durationLabel = '6 เดือน';
+                elseif ($days >= 90)  $durationLabel = '3 เดือน';
+                elseif ($days >= 30)  $durationLabel = '1 เดือน';
+                else                  $durationLabel = "{$days} วัน";
+            }
+          ?>
+          <div class="text-xs text-slate-600 mt-1"><?= $durationLabel ?></div>
           <a href="<?= url('/owner/membership/buy?plan=' . (int)$pl['id']) ?>" class="mt-auto pt-4 inline-flex justify-center items-center gap-2 py-2.5 rounded-xl font-semibold text-sm <?= $isVip ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white' ?>">
             <i data-lucide="shopping-cart" class="w-4 h-4"></i> สมัครแพ็กเกจนี้
           </a>

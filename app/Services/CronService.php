@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Core\Database;
 use App\Models\Setting;
+use App\Services\LineService;
 
 /**
  * Job runner for scheduled automation tasks.
@@ -283,34 +284,70 @@ class CronService
         return ['affected' => $n, 'output' => "Downgraded $n expired memberships"];
     }
 
-    /** แจ้งเตือนก่อนหมดอายุ 7 วัน (สมัครแบบมีวันหมด) */
+    /** แจ้งเตือนก่อนหมดอายุ 30/14/7/3 วัน — in-app + LINE push ผ่าน OA แพกาญ.com */
     public static function membershipWarnExpiring(): array
     {
-        $rows = Database::fetchAll(
-            "SELECT id, user_id, membership_expires_at FROM owners
-             WHERE membership_tier IN ('standard','vip')
-             AND membership_expires_at IS NOT NULL
-             AND membership_expires_at > NOW()
-             AND DATE(membership_expires_at) = DATE(DATE_ADD(CURDATE(), INTERVAL 7 DAY))
-             LIMIT 500"
-        );
-
+        $intervals = [30, 14, 7, 3];
         $n = 0;
-        foreach ($rows as $r) {
-            NotificationService::send(
-                (int)$r['user_id'],
-                'membership_expiring_7d',
-                'สมาชิกจะหมดอายุใน 7 วัน',
-                sprintf(
-                    'แพ็กเกจของคุณจะหมดอายุวันที่ %s — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ',
-                    format_date_th($r['membership_expires_at'])
-                ),
-                '/owner/membership'
+        $lineN = 0;
+        $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+        foreach ($intervals as $days) {
+            $rows = Database::fetchAll(
+                "SELECT o.id, o.user_id, o.membership_tier, o.membership_expires_at
+                 FROM owners o
+                 WHERE o.membership_tier IN ('standard','vip')
+                 AND o.membership_expires_at IS NOT NULL
+                 AND o.membership_expires_at > NOW()
+                 AND DATE(o.membership_expires_at) = DATE(DATE_ADD(CURDATE(), INTERVAL :d DAY))
+                 LIMIT 500",
+                ['d' => $days]
             );
-            $n++;
+
+            foreach ($rows as $r) {
+                $expTs    = strtotime((string)$r['membership_expires_at']);
+                $dayStr   = (int)date('j', $expTs);
+                $monStr   = $thaiMonths[(int)date('n', $expTs)];
+                $yearStr  = (int)date('Y', $expTs) + 543;
+                $expThai  = "{$dayStr} {$monStr} {$yearStr}";
+                $tierLabel = $r['membership_tier'] === 'vip' ? 'VIP' : 'Standard';
+                $typeLabel = $days === 1 ? 'พรุ่งนี้' : "อีก {$days} วัน";
+
+                // In-app notification
+                NotificationService::send(
+                    (int)$r['user_id'],
+                    "membership_expiring_{$days}d",
+                    "สมาชิกจะหมดอายุใน {$days} วัน",
+                    "แพ็กเกจ {$tierLabel} จะหมดอายุวันที่ {$expThai} — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ",
+                    '/owner/membership'
+                );
+                $n++;
+
+                // LINE push ผ่าน OA แพกาญ.com (ใช้ line_user_id จาก users)
+                try {
+                    $uRow = Database::fetch(
+                        'SELECT line_user_id FROM users WHERE id = :uid LIMIT 1',
+                        ['uid' => $r['user_id']]
+                    );
+                    if (!empty($uRow['line_user_id'])) {
+                        $renewUrl = (string)Setting::get('app_url', 'https://paekarn.com') . '/owner/membership';
+                        $msg = "⚠️ แจ้งเตือนสมาชิกแพกาญ.com\n\n"
+                             . "แพ็กเกจ {$tierLabel} ของคุณจะหมดอายุ{$typeLabel}\n"
+                             . "📅 วันหมดอายุ: {$expThai}\n\n"
+                             . "ต่ออายุตอนนี้เพื่อคงสิทธิ์โปรโมตที่พัก\n"
+                             . "👉 {$renewUrl}";
+                        if (LineService::push((string)$uRow['line_user_id'], $msg)) {
+                            $lineN++;
+                        }
+                    }
+                } catch (\Throwable) { /* never block cron */ }
+            }
         }
 
-        return ['affected' => $n, 'output' => "Sent $n membership expiry warnings"];
+        return [
+            'affected' => $n + $lineN,
+            'output'   => "Sent {$n} in-app + {$lineN} LINE membership expiry warnings",
+        ];
     }
 
     private static function finalizeMembershipDowngrade(int $ownerId, int $userId): void

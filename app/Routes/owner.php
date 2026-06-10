@@ -15,6 +15,8 @@ use App\Controllers\Owner\MembershipController;
 use App\Controllers\Owner\ContentPlanController;
 use App\Controllers\Owner\LineHubController;
 use App\Controllers\Owner\LineContactController;
+use App\Controllers\Owner\AnalyticsController as OwnerAnalytics;
+use App\Controllers\Owner\AutomationController as OwnerAutomation;
 
 return function (Router $r): void {
     // Auth (no middleware)
@@ -61,6 +63,14 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/availability/save',     [AvailabilityController::class, 'save'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/availability/booking', [AvailabilityController::class, 'storeBooking'])->middleware('csrf');
 
+        // Analytics
+        $r->get('/analytics',        [OwnerAnalytics::class, 'index']);
+
+        // Automation templates
+        $r->get('/automation',       [OwnerAutomation::class, 'index']);
+        $r->post('/automation/save',     [OwnerAutomation::class, 'save']);
+        $r->post('/automation/ai-draft', [OwnerAutomation::class, 'aiDraft']);
+
         // Bookings
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
         $r->get('/bookings/create',                [OwnerBooking::class, 'create']);
@@ -71,6 +81,8 @@ return function (Router $r): void {
         $r->get('/line-contacts',                              [LineContactController::class, 'index']);
         $r->post('/line-contacts/{id:[0-9]+}/phone',           [LineContactController::class, 'updatePhone']);
         $r->post('/line-contacts/{id:[0-9]+}/message',         [LineContactController::class, 'sendMessage']);
+        $r->post('/line-contacts/{id:[0-9]+}/tags',            [LineContactController::class, 'updateTags']);
+        $r->post('/line-contacts/{id:[0-9]+}/notes',           [LineContactController::class, 'updateNotes']);
         $r->post('/line-contacts/broadcast',                   [LineContactController::class, 'broadcast']);
         $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');

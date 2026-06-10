@@ -338,6 +338,8 @@ class Property extends Model
 , CAST(NULL AS UNSIGNED) AS listing_unit_cap_max
 , p.min_price AS listing_sort_price
 , CAST(NULL AS SIGNED) AS listing_sort_rank
+, (SELECT o.membership_tier FROM owners o WHERE o.id = p.owner_id LIMIT 1) AS owner_membership_tier
+, (SELECT o.membership_expires_at FROM owners o WHERE o.id = p.owner_id LIMIT 1) AS owner_membership_expires_at
 SQL;
 
         $listingExtrasBranch2 = <<<'SQL'
@@ -351,6 +353,8 @@ SQL;
 , u.capacity_max AS listing_unit_cap_max
 , u.price AS listing_sort_price
 , u.sort_order AS listing_sort_rank
+, (SELECT o.membership_tier FROM owners o WHERE o.id = p.owner_id LIMIT 1) AS owner_membership_tier
+, (SELECT o.membership_expires_at FROM owners o WHERE o.id = p.owner_id LIMIT 1) AS owner_membership_expires_at
 SQL;
 
         $sqlBranch1 = "SELECT p.*{$listingExtrasBranch1} FROM properties p WHERE {$sharedSql1}{$branch1Tail}";

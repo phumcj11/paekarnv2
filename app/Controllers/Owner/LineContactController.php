@@ -38,6 +38,8 @@ class LineContactController extends Controller
 
         $contacts = [];
         $total    = 0;
+        $allTags  = [];
+        $filterTag = trim((string)($_GET['tag'] ?? ''));
 
         if ($propertyId) {
             $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', plc.phone' : '';
@@ -63,11 +65,21 @@ class LineContactController extends Controller
             $total  = (int)($countRow['cnt'] ?? 0);
             $offset = ($page - 1) * $perPage;
 
+            $tagsCol  = Database::tableHasColumn('property_line_contacts', 'tags')  ? ', plc.tags'  : '';
+            $notesCol = Database::tableHasColumn('property_line_contacts', 'notes') ? ', plc.notes' : '';
+
+            // filter by tag
+            $filterTag = trim((string)($_GET['tag'] ?? ''));
+            if ($filterTag !== '' && $tagsCol !== '') {
+                $where .= " AND JSON_CONTAINS(plc.tags, :ft, '$')";
+                $params['ft'] = json_encode($filterTag, JSON_UNESCAPED_UNICODE);
+            }
+
             $hasLineUid = Database::tableHasColumn('bookings', 'guest_line_user_id');
             if ($hasLineUid) {
                 $contacts = Database::fetchAll(
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
-                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol},
+                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
                             COUNT(b.id) AS booking_count,
                             MAX(b.check_in) AS last_booking_date
                      FROM property_line_contacts plc
@@ -83,7 +95,7 @@ class LineContactController extends Controller
             } else {
                 $contacts = Database::fetchAll(
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
-                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol},
+                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
                             0 AS booking_count, NULL AS last_booking_date
                      FROM property_line_contacts plc
                      WHERE {$where}
@@ -91,6 +103,24 @@ class LineContactController extends Controller
                      LIMIT {$perPage} OFFSET {$offset}",
                     $params
                 );
+            }
+
+            // เก็บ tag ทั้งหมดที่ใช้ใน property นี้ (สำหรับ filter sidebar)
+            if ($tagsCol !== '') {
+                $allTagRows = Database::fetchAll(
+                    "SELECT DISTINCT tags FROM property_line_contacts
+                     WHERE property_id = :p AND tags IS NOT NULL AND tags != 'null'",
+                    ['p' => $propertyId]
+                );
+                foreach ($allTagRows as $tr) {
+                    $decoded = json_decode((string)$tr['tags'], true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $t) {
+                            $allTags[$t] = ($allTags[$t] ?? 0) + 1;
+                        }
+                    }
+                }
+                arsort($allTags);
             }
         }
 
@@ -103,6 +133,8 @@ class LineContactController extends Controller
             'page'        => $page,
             'perPage'     => $perPage,
             'q'           => $q,
+            'allTags'     => $allTags,
+            'filterTag'   => $filterTag,
         ], 'layouts/owner');
     }
 
@@ -142,6 +174,46 @@ class LineContactController extends Controller
         $this->json(['ok' => $ok, 'error' => $ok ? '' : 'ส่งไม่สำเร็จ — ตรวจสอบ Channel Access Token']);
     }
 
+    /** POST /owner/line-contacts/{id}/tags — เพิ่ม/ลบ tag บน contact */
+    public function updateTags(int $id): void
+    {
+        $contact = $this->ownedContact($id);
+        if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
+
+        if (!Database::tableHasColumn('property_line_contacts', 'tags')) {
+            $this->json(['ok' => false, 'error' => 'ยังไม่ได้รัน migration tags']); return;
+        }
+
+        $rawTags = $_POST['tags'] ?? [];
+        if (is_string($rawTags)) {
+            $rawTags = json_decode($rawTags, true) ?: explode(',', $rawTags);
+        }
+        $tags = array_values(array_unique(array_filter(array_map('trim', (array)$rawTags))));
+        // จำกัด tag ไม่เกิน 10 อัน, ยาวไม่เกิน 30 ตัวอักษรต่ออัน
+        $tags = array_slice(array_filter($tags, fn($t) => mb_strlen($t) <= 30), 0, 10);
+
+        Database::update(
+            'property_line_contacts',
+            ['tags' => !empty($tags) ? json_encode($tags, JSON_UNESCAPED_UNICODE) : null],
+            'id = :i',
+            ['i' => $id]
+        );
+        $this->json(['ok' => true, 'tags' => $tags]);
+    }
+
+    /** POST /owner/line-contacts/{id}/notes — บันทึกโน้ต */
+    public function updateNotes(int $id): void
+    {
+        $contact = $this->ownedContact($id);
+        if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
+
+        $notes = mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 500);
+        if (Database::tableHasColumn('property_line_contacts', 'notes')) {
+            Database::update('property_line_contacts', ['notes' => $notes ?: null], 'id = :i', ['i' => $id]);
+        }
+        $this->json(['ok' => true]);
+    }
+
     /** POST /owner/line-contacts/broadcast?property_id=N — push ให้ทุกคน (หรือ filtered) */
     public function broadcast(): void
     {
@@ -156,11 +228,21 @@ class LineContactController extends Controller
         if ($text === '') { $this->json(['ok' => false, 'error' => 'ข้อความว่าง']); return; }
         if (mb_strlen($text) > 2000) { $this->json(['ok' => false, 'error' => 'ข้อความยาวเกิน 2000 ตัวอักษร']); return; }
 
+        // filter by tag ถ้าระบุมา
+        $filterTag  = trim((string)($_POST['tag'] ?? ''));
+        $tagWhere   = '';
+        $tagParams  = ['p' => $propertyId];
+
+        if ($filterTag !== '' && Database::tableHasColumn('property_line_contacts', 'tags')) {
+            $tagWhere = " AND JSON_CONTAINS(tags, :tag, '$')";
+            $tagParams['tag'] = json_encode($filterTag, JSON_UNESCAPED_UNICODE);
+        }
+
         $contacts = Database::fetchAll(
             "SELECT line_user_id FROM property_line_contacts
-             WHERE property_id = :p AND unfollowed_at IS NULL
+             WHERE property_id = :p AND unfollowed_at IS NULL {$tagWhere}
              ORDER BY last_seen_at DESC",
-            ['p' => $propertyId]
+            $tagParams
         );
 
         $sent    = 0;

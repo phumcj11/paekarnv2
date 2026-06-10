@@ -7,6 +7,8 @@
  * @var int     $page
  * @var int     $perPage
  * @var string  $q
+ * @var array   $allTags    ['tagName' => count]
+ * @var string  $filterTag
  */
 $pages    = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 $property = null;
@@ -28,9 +30,15 @@ function lineThaiDate(?string $ymd): string {
 }
 
 $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build_query(array_filter(
-    array_merge(['property_id' => $propertyId, 'q' => $q, 'page' => $page], $extra),
+    array_merge(['property_id' => $propertyId, 'q' => $q, 'page' => $page, 'tag' => $filterTag], $extra),
     fn($v) => $v !== '' && $v !== null && $v !== 0
 )));
+
+$tagColors = ['bg-violet-100 text-violet-800', 'bg-sky-100 text-sky-800', 'bg-amber-100 text-amber-800',
+              'bg-rose-100 text-rose-800', 'bg-emerald-100 text-emerald-800', 'bg-orange-100 text-orange-800'];
+$tagColorFn = function(string $tag) use ($tagColors): string {
+    return $tagColors[abs(crc32($tag)) % count($tagColors)];
+};
 ?>
 
 <!-- Property selector + controls -->
@@ -73,6 +81,23 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
   <?php endif; ?>
 </div>
 
+<?php if (!empty($allTags)): ?>
+<!-- Tag filter strip -->
+<div class="flex flex-wrap items-center gap-2 mb-4">
+  <span class="text-xs text-slate-500 font-semibold shrink-0">กรองด้วย Tag:</span>
+  <a href="<?= $buildUrl(['tag' => '', 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterTag === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
+    ทั้งหมด
+  </a>
+  <?php foreach ($allTags as $tag => $cnt): ?>
+  <a href="<?= $buildUrl(['tag' => $tag, 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterTag === $tag ? 'bg-slate-800 text-white' : $tagColorFn($tag) . ' hover:opacity-80' ?>">
+    <?= e($tag) ?> (<?= $cnt ?>)
+  </a>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <!-- Main content -->
 <div x-data="lineContactsPage()" x-init="init()">
 
@@ -92,11 +117,18 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
     </button>
 
     <!-- Broadcast button -->
-    <button type="button" @click="showBroadcast = !showBroadcast"
+    <button type="button" @click="showBroadcast = !showBroadcast; broadcastTag = ''"
             class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl shadow-sm transition">
       <i data-lucide="send" class="w-4 h-4"></i>
-      ส่งข้อความหาทุกคน
+      ส่งทุกคน
     </button>
+    <?php if (!empty($allTags)): ?>
+    <button type="button" @click="showBroadcast = !showBroadcast; broadcastTag = ''"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-violet-200 hover:bg-violet-50 text-violet-700 text-sm font-semibold rounded-xl shadow-sm transition">
+      <i data-lucide="tag" class="w-4 h-4"></i>
+      ส่งตาม Tag
+    </button>
+    <?php endif; ?>
 
     <!-- sync result -->
     <p x-show="syncMsg" x-text="syncMsg"
@@ -107,14 +139,43 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
   <!-- Broadcast panel -->
   <div x-show="showBroadcast" x-cloak
        class="mb-4 bg-white rounded-2xl border border-slate-200 shadow-soft p-4 space-y-3">
-    <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
-      <i data-lucide="megaphone" class="w-4 h-4 text-[#06C755]"></i>
-      ส่งข้อความหาทุกคนใน OA นี้
-      <span class="text-xs font-normal text-slate-400">(<?= number_format($total) ?> คน · เฉพาะที่ยังไม่ Unfollow)</span>
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <i data-lucide="megaphone" class="w-4 h-4 text-[#06C755]"></i>
+        ส่งข้อความ
+      </div>
+      <?php if (!empty($allTags)): ?>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-500">หา:</span>
+        <select x-model="broadcastTag" class="px-2 py-1 rounded-lg border border-slate-200 text-xs focus:border-violet-400 outline-none bg-white">
+          <option value="">ทุกคน (<?= number_format($total) ?> คน)</option>
+          <?php foreach ($allTags as $tag => $cnt): ?>
+          <option value="<?= e($tag) ?>">Tag: <?= e($tag) ?> (<?= $cnt ?> คน)</option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php else: ?>
+      <span class="text-xs text-slate-400">(<?= number_format($total) ?> คน · เฉพาะที่ยังไม่ Unfollow)</span>
+      <?php endif; ?>
     </div>
     <textarea x-model="broadcastText" rows="3" maxlength="2000"
               placeholder="พิมพ์ข้อความที่ต้องการส่ง... &#10;เช่น: สวัสดีครับ มีโปรโมชั่นพิเศษเดือนนี้นะครับ 🎉"
               class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y focus:border-[#06C755] outline-none"></textarea>
+
+    <!-- AI draft helper -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <button type="button" @click="aiBroadcastDraft()"
+              :disabled="aiBroadcastLoading"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs font-semibold rounded-lg transition disabled:opacity-60">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+        <span x-show="!aiBroadcastLoading">AI ช่วยเขียน</span>
+        <span x-show="aiBroadcastLoading">กำลังร่าง…</span>
+      </button>
+      <input type="text" x-model="aiBroadcastContext" placeholder="หัวข้อ เช่น โปรโมชั่นเดือนหน้า / วันหยุดยาว" maxlength="100"
+             class="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg border border-violet-200 text-xs outline-none focus:border-violet-400 bg-violet-50/60 text-slate-700">
+      <p x-show="aiBroadcastMsg" x-text="aiBroadcastMsg" class="text-xs text-violet-700 flex-1 truncate"></p>
+    </div>
+
     <div class="flex items-center gap-3">
       <button type="button" @click="sendBroadcast()"
               :disabled="broadcasting || !broadcastText.trim()"
@@ -160,6 +221,7 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
             <th class="px-4 py-3 text-left font-semibold text-slate-600 w-10">#</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">ชื่อ / LINE</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">เบอร์โทร</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">Tag</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">ทักล่าสุด</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">การจอง</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">สถานะ</th>
@@ -167,10 +229,16 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <?php foreach ($contacts as $i => $c): ?>
-          <?php $rowNum = ($page - 1) * $perPage + $i + 1; ?>
-          <tr class="hover:bg-slate-50/60 transition group" x-data="contactRow(<?= (int)$c['id'] ?>, '<?= addslashes($c['phone'] ?? '') ?>')">
-            <td class="px-4 py-3 text-slate-400 text-xs"><?= $rowNum ?></td>
+          <?php foreach ($contacts as $i => $c):
+            $cTags = [];
+            if (!empty($c['tags'])) {
+                $decoded = json_decode((string)$c['tags'], true);
+                if (is_array($decoded)) $cTags = $decoded;
+            }
+            $cTagsJs = json_encode($cTags, JSON_UNESCAPED_UNICODE);
+          ?>
+          <tr class="hover:bg-slate-50/60 transition group" x-data="contactRow(<?= (int)$c['id'] ?>, '<?= addslashes($c['phone'] ?? '') ?>', <?= htmlspecialchars($cTagsJs, ENT_QUOTES) ?>)">
+            <td class="px-4 py-3 text-slate-400 text-xs"><?= ($page - 1) * $perPage + $i + 1 ?></td>
             <td class="px-4 py-3">
               <div class="flex items-center gap-3">
                 <?php if ($c['picture_url']): ?>
@@ -206,6 +274,29 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
                 </button>
               </div>
               <p x-show="phoneSaved" class="text-[10px] text-emerald-600">บันทึกแล้ว ✓</p>
+            </td>
+            <!-- Tags cell -->
+            <td class="px-4 py-3 max-w-[160px]">
+              <div class="flex flex-wrap gap-1 items-center">
+                <template x-for="tag in tags" :key="tag">
+                  <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-800">
+                    <span x-text="tag"></span>
+                    <button type="button" @click="removeTag(tag)" class="ml-0.5 opacity-60 hover:opacity-100">×</button>
+                  </span>
+                </template>
+                <!-- add tag input -->
+                <div x-show="!addingTag" class="opacity-0 group-hover:opacity-100 transition">
+                  <button type="button" @click="addingTag=true; $nextTick(()=>$el.closest('td').querySelector('input.tag-input')?.focus())"
+                          class="w-5 h-5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-violet-400 hover:text-violet-600 text-xs grid place-items-center transition">+</button>
+                </div>
+                <div x-show="addingTag" class="flex items-center gap-1">
+                  <input type="text" x-model="newTagVal" maxlength="30" placeholder="tag..."
+                         class="tag-input w-20 px-1.5 py-0.5 rounded-lg border border-violet-300 text-[11px] outline-none focus:border-violet-500"
+                         @keyup.enter="addTag()" @keyup.escape="addingTag=false; newTagVal=''">
+                  <button type="button" @click="addTag()" class="text-violet-600 hover:text-violet-700 text-xs">✓</button>
+                  <button type="button" @click="addingTag=false; newTagVal=''" class="text-slate-400 text-xs">✕</button>
+                </div>
+              </div>
             </td>
             <td class="px-4 py-3 text-slate-500 text-xs"><?= lineThaiDate($c['last_seen_at']) ?></td>
             <td class="px-4 py-3">
@@ -368,9 +459,13 @@ function lineContactsPage() {
     syncOk: true,
     showBroadcast: false,
     broadcastText: '',
+    broadcastTag: '',
     broadcasting: false,
     broadcastMsg: '',
     broadcastOk: true,
+    aiBroadcastLoading: false,
+    aiBroadcastContext: '',
+    aiBroadcastMsg: '',
 
     init() {
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
@@ -394,6 +489,28 @@ function lineContactsPage() {
       this.syncing = false;
     },
 
+    async aiBroadcastDraft() {
+      if (this.aiBroadcastLoading || !__LC_PROP_ID__) return;
+      this.aiBroadcastLoading = true;
+      this.aiBroadcastMsg = '';
+      try {
+        const fd = new FormData();
+        fd.set('property_id', String(__LC_PROP_ID__));
+        fd.set('event_type', 'broadcast');
+        fd.set('context', this.aiBroadcastContext || 'ข้อความทั่วไปถึงลูกค้า LINE');
+        const r = await fetch('<?= url('/owner/automation/ai-draft') ?>', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.ok && d.text) {
+          this.broadcastText = d.text;
+          this.aiBroadcastMsg = '✨ ร่างแล้ว — แก้ไขก่อนส่งได้';
+          setTimeout(() => this.aiBroadcastMsg = '', 3000);
+        } else {
+          this.aiBroadcastMsg = d.error || 'AI ไม่พร้อม';
+        }
+      } catch(e) { this.aiBroadcastMsg = 'เกิดข้อผิดพลาด'; }
+      this.aiBroadcastLoading = false;
+    },
+
     async sendBroadcast() {
       if (this.broadcasting || !this.broadcastText.trim()) return;
       const confirmMsg = `ยืนยันส่งข้อความหา <?= $total ?> คน ใช่ไหม?`;
@@ -404,6 +521,7 @@ function lineContactsPage() {
         const fd = new FormData();
         fd.set('property_id', String(__LC_PROP_ID__));
         fd.set('text', this.broadcastText);
+        if (this.broadcastTag) fd.set('tag', this.broadcastTag);
         const r = await fetch('<?= url('/owner/line-contacts/broadcast') ?>', { method: 'POST', body: fd });
         const d = await r.json();
         this.broadcastOk = !!d.ok;
@@ -417,13 +535,16 @@ function lineContactsPage() {
 }
 
 // ── Per-contact row ──────────────────────────────────
-function contactRow(id, initialPhone) {
+function contactRow(id, initialPhone, initialTags) {
   return {
     id,
     phone: initialPhone,
     editPhone: false,
     editPhoneVal: initialPhone,
     phoneSaved: false,
+    tags: Array.isArray(initialTags) ? [...initialTags] : [],
+    addingTag: false,
+    newTagVal: '',
 
     async savePhone() {
       try {
@@ -436,6 +557,32 @@ function contactRow(id, initialPhone) {
           this.editPhone = false;
           this.phoneSaved = true;
           setTimeout(() => this.phoneSaved = false, 2000);
+        }
+      } catch(e) {}
+    },
+
+    async addTag() {
+      const tag = this.newTagVal.trim();
+      if (!tag || this.tags.includes(tag)) { this.addingTag = false; this.newTagVal = ''; return; }
+      const newTags = [...this.tags, tag];
+      await this._saveTags(newTags);
+    },
+
+    async removeTag(tag) {
+      const newTags = this.tags.filter(t => t !== tag);
+      await this._saveTags(newTags);
+    },
+
+    async _saveTags(newTags) {
+      try {
+        const fd = new FormData();
+        fd.set('tags', JSON.stringify(newTags));
+        const r = await fetch(`<?= url('/owner/line-contacts') ?>/${this.id}/tags`, { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.ok) {
+          this.tags = d.tags;
+          this.addingTag = false;
+          this.newTagVal = '';
         }
       } catch(e) {}
     },

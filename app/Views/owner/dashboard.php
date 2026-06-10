@@ -165,6 +165,28 @@ $scheduleUrl = !empty($myProperties[0]['id'])
     <div class="ow-card p-4"><div class="text-xs text-slate-500">Lead จากเว็บเดือนนี้</div><div class="text-2xl font-bold text-core-700 mt-1"><?= number_format($stats['leads_month']) ?></div></div>
   </div>
 
+  <?php
+  $apv = $analyticsPreview ?? [];
+  $apTotal = ($apv['phone'] ?? 0) + ($apv['line'] ?? 0) + ($apv['book'] ?? 0);
+  if ($apTotal > 0 || ($apv['views'] ?? 0) > 0): ?>
+  <a href="<?= url('/owner/analytics' . ($apv['property_id'] ? '?property_id=' . $apv['property_id'] : '')) ?>"
+     class="ow-card block p-4 mb-5 border-2 border-dashed border-accent-200 hover:border-accent-400 hover:bg-accent-50/30 transition group">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold text-accent-600 flex items-center gap-1.5">
+        <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
+        Analytics — 30 วันล่าสุด
+      </span>
+      <span class="text-xs text-slate-400 group-hover:text-accent-600 transition">ดูทั้งหมด →</span>
+    </div>
+    <div class="grid grid-cols-4 gap-2 text-center">
+      <div><div class="text-lg font-bold text-slate-800"><?= number_format($apv['views'] ?? 0) ?></div><div class="text-[10px] text-slate-400">ยอดชม</div></div>
+      <div><div class="text-lg font-bold text-emerald-700"><?= number_format($apv['phone'] ?? 0) ?></div><div class="text-[10px] text-slate-400">กดโทร</div></div>
+      <div><div class="text-lg font-bold text-[#06C755]"><?= number_format($apv['line'] ?? 0) ?></div><div class="text-[10px] text-slate-400">กด LINE</div></div>
+      <div><div class="text-lg font-bold text-accent-600"><?= number_format($apv['book'] ?? 0) ?></div><div class="text-[10px] text-slate-400">กดจอง</div></div>
+    </div>
+  </a>
+  <?php endif; ?>
+
   <div class="grid grid-cols-4 gap-4 mb-6">
     <?php
     $metrics = [

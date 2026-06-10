@@ -25,6 +25,7 @@ $logoTagline = $heroSubLine
   : 'Travel · Voucher · Kanchanaburi';
 
 $raftsActive = str_contains($uriPath, '/rafts');
+$availableActive = str_contains($uriPath, '/available-');
 $resortsActive = str_contains($uriPath, '/resorts');
 $hotelsActive = str_contains($uriPath, '/hotels');
 $staysActive = str_contains($uriPath, '/stays');
@@ -45,6 +46,7 @@ $guestSeekLabel = $navLabel('nav_label_guest_seek', 'หาที่พัก');
 $navItems = [
     ['href' => url('/'),            'label' => $navLabel('nav_label_home', 'หน้าแรก'),                 'icon' => 'home',           'active' => $isHome],
     ['href' => url('/rafts'),       'label' => $navLabel('nav_label_rafts', 'แพพัก'),                 'icon' => 'anchor',         'active' => $raftsActive],
+    ['href' => url('/available-today'), 'label' => 'ว่างวันนี้',                                         'icon' => 'check-circle-2', 'active' => $availableActive, 'badge' => 'ใหม่'],
     ['href' => url('/resorts'),     'label' => $navLabel('nav_label_resorts', 'รีสอร์ท'),              'icon' => 'trees',          'active' => $resortsActive],
     ['href' => url('/hotels'),      'label' => $navLabel('nav_label_hotels', 'โรงแรม'),               'icon' => 'building-2',     'active' => $hotelsActive],
     ['href' => url('/stays'),       'label' => $navLabel('nav_label_stays', 'โฮมสเตย์ & บ้านพัก'),     'icon' => 'home',           'active' => $staysActive],
@@ -80,8 +82,11 @@ $guestSeekCtaClass = $guestSeekActive
         <nav class="hidden lg:flex items-center justify-start gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5 gap-y-1 min-w-0 py-0.5 flex-wrap xl:flex-nowrap" aria-label="เมนูหลัก">
             <?php foreach ($navItems as $item): ?>
               <a href="<?= e($item['href']) ?>"
-                 class="px-2 py-2 rounded-lg text-[11px] xl:text-[12px] 2xl:text-[13px] whitespace-nowrap shrink-0 transition <?= $item['active'] ? 'text-forest-700 font-bold bg-forest-50/90 ring-1 ring-forest-200/70' : 'text-slate-800 font-semibold hover:text-forest-800 hover:bg-slate-50' ?>">
+                 class="relative px-2 py-2 rounded-lg text-[11px] xl:text-[12px] 2xl:text-[13px] whitespace-nowrap shrink-0 transition <?= $item['active'] ? 'text-forest-700 font-bold bg-forest-50/90 ring-1 ring-forest-200/70' : 'text-slate-800 font-semibold hover:text-forest-800 hover:bg-slate-50' ?>">
                 <?= e($item['label']) ?>
+                <?php if (!empty($item['badge'])): ?>
+                <span class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none"><?= e($item['badge']) ?></span>
+                <?php endif; ?>
               </a>
             <?php endforeach; ?>
         </nav>

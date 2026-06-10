@@ -24,6 +24,7 @@ use App\Controllers\PromptPayQrController;
 use App\Controllers\TrackOrderController;
 use App\Controllers\CompareController;
 use App\Controllers\BookingConfirmationController;
+use App\Controllers\AvailableController;
 
 return function (Router $r): void {
     $r->get('/robots.txt',   [SeoController::class, 'robots']);
@@ -33,6 +34,8 @@ return function (Router $r): void {
     $r->get('/',                [HomeController::class, 'index']);
 
     // ---------- Properties ----------
+    $r->get('/available-today',                   [AvailableController::class, 'today']);
+    $r->get('/available-weekend',                 [AvailableController::class, 'weekend']);
     $r->get('/properties',                        [PropertyController::class, 'index']);
     $r->get('/rafts',                             [PropertyController::class, 'rafts']);
     $r->get('/resorts',                           [PropertyController::class, 'resorts']);

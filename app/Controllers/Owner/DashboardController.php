@@ -5,6 +5,7 @@ use App\Core\Controller;
 use App\Core\Auth;
 use App\Core\Database;
 use App\Core\View;
+use App\Models\PropertyLeadClick;
 use App\Services\OwnerMembership;
 use App\Services\OwnerAvailabilityCalendar;
 
@@ -96,6 +97,40 @@ class DashboardController extends Controller
                 array_merge(['d' => $d], $params)
             );
             $chart[] = ['date' => date('j/n', strtotime($d)), 'count' => (int)$row['c']];
+        }
+
+        // Analytics preview (30 วัน)
+        $analyticsPreview = ['phone' => 0, 'line' => 0, 'book' => 0, 'views' => 0, 'property_id' => 0];
+        if ($ownerId && !empty($calProperties)) {
+            $firstPid = (int)($calProperties[0]['id'] ?? 0);
+            if ($firstPid && PropertyLeadClick::tableReady()) {
+                $row = Database::fetch(
+                    "SELECT
+                       SUM(CASE WHEN click_type='phone' THEN 1 ELSE 0 END) AS phone,
+                       SUM(CASE WHEN click_type='line'  THEN 1 ELSE 0 END) AS line,
+                       SUM(CASE WHEN click_type='book'  THEN 1 ELSE 0 END) AS book
+                     FROM property_lead_clicks
+                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+                    ['p' => $firstPid]
+                );
+                if ($row) {
+                    $analyticsPreview = [
+                        'phone'       => (int)$row['phone'],
+                        'line'        => (int)$row['line'],
+                        'book'        => (int)$row['book'],
+                        'views'       => 0,
+                        'property_id' => $firstPid,
+                    ];
+                }
+                if (Database::tableHasColumn('analytics_page_views', 'id')) {
+                    $vRow = Database::fetch(
+                        "SELECT COUNT(*) AS cnt FROM analytics_page_views
+                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+                        ['p' => $firstPid]
+                    );
+                    $analyticsPreview['views'] = (int)($vRow['cnt'] ?? 0);
+                }
+            }
         }
 
         $membershipOwner          = null;
@@ -198,6 +233,7 @@ class DashboardController extends Controller
         }
 
         View::render('owner/dashboard', [
+            'analyticsPreview'         => $analyticsPreview,
             'page_title'               => 'ภาพรวม',
             'stats'                    => $stats,
             'recentBookings'           => $recentBookings,
