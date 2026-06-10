@@ -393,7 +393,10 @@ class PropertyLineService
             return ['ok' => false, 'code' => 0, 'detail' => "ไม่พบไฟล์รูป ({$tried})"];
         }
 
-        error_log("[Paekarn] uploadRichMenuImage: ใช้ไฟล์ {$usedPath} ขนาด " . strlen($png) . " bytes");
+        // LINE ต้องการรูปขนาด 2500×843 — resize ด้วย GD ถ้าจำเป็น
+        $png = self::resizeImageTo2500x843($png) ?: $png;
+
+        error_log("[Paekarn] uploadRichMenuImage: ใช้ไฟล์ {$usedPath} ขนาดหลัง resize=" . strlen($png) . " bytes");
 
         $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/{$richMenuId}/content");
         curl_setopt_array($ch, [
@@ -499,6 +502,48 @@ class PropertyLineService
                 'wrap'  => true,
             ]],
         ];
+    }
+
+    /**
+     * Resize PNG/JPEG bytes ให้ได้ 2500×843 (LINE Rich Menu full size)
+     * @return string|null PNG bytes หลัง resize, null ถ้า GD ไม่ available
+     */
+    private static function resizeImageTo2500x843(string $imageData): ?string
+    {
+        if (!function_exists('imagecreatefromstring')) return null;
+
+        $src = @imagecreatefromstring($imageData);
+        if (!$src) return null;
+
+        $sw = imagesx($src);
+        $sh = imagesy($src);
+
+        // ถ้าขนาดถูกต้องแล้ว ไม่ต้อง resize
+        if ($sw === 2500 && $sh === 843) {
+            imagedestroy($src);
+            return $imageData;
+        }
+
+        $tw = 2500; $th = 843;
+        $dst = imagecreatetruecolor($tw, $th);
+        if (!$dst) { imagedestroy($src); return null; }
+
+        // เปิด alpha สำหรับ PNG
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefilledrectangle($dst, 0, 0, $tw - 1, $th - 1, $white);
+        imagealphablending($dst, true);
+
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
+        imagedestroy($src);
+
+        ob_start();
+        imagepng($dst, null, 6); // compression 6 — ขนาดเล็กพอ
+        $out = ob_get_clean();
+        imagedestroy($dst);
+
+        return $out ?: null;
     }
 
     /** @return array{code:int,body:string} */

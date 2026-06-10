@@ -325,9 +325,11 @@ class PropertyController extends Controller
         // create
         $result = PropertyLineService::createPropertyRichMenu($id, (string)$property['name']);
         if (!$result['ok']) {
+            $lineErr = PropertyLineService::parseLineError($result['detail']);
+            $detail  = $lineErr ?: $result['detail'];
             $this->json([
                 'ok'      => false,
-                'message' => 'สร้าง Rich Menu ไม่สำเร็จ: ' . PropertyLineService::parseLineError($result['detail']),
+                'message' => 'สร้าง Rich Menu ไม่สำเร็จ: ' . $detail,
             ]);
         }
 
