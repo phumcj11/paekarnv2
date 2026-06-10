@@ -29,9 +29,15 @@ class AvailabilityController extends Controller
             ['p' => $id]
         );
 
-        $month = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
-        $year  = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+        $month  = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
+        $year   = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
         $unitId = isset($_GET['unit']) ? (int)$_GET['unit'] : (int)($units[0]['id'] ?? 0);
+
+        $selectedUnit = null;
+        foreach ($units as $u) {
+            if ((int)$u['id'] === $unitId) { $selectedUnit = $u; break; }
+        }
+        $totalUnits = max(1, (int)($selectedUnit['total_units'] ?? 1));
 
         $start = sprintf('%04d-%02d-01', $year, $month);
         $end   = date('Y-m-t', strtotime($start));
@@ -63,11 +69,37 @@ class AvailabilityController extends Controller
             }
         }
 
+        $dayMeta = [];
+        if ($unitId) {
+            for ($d = 1; $d <= (int)date('t', strtotime($start)); $d++) {
+                $date = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                $dayMeta[$date] = self::dayMeta($date, $availMap[$date] ?? null, $totalUnits);
+            }
+        }
+
         View::render('owner/availability/index', [
             'page_title' => 'ปฏิทินวันว่าง: ' . $property['name'],
             'property' => $property, 'units' => $units, 'unitId' => $unitId,
             'month' => $month, 'year' => $year, 'availMap' => $availMap,
+            'dayMeta' => $dayMeta, 'totalUnits' => $totalUnits,
         ], 'layouts/owner');
+    }
+
+    /** สถานะวันสำหรับแสดงในปฏิทิน (ตรงกับที่ LINE bot ใช้เป็นหลัก) */
+    private static function dayMeta(string $date, ?array $row, int $totalUnits): array
+    {
+        if ($date < date('Y-m-d')) {
+            return ['key' => 'past', 'label' => '', 'cls' => 'bg-slate-50 border-slate-200 text-slate-400'];
+        }
+        $status = $row['status'] ?? null;
+        if (in_array($status, ['closed', 'blocked', 'fully_booked'], true)) {
+            return ['key' => 'closed', 'label' => 'ปิด', 'cls' => 'bg-slate-300 border-slate-400 text-slate-700'];
+        }
+        $booked = (int)($row['booked'] ?? 0);
+        if ($booked >= $totalUnits) {
+            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800'];
+        }
+        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800'];
     }
 
     public function save(int $id): void

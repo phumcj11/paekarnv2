@@ -13,6 +13,7 @@ use App\Controllers\Owner\CouponController as OwnerCoupon;
 use App\Controllers\Owner\ProfileController;
 use App\Controllers\Owner\MembershipController;
 use App\Controllers\Owner\ContentPlanController;
+use App\Controllers\Owner\LineHubController;
 
 return function (Router $r): void {
     // Auth (no middleware)
@@ -41,6 +42,8 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/images/{img:[0-9]+}/delete', [PropertyController::class, 'deleteImage'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/line-test',       [PropertyController::class, 'lineTest'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/line-rich-menu', [PropertyController::class, 'lineRichMenu'])->middleware('csrf');
+        $r->get('/properties/{id:[0-9]+}/line',             [LineHubController::class, 'index']);
+        $r->post('/properties/{id:[0-9]+}/line',            [LineHubController::class, 'save'])->middleware('csrf');
 
         // Units: nested CRUD + ทางลัดจากเมนู
         $r->get('/units', [UnitController::class, 'hub']);

@@ -39,7 +39,8 @@
         <div class="mt-auto pt-3 flex gap-2">
           <a href="<?= url('/owner/properties/' . $p['id'] . '/edit') ?>" class="flex-1 px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="edit" class="w-3.5 h-3.5"></i> แก้ไข</a>
           <a href="<?= url('/owner/properties/' . $p['id'] . '/units') ?>" class="flex-1 px-3 py-1.5 text-xs bg-accent-500 text-white rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="bed-double" class="w-3.5 h-3.5"></i> ห้อง/แพ</a>
-          <a href="<?= url('/owner/properties/' . $p['id'] . '/availability') ?>" class="px-3 py-1.5 text-xs border border-slate-300 hover:bg-slate-50 rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i></a>
+          <a href="<?= url('/owner/properties/' . $p['id'] . '/line') ?>" title="LINE & ปฏิทิน" class="px-3 py-1.5 text-xs border border-[#06C755]/40 text-[#06C755] hover:bg-[#06C755]/5 rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></a>
+          <a href="<?= url('/owner/properties/' . $p['id'] . '/availability') ?>" title="ปฏิทินวันว่าง" class="px-3 py-1.5 text-xs border border-slate-300 hover:bg-slate-50 rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i></a>
         </div>
       </div>
     </div>

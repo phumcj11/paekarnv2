@@ -557,171 +557,32 @@ $bookingCaps = $property
   </aside>
 
   <?php if (\App\Core\Database::tableHasColumn('properties', 'line_messaging_enabled') && $isEdit): ?>
-  <div x-data="lineOASettings()" x-init="init()" class="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
-    <input type="hidden" name="line_settings_sent" value="1">
-    <h4 class="font-bold flex items-center gap-2 mb-3">
-      <svg class="w-5 h-5 text-[#06C755]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
-      LINE Messaging API (OA ต่อที่พัก)
-    </h4>
-
-    <label class="flex items-center gap-3 mb-4 cursor-pointer">
-      <input type="checkbox" name="line_messaging_enabled" value="1"
-             <?= !empty($property['line_messaging_enabled']) ? 'checked' : '' ?>
-             x-model="enabled" class="rounded accent-[#06C755]">
-      <span class="text-sm font-semibold text-slate-700">เปิดใช้ LINE OA สำหรับที่พักนี้</span>
-    </label>
-
-    <div x-show="enabled" x-cloak class="space-y-3">
+  <div class="lg:col-span-3 bg-gradient-to-br from-[#06C755]/5 to-accent-50 rounded-2xl border border-[#06C755]/20 shadow-soft p-5">
+    <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">Channel Access Token</label>
-        <input type="text" name="line_channel_access_token"
-               value="<?= e($property['line_channel_access_token'] ?? '') ?>"
-               placeholder="Channel Access Token จาก LINE Developers"
-               class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">Channel Secret</label>
-        <input type="text" name="line_channel_secret"
-               value="<?= e($property['line_channel_secret'] ?? '') ?>"
-               placeholder="Channel Secret (สำหรับ webhook)"
-               class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
-      </div>
-      <div class="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
-        <div class="font-semibold text-slate-600">Webhook URL สำหรับใส่ใน LINE Developers:</div>
-        <code class="text-primary-700 select-all break-all"><?= url('/line/property/' . (int)$property['id'] . '/webhook') ?></code>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3 pt-1">
-        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold rounded-xl shadow transition">
-          <i data-lucide="save" class="w-4 h-4"></i> บันทึกการตั้งค่า LINE
-        </button>
-        <span class="text-xs text-slate-500">หรือกด «บันทึก» ด้านขวาบนก็ได้</span>
-      </div>
-
-      <!-- Rich Menu -->
-      <div class="border-t border-slate-100 pt-3">
-        <div class="text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-          <svg class="w-4 h-4 text-[#06C755]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          Rich Menu (6 ปุ่ม — ราคา, เช็ควันว่าง, ที่อยู่, เช็คอิน, ติดต่อ, วิธีจอง)
-        </div>
-        <p class="text-xs text-slate-500 mb-2">Rich Menu ขนาดใหญ่ (2500×1686) — ปุ่ม «เช็ควันว่าง» แสดงตารางปฏิทินในแชท</p>
-        <?php if (!empty($property['line_rich_menu_id'])): ?>
-        <p class="text-xs text-emerald-700 mb-2">✅ มี Rich Menu อยู่แล้ว: <code class="text-[10px] bg-slate-100 px-1 rounded"><?= e($property['line_rich_menu_id']) ?></code></p>
+        <h4 class="font-bold flex items-center gap-2 text-slate-800">
+          <svg class="w-5 h-5 text-[#06C755]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
+          LINE OA & Chatbot
+        </h4>
+        <p class="text-xs text-slate-600 mt-1 max-w-md">
+          ตั้งค่า Token, Rich Menu, ทดสอบส่งข้อความ และเชื่อมกับปฏิทินวันว่างที่ลูกค้าเห็นใน LINE
+        </p>
+        <?php if (!empty($property['line_messaging_enabled'])): ?>
+        <span class="inline-block mt-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">เปิดใช้งานแล้ว</span>
         <?php endif; ?>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" @click="richMenuAction('create')" :disabled="rmBusy"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-xs font-semibold rounded-lg transition disabled:opacity-50">
-            <span x-show="!rmBusy">สร้าง / อัปเดต Rich Menu</span><span x-show="rmBusy">กำลังสร้าง...</span>
-          </button>
-          <button type="button" @click="richMenuAction('delete')" :disabled="rmBusy"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50">
-            ลบ Rich Menu
-          </button>
-        </div>
-        <div x-show="rmResult" x-text="rmResult" :class="rmOk ? 'text-emerald-600' : 'text-rose-600'" class="text-xs mt-1.5"></div>
       </div>
-
-      <!-- Test push -->
-      <div class="border-t border-slate-100 pt-3">
-        <div class="text-xs font-semibold text-slate-600 mb-1">ทดสอบส่ง (LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
-        <p class="text-xs text-slate-500 mb-2">คัดลอกจาก URL แชท chat.line.biz — ส่วนหลัง <code class="bg-slate-100 px-1 rounded">/chat/</code> เช่น <code class="bg-slate-100 px-1 rounded text-[10px]">Ucdeefc0f94d61852570d94808a708423</code></p>
-        <?php if (!empty($lineContacts ?? [])): ?>
-        <p class="text-xs text-emerald-700 mb-1">Webhook ทำงานแล้ว — พบ <?= count($lineContacts) ?> คน (ทักข้อความใหม่แล้วรีเฟรชหน้านี้)</p>
-        <div class="flex gap-2 mb-2">
-          <select @change="if($event.target.value){ testUid=$event.target.value; $event.target.value=''; }"
-                  class="flex-1 px-2 py-1.5 rounded-lg border border-slate-300 text-xs">
-            <option value="">— เลือกจากลูกค้าที่ทัก OA แล้ว (<?= count($lineContacts) ?>) —</option>
-            <?php foreach (($lineContacts ?? []) as $lc): ?>
-            <option value="<?= e($lc['line_user_id']) ?>"><?= e(($lc['display_name'] ? $lc['display_name'] . ' — ' : '') . $lc['line_user_id']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <?php endif; ?>
-        <div class="flex gap-2">
-          <input type="text" x-model="testUid" @paste="onPasteUid($event)" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                 class="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 outline-none">
-          <button type="button" @click="testPush()" :disabled="pushing"
-                  class="px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
-            <span x-show="!pushing">ส่งทดสอบ</span><span x-show="pushing">...</span>
-          </button>
-        </div>
-        <div x-show="testResult" x-text="testResult"
-             :class="testOk ? 'text-emerald-600' : 'text-rose-600'"
-             class="text-xs mt-1.5"></div>
+      <div class="flex flex-wrap gap-2">
+        <a href="<?= url('/owner/properties/' . (int)$property['id'] . '/line') ?>"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-xl transition">
+          <i data-lucide="settings" class="w-4 h-4"></i> ตั้งค่า LINE
+        </a>
+        <a href="<?= url('/owner/properties/' . (int)$property['id'] . '/availability') ?>"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition">
+          <i data-lucide="calendar" class="w-4 h-4"></i> ปฏิทินวันว่าง
+        </a>
       </div>
     </div>
   </div>
-
-  <script>
-  function lineOASettings() {
-    return {
-      enabled: <?= !empty($property['line_messaging_enabled']) ? 'true' : 'false' ?>,
-      testUid: '',
-      pushing: false,
-      testResult: '',
-      testOk: false,
-      rmBusy: false,
-      rmResult: '',
-      rmOk: false,
-      init() {},
-      async richMenuAction(action) {
-        this.rmBusy = true;
-        this.rmResult = '';
-        try {
-          const fd = new FormData();
-          fd.append('_csrf', document.querySelector('#propertyForm [name="_csrf"]')?.value ?? '');
-          fd.append('action', action);
-          const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-rich-menu') ?>', {method:'POST', body:fd});
-          const j = await r.json().catch(() => null);
-          if (!j) {
-            this.rmOk = false;
-            this.rmResult = r.status === 419 ? 'เซสชันหมดอายุ — รีเฟรชหน้าแล้วลองใหม่' : 'เกิดข้อผิดพลาด (HTTP ' + r.status + ')';
-          } else {
-            this.rmOk = j.ok;
-            this.rmResult = j.message ?? (j.ok ? 'สำเร็จ!' : 'ไม่สำเร็จ');
-          }
-        } catch(e) { this.rmOk = false; this.rmResult = 'เกิดข้อผิดพลาด'; }
-        this.rmBusy = false;
-      },
-      onPasteUid(e) {
-        const text = (e.clipboardData?.getData('text') || '').trim();
-        const m = text.match(/\/chat\/(U[0-9a-f]{32})/i) || text.match(/(U[0-9a-f]{32})/i);
-        if (m) {
-          e.preventDefault();
-          this.testUid = m[1];
-        }
-      },
-      async testPush() {
-        const uid = this.testUid.trim();
-        if (!uid) { this.testResult = 'กรุณากรอก LINE User ID'; this.testOk = false; return; }
-        if (!/^U[0-9a-f]{32}$/i.test(uid)) {
-          this.testResult = 'ต้องเป็น LINE User ID ขึ้นต้นด้วย U (ไม่ใช่ @username เช่น p.pankan)';
-          this.testOk = false;
-          return;
-        }
-        this.pushing = true;
-        this.testResult = '';
-        try {
-          const fd = new FormData();
-          fd.append('_csrf', document.querySelector('#propertyForm [name="_csrf"]')?.value ?? '');
-          fd.append('line_user_id', uid);
-          const tokEl = document.querySelector('#propertyForm [name="line_channel_access_token"]');
-          if (tokEl?.value) fd.append('line_channel_access_token', tokEl.value);
-          const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-test') ?>', {method:'POST', body:fd});
-          const j = await r.json().catch(() => null);
-          if (!j) {
-            this.testOk = false;
-            this.testResult = r.status === 419 ? 'เซสชันหมดอายุ — รีเฟรชหน้าแล้วลองใหม่' : 'เกิดข้อผิดพลาด (HTTP ' + r.status + ')';
-          } else {
-            this.testOk = j.ok;
-            this.testResult = j.message ?? (j.ok ? 'ส่งสำเร็จ!' : 'ส่งไม่สำเร็จ');
-          }
-        } catch(e) { this.testOk = false; this.testResult = 'เกิดข้อผิดพลาด'; }
-        this.pushing = false;
-      },
-    };
-  }
-  </script>
   <?php endif; ?>
 
 </form>
