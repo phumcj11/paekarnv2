@@ -542,16 +542,28 @@ class PropertyLineService
         $white = imagecolorallocate($dst, 255, 255, 255);
         imagefilledrectangle($dst, 0, 0, $tw - 1, $th - 1, $white);
 
-        // fit ทั้งรูปใน 2500×843 (letterbox) — ไม่ crop ตัดแถวบน/ล่างทิ้ง
+        // cover crop เต็มจอ 2500×843 — ไม่มีขอบขาว (LINE แสดงเต็มความกว้าง)
+        // ถ้ารูปสูงเกิน → crop ด้านล่างทิ้ง เก็บแถวบน (6 ปุ่ม) ไว้
         $sw = imagesx($src);
         $sh = imagesy($src);
-        $scale = min($tw / $sw, $th / $sh);
-        $nw    = max(1, (int)round($sw * $scale));
-        $nh    = max(1, (int)round($sh * $scale));
-        $dx    = (int)(($tw - $nw) / 2);
-        $dy    = (int)(($th - $nh) / 2);
+        $targetRatio = $tw / $th;
+        $srcRatio    = $sw / $sh;
 
-        imagecopyresampled($dst, $src, $dx, $dy, 0, 0, $nw, $nh, $sw, $sh);
+        if ($srcRatio > $targetRatio) {
+            // รูปกว้างเกิน → fit ความสูง, crop ซ้าย-ขวา
+            $srcH = $sh;
+            $srcW = (int)round($sh * $targetRatio);
+            $srcX = (int)(($sw - $srcW) / 2);
+            $srcY = 0;
+        } else {
+            // รูปสูงเกิน → fit ความกว้าง, crop ล่าง (จัดจากบน)
+            $srcW = $sw;
+            $srcH = (int)round($sw / $targetRatio);
+            $srcX = 0;
+            $srcY = 0;
+        }
+
+        imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $tw, $th, $srcW, $srcH);
         imagedestroy($src);
 
         $maxBytes = 950 * 1024; // LINE จำกัด 1MB — เหลือ buffer
