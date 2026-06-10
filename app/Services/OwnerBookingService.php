@@ -160,6 +160,8 @@ class OwnerBookingService
             throw new \InvalidArgumentException('ไม่พบยูนิตของที่พักนี้');
         }
 
+        self::assertUnitAvailableForRange($unitId, $checkIn, $checkOut, $bookingId);
+
         $calc = BookingService::calculate($unit, $checkIn, $checkOut, $guestCount);
 
         $chargedTotal = array_key_exists('total_price', $params) && $params['total_price'] !== '' && $params['total_price'] !== null
@@ -215,6 +217,32 @@ class OwnerBookingService
         }
 
         return true;
+    }
+
+    public static function assertUnitAvailableForRange(int $unitId, string $checkIn, string $checkOut, ?int $excludeBookingId = null): void
+    {
+        $unit = PropertyUnit::find($unitId);
+        if (!$unit) {
+            throw new \InvalidArgumentException('ไม่พบยูนิต');
+        }
+        $capacity = max(1, (int)($unit['total_units'] ?? 1));
+
+        $params = ['u' => $unitId, 'ci' => $checkIn, 'co' => $checkOut];
+        $excludeSql = '';
+        if ($excludeBookingId) {
+            $excludeSql = ' AND id <> :bid';
+            $params['bid'] = $excludeBookingId;
+        }
+
+        $row = Database::fetch(
+            "SELECT COUNT(*) AS cnt FROM bookings
+             WHERE unit_id = :u AND status IN ('pending','confirmed')
+             AND check_in < :co AND check_out > :ci{$excludeSql}",
+            $params
+        );
+        if ((int)($row['cnt'] ?? 0) >= $capacity) {
+            throw new \InvalidArgumentException('ช่วงวันที่นี้ยูนิตเต็มแล้ว — เลือกวันอื่นหรือยูนิตอื่น');
+        }
     }
 
     private static function syncCashDeposit(int $bookingId, float $amount): void

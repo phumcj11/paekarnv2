@@ -192,7 +192,13 @@ $csrfToken    = \App\Core\Csrf::token();
                       <div class="font-bold text-core-700" x-text="formatMoney(bookingBalance(b))"></div>
                     </div>
                   </div>
-                  <div class="flex items-center justify-end gap-2 pt-0.5">
+                  <div class="flex items-center justify-end gap-2 pt-0.5 flex-wrap">
+                    <template x-if="canEditBooking(b)">
+                      <button type="button" @click="openReschedule(b)"
+                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100">
+                        <i data-lucide="calendar-clock" class="w-3 h-3"></i> เลื่อนวัน
+                      </button>
+                    </template>
                     <template x-if="canEditBooking(b)">
                       <button type="button" @click="openEdit(b)"
                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-core-700 bg-core-50 border border-core-200 hover:bg-core-100">
@@ -346,13 +352,18 @@ $csrfToken    = \App\Core\Csrf::token();
               <input type="tel" x-model="guestPhone" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
             </div>
             <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">วันเช็คอิน</label>
+              <input type="date" x-model="editCheckIn" @change="syncCheckOutFromCheckIn(); fetchQuote()"
+                     class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">จำนวนคืน</label>
               <select x-model="nights" @change="syncCheckOutFromCheckIn(); fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
                 <template x-for="n in 14" :key="n">
                   <option :value="n" x-text="n + ' คืน'"></option>
                 </template>
               </select>
-              <p class="text-xs text-slate-500 mt-1" x-text="formatDate(editCheckIn) + ' → ' + formatDate(checkOut)"></p>
+              <p class="text-xs text-slate-500 mt-1" x-text="'เช็คเอาท์ ' + formatDate(checkOut)"></p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">ราคา (บาท)</label>
@@ -375,6 +386,55 @@ $csrfToken    = \App\Core\Csrf::token();
             </div>
             <button type="button" @click="confirmEdit()" :disabled="!canBook()"
                     class="ow-btn-primary w-full disabled:opacity-40">บันทึกการแก้ไข</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Step: เลื่อนการจอง (เปลี่ยนวัน) -->
+      <template x-if="step === 'reschedule'">
+        <div>
+          <button type="button" @click="step='choose'" class="text-sm text-slate-500 mb-3 inline-flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> กลับ</button>
+          <h3 class="font-bold text-lg mb-1">เลื่อนการจอง</h3>
+          <p class="text-sm text-slate-500 mb-1" x-text="editCode + ' · ' + (guestName || '')"></p>
+          <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+            เดิม: <span class="font-semibold" x-text="formatDate(rescheduleFromIn) + ' → ' + formatDate(rescheduleFromOut)"></span>
+            (<span x-text="rescheduleFromNights + ' คืน'"></span>)
+          </p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">วันเช็คอินใหม่ <span class="text-rose-500">*</span></label>
+              <input type="date" x-model="editCheckIn" @change="onRescheduleDateChange()"
+                     class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+              <button type="button" x-show="selectedDate && selectedDate !== editCheckIn"
+                      @click="editCheckIn = selectedDate; onRescheduleDateChange()"
+                      class="mt-2 w-full text-xs font-semibold text-core-700 bg-core-50 border border-core-200 rounded-lg py-2 hover:bg-core-100">
+                ใช้วันที่แตะในปฏิทิน: <span x-text="formatDate(selectedDate)"></span>
+              </button>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">จำนวนคืน</label>
+              <select x-model="nights" @change="syncCheckOutFromCheckIn(); fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="n in 14" :key="n">
+                  <option :value="n" x-text="n + ' คืน'"></option>
+                </template>
+              </select>
+            </div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm">
+              <div class="text-slate-500 text-xs">ช่วงใหม่</div>
+              <div class="font-bold text-slate-800" x-text="formatDate(editCheckIn) + ' → ' + formatDate(checkOut)"></div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ราคา (บาท)</label>
+              <div class="relative">
+                <input type="number" min="0" step="1" x-model="totalPrice" @input="priceEdited = true"
+                       class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm pr-10">
+                <span x-show="priceLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">...</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">ปรับราคาอัตโนมัติเมื่อเปลี่ยนวัน — แก้ได้ตามตกลง</p>
+            </div>
+            <button type="button" @click="confirmReschedule()" :disabled="!canReschedule()"
+                    class="ow-btn-primary w-full disabled:opacity-40">บันทึกเลื่อนวัน</button>
           </div>
         </div>
       </template>
@@ -488,6 +548,9 @@ function homeCalManage() {
     editBookingId: 0,
     editCode: '',
     editCheckIn: '',
+    rescheduleFromIn: '',
+    rescheduleFromOut: '',
+    rescheduleFromNights: 0,
     init() {
       this.$watch('open', v => { if (v) this.$nextTick(() => lucide.createIcons()); });
       this.$watch('step', v => {
@@ -500,8 +563,8 @@ function homeCalManage() {
           this.$nextTick(() => this.fetchQuote());
           if (!this.lineContactsLoaded) this.fetchLineContacts();
         }
-        if (v === 'edit') {
-          this.priceEdited = true;
+        if (v === 'edit' || v === 'reschedule') {
+          this.priceEdited = v === 'reschedule' ? false : true;
           this.$nextTick(() => this.fetchQuote());
         }
       });
@@ -549,7 +612,7 @@ function homeCalManage() {
     canCancelBooking(b) {
       return ['pending', 'confirmed'].includes(b.status);
     },
-    openEdit(b) {
+    loadBookingForEdit(b) {
       this.editBookingId = b.id;
       this.editCode = '#' + b.code;
       this.editCheckIn = b.check_in;
@@ -561,8 +624,32 @@ function homeCalManage() {
       this.totalPrice = String(Math.round(parseFloat(b.total_price) || 0));
       this.deposit = String(Math.round(this.bookingDeposit(b)));
       this.notes = b.notes || '';
+      this.rescheduleFromIn = b.check_in;
+      this.rescheduleFromOut = b.check_out;
+      this.rescheduleFromNights = b.nights || 1;
+    },
+    openEdit(b) {
+      this.loadBookingForEdit(b);
       this.priceEdited = true;
       this.step = 'edit';
+    },
+    openReschedule(b) {
+      this.loadBookingForEdit(b);
+      if (this.selectedDate && this.selectedDate !== b.check_in) {
+        this.editCheckIn = this.selectedDate;
+        this.syncCheckOutFromCheckIn();
+      }
+      this.priceEdited = false;
+      this.step = 'reschedule';
+    },
+    onRescheduleDateChange() {
+      this.syncCheckOutFromCheckIn();
+      this.priceEdited = false;
+      this.fetchQuote();
+    },
+    canReschedule() {
+      return this.editBookingId && this.editCheckIn && this.checkOut
+        && (this.editCheckIn !== this.rescheduleFromIn || this.checkOut !== this.rescheduleFromOut);
     },
     formatDate(ymd) { return thaiShort(ymd); },
     formatMoney(n) {
@@ -580,7 +667,7 @@ function homeCalManage() {
       return Math.max(0, t - d);
     },
     async fetchQuote() {
-      const checkIn = this.step === 'edit' ? this.editCheckIn : this.selectedDate;
+      const checkIn = (this.step === 'edit' || this.step === 'reschedule') ? this.editCheckIn : this.selectedDate;
       if (!checkIn || !this.checkOut || !this.formUnitId) return;
       this.priceLoading = true;
       try {
@@ -600,7 +687,7 @@ function homeCalManage() {
       this.priceLoading = false;
     },
     canBook() {
-      const checkIn = this.step === 'edit' ? this.editCheckIn : this.selectedDate;
+      const checkIn = (this.step === 'edit' || this.step === 'reschedule') ? this.editCheckIn : this.selectedDate;
       return this.guestName.trim() && this.guestPhone.trim() && checkIn && this.checkOut;
     },
     fillForm(formId, fields) {
@@ -670,6 +757,31 @@ function homeCalManage() {
         ${this.notes.trim() ? `<p><strong>หมายเหตุ:</strong> ${this.notes.trim()}</p>` : ''}
       </div>`;
       const ok = await this.swalConfirm('ยืนยันแก้ไขการจอง?', html, 'question');
+      if (!ok) return;
+      const f = document.getElementById('homeCalEditForm');
+      f.action = '<?= url('/owner/bookings') ?>/' + this.editBookingId;
+      this.fillForm('homeCalEditForm', {
+        unit_id:        this.formUnitId,
+        check_in:       this.editCheckIn,
+        check_out:      this.checkOut,
+        guest_name:     this.guestName.trim(),
+        guest_phone:    this.guestPhone.trim(),
+        total_price:    this.totalPrice,
+        deposit_amount: this.deposit,
+        notes:          this.notes.trim(),
+      });
+      f.submit();
+    },
+    async confirmReschedule() {
+      if (!this.canReschedule()) return;
+      this.syncCheckOutFromCheckIn();
+      const html = `<div class="text-left text-sm space-y-1">
+        <p><strong>รหัส:</strong> ${this.editCode}</p>
+        <p><strong>เดิม:</strong> ${thaiShort(this.rescheduleFromIn)} → ${thaiShort(this.rescheduleFromOut)}</p>
+        <p><strong>ใหม่:</strong> ${thaiShort(this.editCheckIn)} → ${thaiShort(this.checkOut)} (${this.nights} คืน)</p>
+        <p><strong>ราคา:</strong> ${this.formatMoney(parseFloat(this.totalPrice) || 0)}</p>
+      </div>`;
+      const ok = await this.swalConfirm('ยืนยันเลื่อนการจอง?', html, 'question');
       if (!ok) return;
       const f = document.getElementById('homeCalEditForm');
       f.action = '<?= url('/owner/bookings') ?>/' + this.editBookingId;
