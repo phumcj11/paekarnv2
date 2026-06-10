@@ -47,12 +47,39 @@ class DashboardController extends Controller
             )['c'],
         ];
 
+        $bookingSelect = "b.id, b.code, b.guest_name, b.guest_phone, b.check_in, b.check_out,
+                          b.status, b.total_price, b.nights, p.name AS property_name, u.name AS unit_name,
+                          COALESCE((
+                              SELECT SUM(bp.amount) FROM booking_payments bp
+                              WHERE bp.booking_id = b.id AND bp.status = 'verified'
+                          ), 0) AS paid_amount";
+
         $recentBookings = Database::fetchAll(
-            "SELECT b.*, p.name AS property_name, u.name AS unit_name FROM bookings b
+            "SELECT $bookingSelect FROM bookings b
              JOIN properties p ON p.id=b.property_id
              LEFT JOIN property_units u ON u.id=b.unit_id
              WHERE 1=1 $whereOwner
              ORDER BY b.created_at DESC LIMIT 8", $params);
+
+        $todayBookings = Database::fetchAll(
+            "SELECT $bookingSelect FROM bookings b
+             JOIN properties p ON p.id=b.property_id
+             LEFT JOIN property_units u ON u.id=b.unit_id
+             WHERE b.status IN ('pending','confirmed')
+             AND b.check_in <= CURDATE() AND b.check_out > CURDATE()
+             $whereOwner
+             ORDER BY b.check_in ASC, b.id ASC
+             LIMIT 20", $params);
+
+        $upcomingBookings = Database::fetchAll(
+            "SELECT $bookingSelect FROM bookings b
+             JOIN properties p ON p.id=b.property_id
+             LEFT JOIN property_units u ON u.id=b.unit_id
+             WHERE b.status IN ('pending','confirmed')
+             AND b.check_in > CURDATE() AND b.check_in <= DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+             $whereOwner
+             ORDER BY b.check_in ASC, b.id ASC
+             LIMIT 10", $params);
 
         $myProperties = Database::fetchAll(
             "SELECT p.*, (SELECT COUNT(*) FROM bookings b WHERE b.property_id=p.id) AS booking_count
@@ -182,6 +209,8 @@ class DashboardController extends Controller
             'membership_is_vip'        => $membershipIsVip,
             'homeCalendar'             => $homeCalendar,
             'calProperties'            => $calProperties,
+            'todayBookings'            => $todayBookings,
+            'upcomingBookings'         => $upcomingBookings,
         ], 'layouts/owner');
     }
 }

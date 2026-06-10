@@ -1,6 +1,7 @@
 <?php /** @var array $stats @var array $recentBookings @var array $myProperties @var array $chart
            @var array|null $membership_owner @var bool $membership_benefits_active @var bool $membership_line_linked @var bool $membership_is_vip
-           @var array|null $homeCalendar @var list<array> $calProperties */
+           @var array|null $homeCalendar @var list<array> $calProperties
+           @var list<array> $todayBookings @var list<array> $upcomingBookings */
 
 $propStatusLabels = [
   'published' => ['published', 'ow-status-pill--published'],
@@ -21,6 +22,11 @@ $scheduleUrl = !empty($myProperties[0]['id'])
   <?php \App\Core\View::partial('owner/partials/home_calendar_mobile', [
     'homeCalendar' => $homeCalendar ?? null,
     'calProperties' => $calProperties ?? [],
+  ]); ?>
+
+  <?php \App\Core\View::partial('owner/partials/home_bookings_mobile', [
+    'todayBookings'    => $todayBookings ?? [],
+    'upcomingBookings' => $upcomingBookings ?? [],
   ]); ?>
 
   <?php if ($stats['properties'] === 0): ?>
