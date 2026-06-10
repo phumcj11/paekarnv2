@@ -471,10 +471,11 @@ class PropertyLineService
 
     /**
      * Sync followers จาก LINE OA → upsert เข้า property_line_contacts
-     * ใช้ GET /v2/bot/followers/ids (max 300/page) แล้ว fetch profile แต่ละคน
+     * Phase 1: ดึง follower IDs ทั้งหมด (max 5 pages = 1500 คน) แล้ว upsert UID ก่อน
+     * Phase 2: fetch profile เฉพาะ record ที่ display_name ยังว่าง (max 50 คนต่อครั้ง, timeout 3s/คน)
      * @return array{imported:int,skipped:int,error:string}
      */
-    public static function syncFollowers(int $propertyId, int $maxPages = 10): array
+    public static function syncFollowers(int $propertyId, int $maxPages = 5): array
     {
         $token = self::token($propertyId);
         if (!$token) {
@@ -484,8 +485,10 @@ class PropertyLineService
         $imported = 0;
         $skipped  = 0;
         $cursor   = null;
+        $now      = date('Y-m-d H:i:s');
         $phoneCol = \App\Core\Database::tableHasColumn('property_line_contacts', 'phone');
 
+        // ── Phase 1: ดึง follower IDs และ upsert เข้า DB (ไม่ fetch profile) ──────
         for ($page = 0; $page < $maxPages; $page++) {
             $url = 'https://api.line.me/v2/bot/followers/ids?limit=300';
             if ($cursor) $url .= '&start=' . rawurlencode($cursor);
@@ -505,42 +508,20 @@ class PropertyLineService
                 $uid = (string)$uid;
                 if (!$uid) continue;
 
-                // ดึง profile จาก LINE
-                $profRes  = self::get('https://api.line.me/v2/bot/profile/' . rawurlencode($uid), $token);
-                $profData = json_decode($profRes['body'], true);
-
-                $displayName = null;
-                $pictureUrl  = null;
-                if ($profRes['code'] === 200 && is_array($profData)) {
-                    $displayName = $profData['displayName'] ?? null;
-                    $pictureUrl  = $profData['pictureUrl'] ?? null;
-                }
-
-                $now      = date('Y-m-d H:i:s');
                 $existing = \App\Core\Database::fetch(
-                    "SELECT id, display_name, picture_url FROM property_line_contacts
+                    "SELECT id FROM property_line_contacts
                      WHERE property_id = :p AND line_user_id = :l LIMIT 1",
                     ['p' => $propertyId, 'l' => $uid]
                 );
 
                 if ($existing) {
-                    $upd = [];
-                    if ($displayName !== null && $displayName !== ($existing['display_name'] ?? '')) {
-                        $upd['display_name'] = $displayName;
-                    }
-                    if ($pictureUrl !== null && $pictureUrl !== ($existing['picture_url'] ?? '')) {
-                        $upd['picture_url'] = $pictureUrl;
-                    }
-                    if ($upd) {
-                        \App\Core\Database::update('property_line_contacts', $upd, 'id = :i', ['i' => $existing['id']]);
-                    }
                     $skipped++;
                 } else {
                     $row = [
                         'property_id'  => $propertyId,
                         'line_user_id' => $uid,
-                        'display_name' => $displayName,
-                        'picture_url'  => $pictureUrl,
+                        'display_name' => null,
+                        'picture_url'  => null,
                         'followed_at'  => $now,
                         'last_seen_at' => $now,
                     ];
@@ -551,6 +532,40 @@ class PropertyLineService
             }
 
             if (!$cursor) break;
+        }
+
+        // ── Phase 2: fetch profile เฉพาะคนที่ยังไม่มีชื่อ (max 50 คน, timeout 3s) ──
+        $noName = \App\Core\Database::fetchAll(
+            "SELECT id, line_user_id FROM property_line_contacts
+             WHERE property_id = :p AND (display_name IS NULL OR display_name = '')
+             ORDER BY last_seen_at DESC LIMIT 50",
+            ['p' => $propertyId]
+        );
+
+        foreach ($noName as $row) {
+            $uid = (string)$row['line_user_id'];
+            $ch  = curl_init('https://api.line.me/v2/bot/profile/' . rawurlencode($uid));
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 3,
+                CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+            ]);
+            $body = (string)curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($code === 200) {
+                $prof = json_decode($body, true);
+                \App\Core\Database::update(
+                    'property_line_contacts',
+                    [
+                        'display_name' => $prof['displayName'] ?? null,
+                        'picture_url'  => $prof['pictureUrl'] ?? null,
+                    ],
+                    'id = :i',
+                    ['i' => $row['id']]
+                );
+            }
         }
 
         return ['imported' => $imported, 'skipped' => $skipped, 'error' => ''];

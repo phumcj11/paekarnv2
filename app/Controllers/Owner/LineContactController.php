@@ -71,7 +71,6 @@ class LineContactController extends Controller
                  LEFT JOIN bookings b
                         ON b.guest_line_user_id = plc.line_user_id
                        AND b.property_id = plc.property_id
-                       AND b.deleted_at IS NULL
                  WHERE {$where}
                  GROUP BY plc.id
                  ORDER BY plc.last_seen_at DESC
