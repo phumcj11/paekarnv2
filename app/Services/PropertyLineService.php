@@ -195,15 +195,18 @@ class PropertyLineService
         $token = self::token($propertyId);
         if (!$token) return ['ok' => false, 'richMenuId' => '', 'detail' => 'ไม่มี token'];
 
+        // Large Rich Menu 2500×1686 (เทมเพลต "ใหญ่" ใน LINE OA Manager)
+        $menuH = 1686;
+        $rowH  = (int)($menuH / 2); // 843 ต่อแถว
         $menu = [
-            'size'        => ['width' => 2500, 'height' => 843],
+            'size'        => ['width' => 2500, 'height' => $menuH],
             'selected'    => true,
             'name'        => 'Paekarn Menu — ' . mb_substr($propertyName, 0, 30),
             'chatBarText' => 'เมนูสอบถาม',
             'areas'       => [
-                // แถวบน: เช็ควันว่าง (date picker) | ราคา & โปรโมชั่น | ดูห้องพัก
+                // แถวบน: เช็ควันว่าง | ราคา & โปรโมชั่น | ดูห้องพัก
                 [
-                    'bounds' => ['x' => 0,    'y' => 0, 'width' => 833,  'height' => 421],
+                    'bounds' => ['x' => 0,    'y' => 0,     'width' => 833,  'height' => $rowH],
                     'action' => [
                         'type'    => 'datetimepicker',
                         'label'   => 'เช็ควันว่าง',
@@ -215,24 +218,24 @@ class PropertyLineService
                     ],
                 ],
                 [
-                    'bounds' => ['x' => 833,  'y' => 0, 'width' => 834,  'height' => 421],
+                    'bounds' => ['x' => 833,  'y' => 0,     'width' => 834,  'height' => $rowH],
                     'action' => ['type' => 'message', 'label' => 'ราคา & โปรโมชั่น', 'text' => 'ราคาเท่าไหร่'],
                 ],
                 [
-                    'bounds' => ['x' => 1667, 'y' => 0, 'width' => 833,  'height' => 421],
+                    'bounds' => ['x' => 1667, 'y' => 0,     'width' => 833,  'height' => $rowH],
                     'action' => ['type' => 'message', 'label' => 'ดูห้องพัก', 'text' => 'ดูห้องพัก'],
                 ],
                 // แถวล่าง: ที่อยู่ | ติดต่อเรา | จองเลย
                 [
-                    'bounds' => ['x' => 0,    'y' => 421, 'width' => 833,  'height' => 422],
+                    'bounds' => ['x' => 0,    'y' => $rowH, 'width' => 833,  'height' => $rowH],
                     'action' => ['type' => 'message', 'label' => 'ที่อยู่', 'text' => 'ที่อยู่'],
                 ],
                 [
-                    'bounds' => ['x' => 833,  'y' => 421, 'width' => 834,  'height' => 422],
+                    'bounds' => ['x' => 833,  'y' => $rowH, 'width' => 834,  'height' => $rowH],
                     'action' => ['type' => 'message', 'label' => 'ติดต่อเรา', 'text' => 'เบอร์โทร'],
                 ],
                 [
-                    'bounds' => ['x' => 1667, 'y' => 421, 'width' => 833,  'height' => 422],
+                    'bounds' => ['x' => 1667, 'y' => $rowH, 'width' => 833,  'height' => $rowH],
                     'action' => ['type' => 'message', 'label' => 'จองเลย', 'text' => 'จองเลย'],
                 ],
             ],
@@ -379,7 +382,7 @@ class PropertyLineService
 
         // GD fallback: สร้างรูปสีน้ำเงินเรียบๆ
         if (!$png && function_exists('imagecreatetruecolor')) {
-            $w = 2500; $h = 843;
+            $w = 2500; $h = 1686;
             $img = imagecreatetruecolor($w, $h);
             if ($img) {
                 $bg  = imagecolorallocate($img, 11, 77, 107);
@@ -387,7 +390,7 @@ class PropertyLineService
                 imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
                 imageline($img, 833, 0, 833, $h, $sep);
                 imageline($img, 1667, 0, 1667, $h, $sep);
-                imageline($img, 0, 421, $w, 421, $sep);
+                imageline($img, 0, 843, $w, 843, $sep);
                 ob_start(); imagepng($img); $png = ob_get_clean();
                 imagedestroy($img);
                 $usedPath = 'GD fallback';
@@ -400,8 +403,8 @@ class PropertyLineService
             return ['ok' => false, 'code' => 0, 'detail' => "ไม่พบไฟล์รูป ({$tried})"];
         }
 
-        // LINE ต้องการ 2500×843 และไฟล์ ≤ 1MB
-        $prepared = self::prepareRichMenuImage($png);
+        // LINE Large Rich Menu 2500×1686, ไฟล์ ≤ 1MB
+        $prepared = self::prepareRichMenuImage($png, 2500, 1686);
         if (!$prepared['ok']) {
             return ['ok' => false, 'code' => 0, 'detail' => $prepared['detail']];
         }
@@ -517,10 +520,10 @@ class PropertyLineService
     }
 
     /**
-     * เตรียมรูป Rich Menu: resize 2500×843 + บีบอัด ≤ 1MB (LINE limit)
+     * เตรียมรูป Rich Menu: resize + บีบอัด ≤ 1MB (LINE limit)
      * @return array{ok:bool,bytes:string,contentType:string,detail:string}
      */
-    private static function prepareRichMenuImage(string $imageData): array
+    private static function prepareRichMenuImage(string $imageData, int $tw = 2500, int $th = 1686): array
     {
         $fail = static fn(string $msg) => ['ok' => false, 'bytes' => '', 'contentType' => '', 'detail' => $msg];
 
@@ -530,9 +533,6 @@ class PropertyLineService
 
         $src = @imagecreatefromstring($imageData);
         if (!$src) return $fail('อ่านไฟล์รูปไม่ได้');
-
-        $tw = 2500;
-        $th = 843;
         $dst = imagecreatetruecolor($tw, $th);
         if (!$dst) {
             imagedestroy($src);
@@ -542,7 +542,7 @@ class PropertyLineService
         $white = imagecolorallocate($dst, 255, 255, 255);
         imagefilledrectangle($dst, 0, 0, $tw - 1, $th - 1, $white);
 
-        // cover crop เต็มจอ 2500×843 — ไม่มีขอบขาว (LINE แสดงเต็มความกว้าง)
+        // cover crop เต็มจอ — ไม่มีขอบขาว (LINE แสดงเต็มความกว้าง)
         // ถ้ารูปสูงเกิน → crop ด้านล่างทิ้ง เก็บแถวบน (6 ปุ่ม) ไว้
         $sw = imagesx($src);
         $sh = imagesy($src);

@@ -604,7 +604,7 @@ $bookingCaps = $property
           <svg class="w-4 h-4 text-[#06C755]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           Rich Menu (6 ปุ่ม — ราคา, เช็ควันว่าง, ที่อยู่, เช็คอิน, ติดต่อ, วิธีจอง)
         </div>
-        <p class="text-xs text-slate-500 mb-2">Rich Menu จะแสดงที่ด้านล่างหน้าจอแชท LINE ของลูกค้า — ปุ่ม «เช็ควันว่าง» เป็น Date Picker</p>
+        <p class="text-xs text-slate-500 mb-2">Rich Menu ขนาดใหญ่ (2500×1686) แบบเทมเพลต LINE — ปุ่ม «เช็ควันว่าง» เป็น Date Picker</p>
         <?php if (!empty($property['line_rich_menu_id'])): ?>
         <p class="text-xs text-emerald-700 mb-2">✅ มี Rich Menu อยู่แล้ว: <code class="text-[10px] bg-slate-100 px-1 rounded"><?= e($property['line_rich_menu_id']) ?></code></p>
         <?php endif; ?>
