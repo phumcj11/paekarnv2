@@ -182,6 +182,24 @@ class PropertyLineService
         return self::push((int)$b['property_id'], (string)$b['guest_line_user_id'], [$flex]);
     }
 
+    /**
+     * Reply กลับลูกค้าผ่าน replyToken + per-property token
+     * $messages = LINE messages array (text/flex)
+     */
+    public static function reply(int $propertyId, string $replyToken, array $messages): bool
+    {
+        $token = self::token($propertyId);
+        if (!$token || !$replyToken) return false;
+
+        $body = json_encode([
+            'replyToken' => $replyToken,
+            'messages'   => $messages,
+        ], JSON_UNESCAPED_UNICODE);
+
+        $res = self::post('https://api.line.me/v2/bot/message/reply', $token, $body);
+        return $res['code'] === 200;
+    }
+
     /** Verify webhook signature ด้วย per-property secret */
     public static function verifySignature(int $propertyId, string $rawBody, ?string $headerSig): bool
     {

@@ -8,6 +8,7 @@ use App\Core\Session;
 use App\Models\User;
 use App\Services\AIService;
 use App\Services\LineService;
+use App\Services\PropertyLineBotService;
 use App\Services\PropertyLineService;
 
 class LineController extends Controller
@@ -172,7 +173,11 @@ class LineController extends Controller
                     'property_id = :p AND line_user_id = :l',
                     ['p' => $id, 'l' => $lineUserId]
                 );
-            } elseif ($type === 'follow' || $type === 'message') {
+                continue;
+            }
+
+            if ($type === 'follow' || $type === 'message') {
+                // บันทึก/อัปเดต contact
                 $profile = PropertyLineService::userProfile($id, $lineUserId);
                 $displayName = $profile['ok'] ? ($profile['data']['displayName'] ?? null) : null;
                 $pictureUrl  = $profile['ok'] ? ($profile['data']['pictureUrl'] ?? null) : null;
@@ -184,6 +189,37 @@ class LineController extends Controller
                     null,
                     $type === 'follow' ? 'follow' : 'message'
                 );
+
+                // Bot reply
+                $replyToken = $event['replyToken'] ?? '';
+                if (!$replyToken) continue;
+
+                if ($type === 'follow') {
+                    // ข้อความต้อนรับตอน Add Friend
+                    $property = Database::fetch(
+                        "SELECT name, phone, line_id FROM properties WHERE id = :i LIMIT 1",
+                        ['i' => $id]
+                    );
+                    $pname = $property ? $property['name'] : 'ที่พักของเรา';
+                    PropertyLineService::reply($id, $replyToken, [[
+                        'type' => 'text',
+                        'text' => "สวัสดีค่ะ ยินดีต้อนรับสู่ {$pname} 🌊\n\n"
+                               . "สอบถามได้เลยนะคะ เช่น\n"
+                               . "• \"ราคาเท่าไหร่\"\n"
+                               . "• \"15-16 มิ.ย. ว่างไหม 4 คน\"\n"
+                               . "• \"เช็คอินกี่โมง\"\n"
+                               . "• \"ที่อยู่อยู่ที่ไหน\"",
+                    ]]);
+                } elseif ($type === 'message' && ($event['message']['type'] ?? '') === 'text') {
+                    $text = trim((string)($event['message']['text'] ?? ''));
+                    if ($text !== '') {
+                        try {
+                            PropertyLineBotService::handle($id, $replyToken, $text);
+                        } catch (\Throwable $e) {
+                            error_log("[Paekarn] PropertyLineBotService error: " . $e->getMessage());
+                        }
+                    }
+                }
             }
         }
 
