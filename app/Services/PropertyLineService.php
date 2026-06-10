@@ -264,30 +264,35 @@ class PropertyLineService
     /**
      * ตั้ง Rich Menu เป็น default ของ OA
      * LINE API: POST https://api.line.me/v2/bot/richmenu/{richMenuId}/default
+     * @return array{ok:bool,code:int,detail:string}
      */
-    public static function setDefaultRichMenu(int $propertyId, string $richMenuId): bool
+    public static function setDefaultRichMenu(int $propertyId, string $richMenuId): array
     {
         $token = self::token($propertyId);
-        if (!$token) return false;
+        if (!$token) return ['ok' => false, 'code' => 0, 'detail' => 'ไม่มี token'];
 
         $ch = curl_init("https://api.line.me/v2/bot/richmenu/{$richMenuId}/default");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
+            CURLOPT_CUSTOMREQUEST  => 'POST',
             CURLOPT_TIMEOUT        => 10,
-            CURLOPT_POSTFIELDS     => '',
-            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Content-Length: 0',
+                'Authorization: Bearer ' . $token,
+            ],
         ]);
-        $body = curl_exec($ch);
+        $body = (string)curl_exec($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($code !== 200) {
-            error_log("[Paekarn] setDefaultRichMenu FAIL property={$propertyId} HTTP {$code}: {$body}");
-        } else {
+        if ($code === 200) {
             Database::update('properties', ['line_rich_menu_id' => $richMenuId], 'id = :i', ['i' => $propertyId]);
+            return ['ok' => true, 'code' => 200, 'detail' => ''];
         }
-        return $code === 200;
+
+        error_log("[Paekarn] setDefaultRichMenu FAIL property={$propertyId} HTTP {$code}: {$body}");
+        return ['ok' => false, 'code' => $code, 'detail' => $body];
     }
 
     /**

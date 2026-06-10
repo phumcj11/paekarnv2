@@ -331,10 +331,19 @@ class PropertyController extends Controller
             ]);
         }
 
-        $setOk = PropertyLineService::setDefaultRichMenu($id, $result['richMenuId']);
+        $setResult = PropertyLineService::setDefaultRichMenu($id, $result['richMenuId']);
+        if (!$setResult['ok']) {
+            $lineErr = PropertyLineService::parseLineError($setResult['detail']);
+            $detail  = $lineErr ?: $setResult['detail'];
+            $this->json([
+                'ok'         => false,
+                'message'    => "สร้าง Rich Menu สำเร็จ (ID: {$result['richMenuId']}) แต่ตั้งเป็น default ไม่ได้ (HTTP {$setResult['code']}): {$detail}",
+                'richMenuId' => $result['richMenuId'],
+            ]);
+        }
         $this->json([
-            'ok'      => true,
-            'message' => 'สร้างและตั้งค่า Rich Menu สำเร็จ' . ($setOk ? '' : ' (แต่ set default ไม่สำเร็จ)'),
+            'ok'         => true,
+            'message'    => 'สร้างและตั้งค่า Rich Menu สำเร็จ ✅',
             'richMenuId' => $result['richMenuId'],
         ]);
     }
