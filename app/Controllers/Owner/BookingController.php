@@ -97,6 +97,10 @@ class BookingController extends Controller
                 'cal_m' => (int)($_POST['cal_m'] ?? 0),
                 'cal_y' => (int)($_POST['cal_y'] ?? 0),
             ]);
+            $calView = ($_POST['cal_view'] ?? '');
+            if ($calView === 'unit') {
+                $q['cal_view'] = 'unit';
+            }
             redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
         }
         redirect(url('/owner/bookings/' . $id));

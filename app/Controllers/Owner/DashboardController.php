@@ -116,15 +116,30 @@ class DashboardController extends Controller
             : [];
         $calUnitId = isset($_GET['cal_u']) ? (int)$_GET['cal_u'] : (int)($calUnits[0]['id'] ?? 0);
         $validCalUnit = false;
+        $calTotalUnits = 1;
         foreach ($calUnits as $cu) {
             if ((int)$cu['id'] === $calUnitId) {
                 $validCalUnit = true;
+                $calTotalUnits = max(1, (int)$cu['total_units']);
                 break;
             }
         }
         if (!$validCalUnit && !empty($calUnits)) {
             $calUnitId = (int)$calUnits[0]['id'];
+            $calTotalUnits = max(1, (int)($calUnits[0]['total_units'] ?? 1));
         }
+
+        // cal_view: 'all' = รวมทุกยูนิต (default), 'unit' = รายยูนิตที่เลือก
+        $multiUnit = count($calUnits) > 1;
+        $calView = 'all';
+        if ($multiUnit && isset($_GET['cal_view']) && $_GET['cal_view'] === 'unit') {
+            $calView = 'unit';
+        }
+        // ที่พักยูนิตเดียว → unit mode เสมอ
+        if (!$multiUnit) {
+            $calView = 'unit';
+        }
+
         $homeCalendar = null;
         $calPropertyName = '';
         foreach ($calProperties as $cp) {
@@ -134,13 +149,25 @@ class DashboardController extends Controller
             }
         }
         if ($calPropertyId > 0) {
-            $homeCalendar = OwnerAvailabilityCalendar::buildPropertyMonth($calPropertyId, $calMonth, $calYear);
-            $homeCalendar['property_id']   = $calPropertyId;
-            $homeCalendar['property_name'] = $calPropertyName;
-            $homeCalendar['unit_id']       = $calUnitId;
-            $homeCalendar['month']         = $calMonth;
-            $homeCalendar['year']          = $calYear;
-            $homeCalendar['units']         = $calUnits;
+            if ($calView === 'unit' && $calUnitId > 0) {
+                $homeCalendar = OwnerAvailabilityCalendar::buildMonth($calUnitId, $calMonth, $calYear, $calTotalUnits);
+                $selectedUnitName = '';
+                foreach ($calUnits as $cu) {
+                    if ((int)$cu['id'] === $calUnitId) { $selectedUnitName = $cu['name']; break; }
+                }
+            } else {
+                $homeCalendar = OwnerAvailabilityCalendar::buildPropertyMonth($calPropertyId, $calMonth, $calYear);
+                $selectedUnitName = '';
+            }
+            $homeCalendar['property_id']        = $calPropertyId;
+            $homeCalendar['property_name']       = $calPropertyName;
+            $homeCalendar['unit_id']             = $calUnitId;
+            $homeCalendar['month']               = $calMonth;
+            $homeCalendar['year']                = $calYear;
+            $homeCalendar['units']               = $calUnits;
+            $homeCalendar['view_mode']           = $calView;
+            $homeCalendar['selected_unit_name']  = $selectedUnitName ?? '';
+            $homeCalendar['multi_unit']          = $multiUnit;
         }
 
         View::render('owner/dashboard', [

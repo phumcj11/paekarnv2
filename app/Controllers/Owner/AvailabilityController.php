@@ -96,9 +96,12 @@ class AvailabilityController extends Controller
     private function redirectAfterCalendar(int $propertyId, int $unitId, int $month, int $year): void
     {
         if (($_POST['return_to'] ?? '') === 'dashboard') {
-            redirect(url('/owner/dashboard') . '?' . http_build_query([
-                'cal_p' => $propertyId, 'cal_u' => $unitId, 'cal_m' => $month, 'cal_y' => $year,
-            ]));
+            $q = ['cal_p' => $propertyId, 'cal_u' => $unitId, 'cal_m' => $month, 'cal_y' => $year];
+            $calView = ($_POST['cal_view'] ?? '');
+            if ($calView === 'unit') {
+                $q['cal_view'] = 'unit';
+            }
+            redirect(url('/owner/dashboard') . '?' . http_build_query($q));
         }
         redirect(url('/owner/properties/' . $propertyId . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
     }

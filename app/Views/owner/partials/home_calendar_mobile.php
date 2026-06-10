@@ -2,29 +2,46 @@
 /** @var array|null $homeCalendar @var list<array> $calProperties */
 if (!$homeCalendar || empty($calProperties)) return;
 
-$thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-$month    = (int)$homeCalendar['month'];
-$year     = (int)$homeCalendar['year'];
-$pid      = (int)$homeCalendar['property_id'];
-$unitId   = (int)$homeCalendar['unit_id'];
-$dayMeta  = $homeCalendar['dayMeta'];
-$bookings = $homeCalendar['bookingsByDate'];
+$thaiMonths   = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+$month        = (int)$homeCalendar['month'];
+$year         = (int)$homeCalendar['year'];
+$pid          = (int)$homeCalendar['property_id'];
+$unitId       = (int)$homeCalendar['unit_id'];
+$dayMeta      = $homeCalendar['dayMeta'];
+$bookings     = $homeCalendar['bookingsByDate'];
 $daysInMonth  = (int)$homeCalendar['daysInMonth'];
 $startWeekday = (int)$homeCalendar['startWeekday'];
+$viewMode     = $homeCalendar['view_mode'] ?? 'all';       // 'all' | 'unit'
+$multiUnit    = (bool)($homeCalendar['multi_unit'] ?? false);
+$selUnitName  = $homeCalendar['selected_unit_name'] ?? '';
+$units        = $homeCalendar['units'] ?? [];
+
 $prevM = $month === 1 ? 12 : $month - 1;
 $prevY = $month === 1 ? $year - 1 : $year;
 $nextM = $month === 12 ? 1 : $month + 1;
 $nextY = $month === 12 ? $year + 1 : $year;
+
+// baseQ preserves view + unit across pagination/property changes
 $baseQ = static fn(array $extra = []) => url('/owner/dashboard') . '?' . http_build_query(array_merge([
-    'cal_p' => $pid, 'cal_u' => $unitId, 'cal_m' => $month, 'cal_y' => $year,
+    'cal_p'    => $pid,
+    'cal_u'    => $unitId,
+    'cal_m'    => $month,
+    'cal_y'    => $year,
+    'cal_view' => $viewMode,
 ], $extra));
-$fullCalUrl = url('/owner/properties/' . $pid . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year;
-$unitsJson = json_encode(array_values($homeCalendar['units'] ?? []), JSON_UNESCAPED_UNICODE);
+
+// "จัดการเต็ม" links to the specific unit in unit mode
+$fullCalUrl = url('/owner/properties/' . $pid . '/availability')
+    . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year;
+
+$unitsJson    = json_encode(array_values($units), JSON_UNESCAPED_UNICODE);
 $bookingsJson = json_encode($bookings, JSON_UNESCAPED_UNICODE);
-$csrfToken = \App\Core\Csrf::token();
+$csrfToken    = \App\Core\Csrf::token();
 ?>
 
 <section class="ow-card p-4 mb-5 lg:hidden" x-data="homeCalManage()" x-init="init()">
+
+  <!-- Header row -->
   <div class="flex items-start justify-between gap-2 mb-3">
     <div class="min-w-0">
       <h3 class="font-bold text-slate-800 flex items-center gap-2">
@@ -37,41 +54,56 @@ $csrfToken = \App\Core\Csrf::token();
   </div>
 
   <?php if (count($calProperties) > 1): ?>
+  <!-- Property selector (multi-property owners) -->
   <form method="get" class="mb-3">
-    <input type="hidden" name="cal_m" value="<?= $month ?>">
-    <input type="hidden" name="cal_y" value="<?= $year ?>">
-    <select name="cal_p" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm mb-2">
+    <input type="hidden" name="cal_m"    value="<?= $month ?>">
+    <input type="hidden" name="cal_y"    value="<?= $year ?>">
+    <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
+    <input type="hidden" name="cal_u"    value="<?= $unitId ?>">
+    <select name="cal_p" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
       <?php foreach ($calProperties as $cp): ?>
       <option value="<?= (int)$cp['id'] ?>" <?= (int)$cp['id'] === $pid ? 'selected' : '' ?>><?= e($cp['name']) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <?php if (!empty($homeCalendar['units']) && count($homeCalendar['units']) > 1): ?>
-    <select name="cal_u" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
-      <?php foreach ($homeCalendar['units'] as $u): ?>
-      <option value="<?= (int)$u['id'] ?>" <?= (int)$u['id'] === $unitId ? 'selected' : '' ?>><?= e($u['name']) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <?php endif; ?>
-  </form>
-  <?php elseif (!empty($homeCalendar['units']) && count($homeCalendar['units']) > 1): ?>
-  <form method="get" class="mb-3">
-    <input type="hidden" name="cal_p" value="<?= $pid ?>">
-    <input type="hidden" name="cal_m" value="<?= $month ?>">
-    <input type="hidden" name="cal_y" value="<?= $year ?>">
-    <select name="cal_u" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
-      <?php foreach ($homeCalendar['units'] as $u): ?>
-      <option value="<?= (int)$u['id'] ?>" <?= (int)$u['id'] === $unitId ? 'selected' : '' ?>><?= e($u['name']) ?></option>
       <?php endforeach; ?>
     </select>
   </form>
   <?php endif; ?>
 
+  <?php if ($multiUnit): ?>
+  <!-- Segmented control: ภาพรวม / รายยูนิต -->
+  <div class="flex rounded-xl overflow-hidden border border-slate-200 mb-3 text-sm font-semibold">
+    <a href="<?= e($baseQ(['cal_view' => 'all'])) ?>"
+       class="flex-1 py-2 text-center transition <?= $viewMode === 'all' ? 'bg-core-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' ?>">
+      ภาพรวม
+    </a>
+    <a href="<?= e($baseQ(['cal_view' => 'unit', 'cal_u' => $unitId])) ?>"
+       class="flex-1 py-2 text-center border-l border-slate-200 transition <?= $viewMode === 'unit' ? 'bg-core-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50' ?>">
+      รายยูนิต
+    </a>
+  </div>
+
+  <?php if ($viewMode === 'unit'): ?>
+  <!-- Unit chip scroller -->
+  <div class="flex gap-2 overflow-x-auto pb-1 mb-3 scrollbar-hide">
+    <?php foreach ($units as $u): ?>
+    <?php $isActive = (int)$u['id'] === $unitId; ?>
+    <a href="<?= e($baseQ(['cal_view' => 'unit', 'cal_u' => (int)$u['id']])) ?>"
+       class="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition
+              <?= $isActive ? 'bg-core-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
+      <?= e($u['name']) ?>
+    </a>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+  <?php endif; ?>
+
+  <!-- Month navigation -->
   <div class="flex items-center justify-between mb-2">
     <a href="<?= e($baseQ(['cal_m' => $prevM, 'cal_y' => $prevY])) ?>" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50"><i data-lucide="chevron-left" class="w-4 h-4"></i></a>
     <span class="text-sm font-bold"><?= $thaiMonths[$month] ?> <?= $year + 543 ?></span>
     <a href="<?= e($baseQ(['cal_m' => $nextM, 'cal_y' => $nextY])) ?>" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50"><i data-lucide="chevron-right" class="w-4 h-4"></i></a>
   </div>
 
+  <!-- Legend -->
   <div class="flex flex-wrap gap-2 text-[10px] text-slate-500 mb-2">
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></span>ว่าง</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></span>จอง</span>
@@ -79,14 +111,15 @@ $csrfToken = \App\Core\Csrf::token();
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-300 border border-slate-400"></span>ปิด</span>
   </div>
 
+  <!-- Calendar grid -->
   <div class="grid grid-cols-7 gap-0.5 mb-0.5 text-center text-[10px] font-semibold text-slate-400">
     <?php foreach (['อา','จ','อ','พ','พฤ','ศ','ส'] as $d): ?><div><?= $d ?></div><?php endforeach; ?>
   </div>
   <div class="grid grid-cols-7 gap-1">
     <?php for ($i = 0; $i < $startWeekday; $i++): ?><div></div><?php endfor; ?>
     <?php for ($d = 1; $d <= $daysInMonth; $d++):
-      $date = sprintf('%04d-%02d-%02d', $year, $month, $d);
-      $meta = $dayMeta[$date] ?? ['key'=>'open','label'=>'ว่าง','cls'=>'bg-emerald-100 border-emerald-300 text-emerald-800'];
+      $date  = sprintf('%04d-%02d-%02d', $year, $month, $d);
+      $meta  = $dayMeta[$date] ?? ['key'=>'open','label'=>'ว่าง','cls'=>'bg-emerald-100 border-emerald-300 text-emerald-800'];
       $isPast = ($meta['key'] ?? '') === 'past';
     ?>
     <?php if ($isPast): ?>
@@ -105,9 +138,16 @@ $csrfToken = \App\Core\Csrf::token();
     <?php endfor; ?>
   </div>
 
-  <p class="text-[10px] text-slate-500 mt-3 text-center">แสดงสถานะรวมทุกยูนิต · แตะวันที่เพื่อจัดการ</p>
+  <!-- Footer hint -->
+  <p class="text-[10px] text-slate-500 mt-3 text-center">
+    <?php if ($viewMode === 'unit' && $selUnitName !== ''): ?>
+    แสดงเฉพาะ <?= e($selUnitName) ?> · แตะวันที่เพื่อจัดการ
+    <?php else: ?>
+    สถานะรวมทุกยูนิต · แตะวันที่เพื่อจัดการ
+    <?php endif; ?>
+  </p>
 
-  <!-- Modal จัดการวัน -->
+  <!-- ==================== Modal จัดการวัน ==================== -->
   <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50" @keydown.escape.window="closeModal()">
     <div @click.outside="closeModal()" class="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] overflow-y-auto p-5 pb-8">
 
@@ -251,7 +291,7 @@ $csrfToken = \App\Core\Csrf::token();
           <div class="space-y-3">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
-              <select x-model="formUnitId" @change="fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+              <select x-model="formUnitId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
                 <template x-for="u in units" :key="u.id">
                   <option :value="String(u.id)" x-text="u.name"></option>
                 </template>
@@ -272,12 +312,14 @@ $csrfToken = \App\Core\Csrf::token();
     <input type="hidden" name="year" value="<?= $year ?>">
     <input type="hidden" name="status" value="closed">
     <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
   </form>
   <form id="homeCalBookForm" method="post" action="<?= url('/owner/properties/' . $pid . '/availability/booking') ?>" class="hidden">
     <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
     <input type="hidden" name="month" value="<?= $month ?>">
     <input type="hidden" name="year" value="<?= $year ?>">
     <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
   </form>
   <form id="homeCalCancelForm" method="post" action="" class="hidden">
     <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
@@ -287,14 +329,17 @@ $csrfToken = \App\Core\Csrf::token();
     <input type="hidden" name="cal_u" value="<?= $unitId ?>">
     <input type="hidden" name="cal_m" value="<?= $month ?>">
     <input type="hidden" name="cal_y" value="<?= $year ?>">
+    <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
   </form>
 </section>
 
 <script>
 function homeCalManage() {
-  const units = <?= $unitsJson ?>;
+  const units         = <?= $unitsJson ?>;
   const bookingsOnDate = <?= $bookingsJson ?>;
-  const defaultUnitId = String(<?= $unitId ?>);
+  // In unit mode, default to the selected unit; in all mode, default to first unit
+  const defaultUnitId = String(<?= $unitId ?>) || (units[0] ? String(units[0].id) : '');
+
   const thaiShort = (ymd) => {
     if (!ymd) return '';
     const [, m, d] = ymd.split('-').map(Number);
@@ -368,7 +413,7 @@ function homeCalManage() {
     bookingBalance(b) {
       if (b.balance != null) return b.balance;
       const total = parseFloat(b.total_price) || 0;
-      const paid = parseFloat(b.paid_amount) || 0;
+      const paid  = parseFloat(b.paid_amount) || 0;
       return Math.max(0, total - paid);
     },
     get balance() {
@@ -381,9 +426,9 @@ function homeCalManage() {
       this.priceLoading = true;
       try {
         const q = new URLSearchParams({
-          unit_id: this.formUnitId,
-          check_in: this.selectedDate,
-          check_out: this.checkOut,
+          unit_id:     this.formUnitId,
+          check_in:    this.selectedDate,
+          check_out:   this.checkOut,
           guest_count: '1',
         });
         const r = await fetch('<?= url('/owner/api/booking-quote') ?>?' + q);
@@ -401,13 +446,11 @@ function homeCalManage() {
     fillForm(formId, fields) {
       const f = document.getElementById(formId);
       Object.entries(fields).forEach(([name, val]) => {
-        const isArray = name.endsWith('[]');
-        const key = isArray ? name : name;
-        let input = f.querySelector(`[name="${key}"]`);
+        let input = f.querySelector(`[name="${name}"]`);
         if (!input) {
           input = document.createElement('input');
           input.type = 'hidden';
-          input.name = key;
+          input.name = name;
           f.appendChild(input);
         }
         input.value = val;
@@ -417,8 +460,8 @@ function homeCalManage() {
       if (!this.canBook()) return;
       this.syncCheckOut();
       const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
-      const price = parseFloat(this.totalPrice) || 0;
-      const dep = parseFloat(this.deposit) || 0;
+      const price    = parseFloat(this.totalPrice) || 0;
+      const dep      = parseFloat(this.deposit) || 0;
       const html = `<div class="text-left text-sm space-y-1">
         <p><strong>ยูนิต:</strong> ${unitName}</p>
         <p><strong>ผู้จอง:</strong> ${this.guestName}</p>
@@ -431,14 +474,14 @@ function homeCalManage() {
       const ok = await this.swalConfirm('ยืนยันเพิ่มการจอง?', html, 'question');
       if (!ok) return;
       this.fillForm('homeCalBookForm', {
-        unit_id: this.formUnitId,
-        check_in: this.selectedDate,
-        check_out: this.checkOut,
-        guest_name: this.guestName.trim(),
-        guest_phone: this.guestPhone.trim(),
-        total_price: this.totalPrice,
+        unit_id:        this.formUnitId,
+        check_in:       this.selectedDate,
+        check_out:      this.checkOut,
+        guest_name:     this.guestName.trim(),
+        guest_phone:    this.guestPhone.trim(),
+        total_price:    this.totalPrice,
         deposit_amount: this.deposit,
-        notes: this.notes.trim(),
+        notes:          this.notes.trim(),
       });
       document.getElementById('homeCalBookForm').submit();
     },
@@ -452,7 +495,7 @@ function homeCalManage() {
       const ok = await this.swalConfirm('ยืนยันปิดการจอง?', html, 'warning');
       if (!ok) return;
       this.fillForm('homeCalCloseForm', {
-        unit_id: this.formUnitId,
+        unit_id:   this.formUnitId,
         'dates[]': this.selectedDate,
       });
       document.getElementById('homeCalCloseForm').submit();
@@ -469,12 +512,12 @@ function homeCalManage() {
       if (!window.Swal) return confirm(title);
       const r = await Swal.fire({
         title, html, icon,
-        showCancelButton: true,
-        confirmButtonColor: '#0e7490',
-        cancelButtonColor: '#94a3b8',
-        confirmButtonText: 'ยืนยัน',
-        cancelButtonText: 'ยกเลิก',
-        reverseButtons: true,
+        showCancelButton:    true,
+        confirmButtonColor:  '#0e7490',
+        cancelButtonColor:   '#94a3b8',
+        confirmButtonText:   'ยืนยัน',
+        cancelButtonText:    'ยกเลิก',
+        reverseButtons:      true,
       });
       return r.isConfirmed;
     },
