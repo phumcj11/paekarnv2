@@ -208,13 +208,10 @@ class PropertyLineService
                 [
                     'bounds' => ['x' => 0,    'y' => 0,     'width' => 833,  'height' => $rowH],
                     'action' => [
-                        'type'    => 'datetimepicker',
-                        'label'   => 'เช็ควันว่าง',
-                        'data'    => 'avail_date',
-                        'mode'    => 'date',
-                        'initial' => date('Y-m-d', strtotime('+1 day')),
-                        'min'     => date('Y-m-d'),
-                        'max'     => date('Y-m-d', strtotime('+6 month')),
+                        'type'        => 'postback',
+                        'label'       => 'เช็ควันว่าง',
+                        'data'        => 'avail_calendar',
+                        'displayText' => 'เช็ควันว่าง',
                     ],
                 ],
                 [

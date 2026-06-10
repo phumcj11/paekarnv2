@@ -74,39 +74,33 @@ class PropertyLineBotService
             ['p' => $propertyId]
         );
 
-        // date picker — avail_date
-        if ($data === 'avail_date' && !empty($params['date'])) {
-            $dateStr  = $params['date'];          // "2026-06-15"
-            $checkIn  = new \DateTime($dateStr);
-            $checkOut = (clone $checkIn)->modify('+1 day');
-
-            $available = self::queryAvailableUnits($propertyId, $checkIn, $checkOut, 1);
-            $label     = self::thaiDateShort($checkIn) . ' – ' . self::thaiDateShort($checkOut) . ' (1 คืน)';
-
-            if (empty($available)) {
-                $msgs = [self::txtMsg("📅 {$label}\nเสียใจด้วย ไม่มียูนิตว่างในวันที่เลือก\nลองเลือกวันอื่นได้เลยครับ")];
-            } else {
-                $lines = ["📅 {$label}\nยูนิตที่ว่าง:"];
-                foreach ($available as $u) {
-                    $price = self::calcPrice($u, $checkIn);
-                    $lines[] = "• {$u['name']} — ฿" . number_format($price) . '/คืน'
-                        . ' (รับ ' . $u['capacity_min'] . '–' . $u['capacity_max'] . ' คน)';
-                }
-                $lines[] = "\nสอบถามเพิ่มเติมหรือต้องการจอง ทักเลยครับ";
-                $msgs = [self::txtMsg(implode("\n", $lines))];
+        // ตารางปฏิทินว่าง — จาก Rich Menu / postback
+        if ($data === 'avail_calendar' || str_starts_with($data, 'avail_calendar=')) {
+            $monthYm = null;
+            if (preg_match('/avail_calendar=(\d{4}-\d{2})/', $data, $m)) {
+                $monthYm = $m[1];
             }
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                self::buildAvailabilityCalendarMsgs($propertyId, $property, $monthYm)
+            );
+        }
 
-            // Quick Reply หลังผลลัพธ์
-            $qr = ['items' => [
-                self::qrDatepicker('📅 เลือกวันอื่น', 'avail_date'),
-                self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
-                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
-            ]];
-            $last = array_pop($msgs);
-            $last['quickReply'] = $qr;
-            $msgs[] = $last;
+        // เลือกวันจากตาราง หรือ date picker
+        $pickDate = null;
+        if (preg_match('/^avail_pick=(\d{4}-\d{2}-\d{2})$/', $data, $m)) {
+            $pickDate = $m[1];
+        } elseif ($data === 'avail_date' && !empty($params['date'])) {
+            $pickDate = $params['date'];
+        }
 
-            return PropertyLineService::reply($propertyId, $replyToken, $msgs);
+        if ($pickDate) {
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                self::buildAvailabilityDayDetailMsgs($propertyId, $property, $units, $pickDate)
+            );
         }
 
         // fallback postback
@@ -187,7 +181,7 @@ class PropertyLineBotService
         ];
 
         $avail = [
-            self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+            self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
             self::qrText('เสาร์นี้', 'เสาร์นี้ ว่างไหม'),
             self::qrText('พรุ่งนี้', 'พรุ่งนี้ ว่างไหม'),
             self::qrText('เสาร์ทั้งเดือน', 'เดือนนี้ เสาร์ไหน ว่างบ้าง'),
@@ -198,7 +192,7 @@ class PropertyLineBotService
             self::INTENT_GREETING    => ['items' => $all],
             self::INTENT_FALLBACK    => ['items' => $all],
             self::INTENT_PRICE       => ['items' => [
-                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
                 self::qrText('เสาร์นี้ ว่างไหม', 'เสาร์นี้ ว่างไหม'),
                 self::qrText('📍 ที่อยู่', 'ที่อยู่'),
                 self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
@@ -206,21 +200,21 @@ class PropertyLineBotService
             self::INTENT_AVAIL       => ['items' => $avail],
             self::INTENT_LOCATION    => ['items' => [
                 self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
-                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
                 self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
             ]],
             self::INTENT_CONTACT     => ['items' => [
-                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
                 self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
                 self::qrText('📍 ที่อยู่', 'ที่อยู่'),
             ]],
             self::INTENT_VIEW_ROOMS  => ['items' => [
-                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
                 self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
                 self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
             ]],
             self::INTENT_BOOK_NOW    => ['items' => [
-                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
                 self::qrText('🏠 ดูห้องพัก', 'ดูห้องพัก'),
                 self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
             ]],
@@ -571,14 +565,9 @@ class PropertyLineBotService
         $dates  = self::parseDates($text);
         $guests = self::parseGuests($text);
 
-        // ไม่พบวันที่ → ถามกลับ
+        // ไม่พบวันที่ → แสดงตารางปฏิทิน
         if (!$dates) {
-            $msg = "ต้องการเช็กวันว่างค่ะ 🗓️\n\n"
-                 . "กรุณาระบุวันที่ต้องการ เช่น\n"
-                 . "• \"เสาร์นี้ ว่างไหม 4 คน\"\n"
-                 . "• \"15-16 มิ.ย. 4 คน\"\n"
-                 . "• \"20/6 - 22/6 ผู้ใหญ่ 6 คน\"";
-            return [self::txtMsg($msg)];
+            return self::buildAvailabilityCalendarMsgs($propertyId, $property);
         }
 
         $checkIn  = $dates['check_in'];
@@ -626,6 +615,221 @@ class PropertyLineBotService
         $lines[] = "สนใจจองแจ้งชื่อและเบอร์โทรได้เลยค่ะ 😊\n" . self::contactLine($property);
 
         return [self::txtMsg(implode("\n", $lines))];
+    }
+
+    /** @return array<int,array> */
+    private static function buildAvailabilityCalendarMsgs(int $propertyId, array $property, ?string $monthYm = null): array
+    {
+        $ym = $monthYm ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $ym)) {
+            $ym = date('Y-m');
+        }
+        [$year, $month] = array_map('intval', explode('-', $ym));
+
+        $minYm = date('Y-m');
+        $maxYm = date('Y-m', strtotime('+6 month'));
+        if ($ym < $minYm) $ym = $minYm;
+        if ($ym > $maxYm) $ym = $maxYm;
+        [$year, $month] = array_map('intval', explode('-', $ym));
+
+        return [self::buildAvailabilityCalendarFlex($propertyId, $property, $year, $month)];
+    }
+
+    /** Flex ตารางปฏิทิน — กดวันที่ว่าง (สีเขียว) เพื่อดูรายละเอียด */
+    private static function buildAvailabilityCalendarFlex(int $propertyId, array $property, int $year, int $month): array
+    {
+        $monthLabels = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        $weekdays    = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+        $first     = new \DateTime(sprintf('%04d-%02d-01', $year, $month));
+        $daysInMon = (int)$first->format('t');
+        $startDow  = (int)$first->format('w');
+        $today     = date('Y-m-d');
+
+        $prevYm = date('Y-m', strtotime($first->format('Y-m-01') . ' -1 month'));
+        $nextYm = date('Y-m', strtotime($first->format('Y-m-01') . ' +1 month'));
+        $minYm  = date('Y-m');
+        $maxYm  = date('Y-m', strtotime('+6 month'));
+
+        $headerContents = [];
+        if ($prevYm >= $minYm) {
+            $headerContents[] = [
+                'type'   => 'button',
+                'style'  => 'link',
+                'height' => 'sm',
+                'action' => ['type' => 'postback', 'label' => '◀', 'data' => "avail_calendar={$prevYm}", 'displayText' => 'เดือนก่อน'],
+            ];
+        } else {
+            $headerContents[] = ['type' => 'filler'];
+        }
+
+        $headerContents[] = [
+            'type'   => 'text',
+            'text'   => ($monthLabels[$month] ?? '') . ' ' . ($year + 543),
+            'weight' => 'bold',
+            'size'   => 'md',
+            'align'  => 'center',
+            'flex'   => 4,
+        ];
+
+        if ($nextYm <= $maxYm) {
+            $headerContents[] = [
+                'type'   => 'button',
+                'style'  => 'link',
+                'height' => 'sm',
+                'action' => ['type' => 'postback', 'label' => '▶', 'data' => "avail_calendar={$nextYm}", 'displayText' => 'เดือนถัดไป'],
+            ];
+        } else {
+            $headerContents[] = ['type' => 'filler'];
+        }
+
+        $bodyContents = [[
+            'type'     => 'box',
+            'layout'   => 'horizontal',
+            'contents' => array_map(static fn(string $d) => [
+                'type'  => 'text',
+                'text'  => $d,
+                'size'  => 'xxs',
+                'color' => '#888888',
+                'align' => 'center',
+                'flex'  => 1,
+            ], $weekdays),
+        ]];
+
+        $day = 1;
+        for ($week = 0; $week < 6; $week++) {
+            $row = [];
+            for ($dow = 0; $dow < 7; $dow++) {
+                $cellIdx = $week * 7 + $dow;
+                if ($cellIdx < $startDow || $day > $daysInMon) {
+                    $row[] = ['type' => 'filler', 'flex' => 1];
+                    continue;
+                }
+
+                $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                $label   = (string)$day;
+
+                if ($dateStr < $today) {
+                    $row[] = [
+                        'type'     => 'box',
+                        'layout'   => 'vertical',
+                        'flex'     => 1,
+                        'contents' => [[
+                            'type'  => 'text',
+                            'text'  => $label,
+                            'size'  => 'xs',
+                            'color' => '#cccccc',
+                            'align' => 'center',
+                        ]],
+                    ];
+                } elseif (self::dayHasAvailability($propertyId, $dateStr)) {
+                    $row[] = [
+                        'type'   => 'button',
+                        'style'  => 'primary',
+                        'color'  => '#1a7a8a',
+                        'height' => 'sm',
+                        'flex'   => 1,
+                        'action' => [
+                            'type'        => 'postback',
+                            'label'       => $label,
+                            'data'        => "avail_pick={$dateStr}",
+                            'displayText' => "เช็ควันที่ {$label}",
+                        ],
+                    ];
+                } else {
+                    $row[] = [
+                        'type'     => 'box',
+                        'layout'   => 'vertical',
+                        'flex'     => 1,
+                        'contents' => [[
+                            'type'  => 'text',
+                            'text'  => $label,
+                            'size'  => 'xs',
+                            'color' => '#e74c3c',
+                            'align' => 'center',
+                        ]],
+                    ];
+                }
+                $day++;
+            }
+            $bodyContents[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'xs', 'contents' => $row];
+            if ($day > $daysInMon) break;
+        }
+
+        $bodyContents[] = [
+            'type'     => 'box',
+            'layout'   => 'horizontal',
+            'margin'   => 'md',
+            'contents' => [
+                ['type' => 'text', 'text' => '🔵 ว่าง', 'size' => 'xxs', 'color' => '#1a7a8a', 'flex' => 1],
+                ['type' => 'text', 'text' => '🔴 เต็ม', 'size' => 'xxs', 'color' => '#e74c3c', 'flex' => 1],
+                ['type' => 'text', 'text' => 'กดวันสีฟ้า = 1 คืน', 'size' => 'xxs', 'color' => '#888888', 'flex' => 2, 'align' => 'end'],
+            ],
+        ];
+
+        return [
+            'type'     => 'flex',
+            'altText'  => "ตารางวันว่าง {$property['name']} — {$monthLabels[$month]} " . ($year + 543),
+            'contents' => [
+                'type'   => 'bubble',
+                'size'   => 'mega',
+                'header' => [
+                    'type'            => 'box',
+                    'layout'          => 'horizontal',
+                    'backgroundColor' => '#E8F4F8',
+                    'paddingAll'      => 'md',
+                    'contents'        => $headerContents,
+                ],
+                'body' => [
+                    'type'     => 'box',
+                    'layout'   => 'vertical',
+                    'spacing'  => 'xs',
+                    'paddingAll' => 'md',
+                    'contents' => $bodyContents,
+                ],
+            ],
+        ];
+    }
+
+    /** รายละเอียดห้องว่างวันที่เลือกจากตาราง */
+    private static function buildAvailabilityDayDetailMsgs(int $propertyId, array $property, array $units, string $dateStr): array
+    {
+        $checkIn  = $dateStr;
+        $checkOut = date('Y-m-d', strtotime($dateStr . ' +1 day'));
+        $available = self::queryAvailableUnits($propertyId, $checkIn, $checkOut, 1);
+        $ciTh      = self::thaiDateShort($checkIn);
+        $coTh      = self::thaiDateShort($checkOut);
+
+        if (empty($available)) {
+            $msgs = [self::txtMsg("📅 {$ciTh} → {$coTh} (1 คืน)\n😔 ไม่มีห้องว่างวันนี้ค่ะ\nกดดูตารางเดือนอื่นได้เลย")];
+        } else {
+            $lines = ["📅 {$ciTh} → {$coTh} (1 คืน)\nยูนิตที่ว่าง:"];
+            foreach ($available as $u) {
+                $price = self::calcPrice($u, $checkIn, 1);
+                $lines[] = "✅ {$u['name']} — ฿" . number_format($price) . '/คืน'
+                    . " ({$u['capacity_min']}–{$u['capacity_max']} คน)";
+            }
+            $lines[] = "\nสนใจจองแจ้งชื่อและเบอร์โทรได้เลยค่ะ 😊";
+            $lines[] = self::contactLine($property);
+            $msgs = [self::txtMsg(implode("\n", $lines))];
+        }
+
+        $qr = ['items' => [
+            self::qrText('📅 ตารางว่าง', 'เช็ควันว่าง'),
+            self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+            self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+        ]];
+        $last = array_pop($msgs);
+        $last['quickReply'] = $qr;
+        $msgs[] = $last;
+
+        return $msgs;
+    }
+
+    private static function dayHasAvailability(int $propertyId, string $date): bool
+    {
+        $next = date('Y-m-d', strtotime($date . ' +1 day'));
+        return !empty(self::queryAvailableUnits($propertyId, $date, $next, 1));
     }
 
     /**
