@@ -87,19 +87,65 @@ class PropertyLineBotService
             );
         }
 
-        // เลือกวันจากตาราง หรือ date picker
+        // เลือกเช็คอิน → เลือกจำนวนคืน / เช็คเอาท์
+        if (preg_match('/^avail_ci=(\d{4}-\d{2}-\d{2})$/', $data, $m)) {
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                self::buildCheckInFollowUpMsgs($propertyId, $property, $m[1])
+            );
+        }
+
+        // จำนวนคืน (เช็คอิน + N คืน)
+        if (preg_match('/^avail_stay=(\d{4}-\d{2}-\d{2})\|(\d+)$/', $data, $m)) {
+            $nights = max(1, min(30, (int)$m[2]));
+            $checkIn  = $m[1];
+            $checkOut = date('Y-m-d', strtotime($checkIn . " +{$nights} days"));
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                self::buildAvailabilityRangeMsgs($propertyId, $property, $units, $checkIn, $checkOut)
+            );
+        }
+
+        // ช่วงวันที่ (เช็คอิน → เช็คเอาท์)
+        if (preg_match('/^avail_range=(\d{4}-\d{2}-\d{2})\|(\d{4}-\d{2}-\d{2})$/', $data, $m)) {
+            $checkIn  = $m[1];
+            $checkOut = $m[2];
+            if ($checkOut <= $checkIn) {
+                return PropertyLineService::reply($propertyId, $replyToken, [
+                    self::txtMsg('วันเช็คเอาท์ต้องหลังวันเช็คอินค่ะ — ลองเลือกใหม่'),
+                ]);
+            }
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                self::buildAvailabilityRangeMsgs($propertyId, $property, $units, $checkIn, $checkOut)
+            );
+        }
+
+        // ปฏิทินเลือกวันเช็คเอาท์
+        if (preg_match('/^avail_co_calendar=(\d{4}-\d{2}-\d{2})\|(\d{4}-\d{2})$/', $data, $m)) {
+            [$y, $mo] = array_map('intval', explode('-', $m[2]));
+            return PropertyLineService::reply(
+                $propertyId,
+                $replyToken,
+                [self::buildCheckoutCalendarFlex($propertyId, $property, $m[1], $y, $mo)]
+            );
+        }
+
+        // date picker (Quick Reply เดิม) → เริ่ม flow เช็คอิน
         $pickDate = null;
         if (preg_match('/^avail_pick=(\d{4}-\d{2}-\d{2})$/', $data, $m)) {
             $pickDate = $m[1];
         } elseif ($data === 'avail_date' && !empty($params['date'])) {
             $pickDate = $params['date'];
         }
-
         if ($pickDate) {
             return PropertyLineService::reply(
                 $propertyId,
                 $replyToken,
-                self::buildAvailabilityDayDetailMsgs($propertyId, $property, $units, $pickDate)
+                self::buildCheckInFollowUpMsgs($propertyId, $property, $pickDate)
             );
         }
 
@@ -732,8 +778,8 @@ class PropertyLineBotService
                         'action' => [
                             'type'        => 'postback',
                             'label'       => $label,
-                            'data'        => "avail_pick={$dateStr}",
-                            'displayText' => "เช็ควันที่ {$label}",
+                            'data'        => "avail_ci={$dateStr}",
+                            'displayText' => "เช็คอิน {$label}",
                         ],
                     ];
                 } else {
@@ -763,7 +809,7 @@ class PropertyLineBotService
             'contents' => [
                 ['type' => 'text', 'text' => '🔵 ว่าง', 'size' => 'xxs', 'color' => '#1a7a8a', 'flex' => 1],
                 ['type' => 'text', 'text' => '🔴 เต็ม', 'size' => 'xxs', 'color' => '#e74c3c', 'flex' => 1],
-                ['type' => 'text', 'text' => 'กดวันสีฟ้า = 1 คืน', 'size' => 'xxs', 'color' => '#888888', 'flex' => 2, 'align' => 'end'],
+                ['type' => 'text', 'text' => 'กดวันสีฟ้า = เลือกเช็คอิน', 'size' => 'xxs', 'color' => '#888888', 'flex' => 2, 'align' => 'end'],
             ],
         ];
 
@@ -791,23 +837,223 @@ class PropertyLineBotService
         ];
     }
 
-    /** รายละเอียดห้องว่างวันที่เลือกจากตาราง */
-    private static function buildAvailabilityDayDetailMsgs(int $propertyId, array $property, array $units, string $dateStr): array
+    /** หลังเลือกเช็คอิน — เลือกจำนวนคืนหรือวันเช็คเอาท์ */
+    private static function buildCheckInFollowUpMsgs(int $propertyId, array $property, string $checkIn): array
     {
-        $checkIn  = $dateStr;
-        $checkOut = date('Y-m-d', strtotime($dateStr . ' +1 day'));
+        $ciTh   = self::thaiDateShort($checkIn);
+        $monthYm = date('Y-m', strtotime($checkIn));
+
+        $nightButtons = [];
+        foreach ([1, 2, 3, 4, 5, 7] as $n) {
+            $nightButtons[] = [
+                'type'   => 'button',
+                'style'  => 'primary',
+                'color'  => '#1a7a8a',
+                'height' => 'sm',
+                'flex'   => 1,
+                'action' => [
+                    'type'        => 'postback',
+                    'label'       => "{$n} คืน",
+                    'data'        => "avail_stay={$checkIn}|{$n}",
+                    'displayText' => "พัก {$n} คืน",
+                ],
+            ];
+        }
+
+        $flex = [
+            'type'     => 'flex',
+            'altText'  => "เลือกจำนวนคืน — เช็คอิน {$ciTh}",
+            'contents' => [
+                'type' => 'bubble',
+                'size' => 'kilo',
+                'body' => [
+                    'type'       => 'box',
+                    'layout'     => 'vertical',
+                    'spacing'    => 'md',
+                    'paddingAll' => 'lg',
+                    'contents'   => [
+                        [
+                            'type'   => 'text',
+                            'text'   => "เช็คอิน: {$ciTh}",
+                            'weight' => 'bold',
+                            'size'   => 'md',
+                        ],
+                        [
+                            'type'   => 'text',
+                            'text'   => 'เลือกจำนวนคืน หรือเลือกวันเช็คเอาท์',
+                            'size'   => 'xs',
+                            'color'  => '#888888',
+                            'wrap'   => true,
+                        ],
+                        [
+                            'type'     => 'box',
+                            'layout'   => 'horizontal',
+                            'spacing'  => 'xs',
+                            'contents' => array_slice($nightButtons, 0, 3),
+                        ],
+                        [
+                            'type'     => 'box',
+                            'layout'   => 'horizontal',
+                            'spacing'  => 'xs',
+                            'contents' => array_slice($nightButtons, 3, 3),
+                        ],
+                        [
+                            'type'   => 'button',
+                            'style'  => 'link',
+                            'height' => 'sm',
+                            'action' => [
+                                'type'        => 'postback',
+                                'label'       => '📅 เลือกวันเช็คเอาท์',
+                                'data'        => "avail_co_calendar={$checkIn}|{$monthYm}",
+                                'displayText' => 'เลือกวันเช็คเอาท์',
+                            ],
+                        ],
+                        [
+                            'type'   => 'button',
+                            'style'  => 'link',
+                            'height' => 'sm',
+                            'action' => [
+                                'type'        => 'postback',
+                                'label'       => '← เปลี่ยนวันเช็คอิน',
+                                'data'        => 'avail_calendar',
+                                'displayText' => 'เช็ควันว่าง',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        return [$flex];
+    }
+
+    /** ปฏิทินเลือกวันเช็คเอาท์ (หลังเช็คอิน) */
+    private static function buildCheckoutCalendarFlex(int $propertyId, array $property, string $checkIn, int $year, int $month): array
+    {
+        $monthLabels = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        $weekdays    = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+        $ciTh        = self::thaiDateShort($checkIn);
+
+        $first     = new \DateTime(sprintf('%04d-%02d-01', $year, $month));
+        $daysInMon = (int)$first->format('t');
+        $startDow  = (int)$first->format('w');
+        $minCo     = date('Y-m-d', strtotime($checkIn . ' +1 day'));
+
+        $prevYm = date('Y-m', strtotime($first->format('Y-m-01') . ' -1 month'));
+        $nextYm = date('Y-m', strtotime($first->format('Y-m-01') . ' +1 month'));
+        $minYm  = date('Y-m', strtotime($checkIn));
+        $maxYm  = date('Y-m', strtotime('+6 month'));
+
+        $headerContents = [];
+        if ($prevYm >= $minYm) {
+            $headerContents[] = [
+                'type'   => 'button', 'style' => 'link', 'height' => 'sm',
+                'action' => ['type' => 'postback', 'label' => '◀', 'data' => "avail_co_calendar={$checkIn}|{$prevYm}", 'displayText' => 'เดือนก่อน'],
+            ];
+        } else {
+            $headerContents[] = ['type' => 'filler'];
+        }
+        $headerContents[] = [
+            'type' => 'text', 'text' => 'เช็คเอาท์ ' . ($monthLabels[$month] ?? '') . ' ' . ($year + 543),
+            'weight' => 'bold', 'size' => 'sm', 'align' => 'center', 'flex' => 4, 'wrap' => true,
+        ];
+        if ($nextYm <= $maxYm) {
+            $headerContents[] = [
+                'type'   => 'button', 'style' => 'link', 'height' => 'sm',
+                'action' => ['type' => 'postback', 'label' => '▶', 'data' => "avail_co_calendar={$checkIn}|{$nextYm}", 'displayText' => 'เดือนถัดไป'],
+            ];
+        } else {
+            $headerContents[] = ['type' => 'filler'];
+        }
+
+        $bodyContents = [
+            ['type' => 'text', 'text' => "เช็คอิน {$ciTh} — กดวันเช็คเอาท์", 'size' => 'xs', 'color' => '#666666', 'wrap' => true],
+            [
+                'type' => 'box', 'layout' => 'horizontal',
+                'contents' => array_map(static fn(string $d) => [
+                    'type' => 'text', 'text' => $d, 'size' => 'xxs', 'color' => '#888888', 'align' => 'center', 'flex' => 1,
+                ], $weekdays),
+            ],
+        ];
+
+        $day = 1;
+        for ($week = 0; $week < 6; $week++) {
+            $row = [];
+            for ($dow = 0; $dow < 7; $dow++) {
+                $cellIdx = $week * 7 + $dow;
+                if ($cellIdx < $startDow || $day > $daysInMon) {
+                    $row[] = ['type' => 'filler', 'flex' => 1];
+                    continue;
+                }
+                $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                $label   = (string)$day;
+
+                if ($dateStr < $minCo) {
+                    $row[] = [
+                        'type' => 'box', 'layout' => 'vertical', 'flex' => 1,
+                        'contents' => [['type' => 'text', 'text' => $label, 'size' => 'xs', 'color' => '#cccccc', 'align' => 'center']],
+                    ];
+                } elseif (self::rangeHasAvailability($propertyId, $checkIn, $dateStr)) {
+                    $nights = (int)((strtotime($dateStr) - strtotime($checkIn)) / 86400);
+                    $row[] = [
+                        'type' => 'button', 'style' => 'primary', 'color' => '#1a7a8a', 'height' => 'sm', 'flex' => 1,
+                        'action' => [
+                            'type' => 'postback', 'label' => $label,
+                            'data' => "avail_range={$checkIn}|{$dateStr}",
+                            'displayText' => "พัก {$nights} คืน",
+                        ],
+                    ];
+                } else {
+                    $row[] = [
+                        'type' => 'box', 'layout' => 'vertical', 'flex' => 1,
+                        'contents' => [['type' => 'text', 'text' => $label, 'size' => 'xs', 'color' => '#e74c3c', 'align' => 'center']],
+                    ];
+                }
+                $day++;
+            }
+            $bodyContents[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'xs', 'contents' => $row];
+            if ($day > $daysInMon) break;
+        }
+
+        return [
+            'type'     => 'flex',
+            'altText'  => "เลือกเช็คเอาท์ — เช็คอิน {$ciTh}",
+            'contents' => [
+                'type'   => 'bubble',
+                'size'   => 'mega',
+                'header' => [
+                    'type' => 'box', 'layout' => 'horizontal', 'backgroundColor' => '#E8F4F8',
+                    'paddingAll' => 'md', 'contents' => $headerContents,
+                ],
+                'body' => [
+                    'type' => 'box', 'layout' => 'vertical', 'spacing' => 'xs', 'paddingAll' => 'md', 'contents' => $bodyContents,
+                ],
+            ],
+        ];
+    }
+
+    /** ผลลัพธ์ห้องว่างตามช่วงวันที่ (หลายคืน) */
+    private static function buildAvailabilityRangeMsgs(int $propertyId, array $property, array $units, string $checkIn, string $checkOut): array
+    {
+        $nights    = max(1, (int)((strtotime($checkOut) - strtotime($checkIn)) / 86400));
         $available = self::queryAvailableUnits($propertyId, $checkIn, $checkOut, 1);
         $ciTh      = self::thaiDateShort($checkIn);
         $coTh      = self::thaiDateShort($checkOut);
 
+        $header = "เช็กวันว่าง {$property['name']} 🗓️\n"
+                . "วันที่ {$ciTh} → {$coTh} ({$nights} คืน)\n"
+                . str_repeat('─', 28) . "\n";
+
         if (empty($available)) {
-            $msgs = [self::txtMsg("📅 {$ciTh} → {$coTh} (1 คืน)\n😔 ไม่มีห้องว่างวันนี้ค่ะ\nกดดูตารางเดือนอื่นได้เลย")];
+            $msgs = [self::txtMsg($header . "😔 ไม่มีห้องว่างในช่วงนี้ค่ะ\nลองเปลี่ยนวันหรือจำนวนคืนนะคะ")];
         } else {
-            $lines = ["📅 {$ciTh} → {$coTh} (1 คืน)\nยูนิตที่ว่าง:"];
+            $lines = [$header];
             foreach ($available as $u) {
-                $price = self::calcPrice($u, $checkIn, 1);
-                $lines[] = "✅ {$u['name']} — ฿" . number_format($price) . '/คืน'
-                    . " ({$u['capacity_min']}–{$u['capacity_max']} คน)";
+                $pricePerNight = self::calcPrice($u, $checkIn, $nights);
+                $total         = $pricePerNight * $nights;
+                $lines[] = "✅ {$u['name']}\n"
+                         . '   ฿' . number_format($pricePerNight) . "/คืน · รวม ฿" . number_format($total)
+                         . " ({$u['capacity_min']}–{$u['capacity_max']} คน)";
             }
             $lines[] = "\nสนใจจองแจ้งชื่อและเบอร์โทรได้เลยค่ะ 😊";
             $lines[] = self::contactLine($property);
@@ -829,7 +1075,12 @@ class PropertyLineBotService
     private static function dayHasAvailability(int $propertyId, string $date): bool
     {
         $next = date('Y-m-d', strtotime($date . ' +1 day'));
-        return !empty(self::queryAvailableUnits($propertyId, $date, $next, 1));
+        return self::rangeHasAvailability($propertyId, $date, $next);
+    }
+
+    private static function rangeHasAvailability(int $propertyId, string $checkIn, string $checkOut): bool
+    {
+        return !empty(self::queryAvailableUnits($propertyId, $checkIn, $checkOut, 1));
     }
 
     /**

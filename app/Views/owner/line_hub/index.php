@@ -54,7 +54,7 @@ $lineOn = !empty($property['line_messaging_enabled']);
     <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-xs text-slate-600 space-y-2">
       <div class="font-semibold text-slate-700">Chatbot ตอบอะไรได้บ้าง</div>
       <div>✅ ราคา · ที่อยู่ · เช็คอิน · ดูห้อง · จอง</div>
-      <div>✅ ตารางวันว่าง (กดจาก Rich Menu)</div>
+      <div>✅ ตารางวันว่าง — เลือกเช็คอิน + จำนวนคืน / วันเช็คเอาท์</div>
       <div>✅ ถามเป็นข้อความ เช่น «เสาร์นี้ ว่างไหม 4 คน»</div>
     </div>
   </div>
