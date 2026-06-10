@@ -9,6 +9,7 @@ use App\Core\Validator;
 use App\Core\View;
 use App\Models\PropertyUnit;
 use App\Services\BookingService;
+use App\Services\OwnerBookingService;
 
 class BookingController extends Controller
 {
@@ -89,6 +90,15 @@ class BookingController extends Controller
         }
 
         Session::flash('success', 'อัปเดตสถานะเป็น ' . $status . ' เรียบร้อย');
+        if (($_POST['return_to'] ?? '') === 'dashboard') {
+            $q = array_filter([
+                'cal_p' => (int)($_POST['cal_p'] ?? 0),
+                'cal_u' => (int)($_POST['cal_u'] ?? 0),
+                'cal_m' => (int)($_POST['cal_m'] ?? 0),
+                'cal_y' => (int)($_POST['cal_y'] ?? 0),
+            ]);
+            redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
+        }
         redirect(url('/owner/bookings/' . $id));
     }
 
@@ -218,41 +228,31 @@ class BookingController extends Controller
 
         $source = in_array($input['source'] ?? '', ['manual_phone', 'manual_line', 'admin'], true)
             ? $input['source'] : 'manual_phone';
+        $sendLine = !empty($input['send_line_confirm']);
 
-        $calc = BookingService::calculate($unit, $checkIn, $checkOut, $guestCount);
-
-        $bookingData = [
-            'property_id'           => $propertyId,
-            'unit_id'               => $unitId,
-            'mode'                  => 'manual',
-            'guest_name'            => $guestName,
-            'guest_phone'           => $guestPhone,
-            'guest_email'           => trim((string)($input['guest_email'] ?? '')) ?: null,
-            'guest_count'           => $guestCount,
-            'check_in'              => $checkIn,
-            'check_out'             => $checkOut,
-            'nights'                => $calc['nights'],
-            'subtotal'              => $calc['subtotal'],
-            'discount'              => 0,
-            'total_price'           => $calc['total'],
-            'status'                => 'confirmed',
-            'payment_status'        => 'unpaid',
-            'notes'                 => trim((string)($input['notes'] ?? '')) ?: null,
-            'source'                => $source,
-            'guest_line_user_id'    => trim((string)($input['guest_line_user_id'] ?? '')) ?: null,
-            'created_by_user_id'    => Auth::id(),
-        ];
-
-        $bookingId = BookingService::create($bookingData);
-        $sendLine  = !empty($input['send_line_confirm']);
-
-        // Trigger confirmation + LINE push
-        if ($bookingId) {
-            BookingService::confirmAndNotify($bookingId, $sendLine);
+        try {
+            $bookingId = OwnerBookingService::createManual([
+                'property_id'        => $propertyId,
+                'unit_id'            => $unitId,
+                'guest_name'         => $guestName,
+                'guest_phone'        => $guestPhone,
+                'guest_email'        => trim((string)($input['guest_email'] ?? '')) ?: null,
+                'guest_count'        => $guestCount,
+                'check_in'           => $checkIn,
+                'check_out'          => $checkOut,
+                'notes'              => trim((string)($input['notes'] ?? '')) ?: null,
+                'source'             => $source,
+                'guest_line_user_id' => trim((string)($input['guest_line_user_id'] ?? '')) ?: null,
+                'send_line_confirm'  => $sendLine,
+            ]);
+            Session::flash('success', 'บันทึกการจองเรียบร้อย' . ($sendLine ? ' และส่งใบยืนยันแล้ว' : ''));
+            redirect(url('/owner/bookings/' . $bookingId));
+        } catch (\Throwable $e) {
+            error_log('[OwnerBooking] manual save: ' . $e->getMessage());
+            Session::flash('error', 'บันทึกการจองไม่สำเร็จ — ' . $e->getMessage());
+            Session::withOld($input);
+            back();
         }
-
-        Session::flash('success', 'บันทึกการจองเรียบร้อย' . ($sendLine ? ' และส่งใบยืนยันแล้ว' : ''));
-        redirect(url('/owner/bookings/' . $bookingId));
     }
 
     private function fetchOwnedBooking(int $id): ?array

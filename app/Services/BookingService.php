@@ -26,8 +26,9 @@ class BookingService
         }
 
         $extra = 0;
-        if ($guests > $unit['capacity_max']) {
-            $extra = ($guests - $unit['capacity_max']) * (float)$unit['extra_person_fee'] * $nights;
+        $capMax = (int)($unit['capacity_max'] ?? 99);
+        if ($guests > $capMax) {
+            $extra = ($guests - $capMax) * (float)($unit['extra_person_fee'] ?? 0) * $nights;
         }
         $subtotal += $extra;
 

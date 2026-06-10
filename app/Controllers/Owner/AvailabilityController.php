@@ -8,8 +8,8 @@ use App\Core\Session;
 use App\Core\View;
 use App\Models\Property;
 use App\Models\PropertyUnit;
-use App\Services\BookingService;
 use App\Services\OwnerAvailabilityCalendar;
+use App\Services\OwnerBookingService;
 
 class AvailabilityController extends Controller
 {
@@ -133,31 +133,23 @@ class AvailabilityController extends Controller
             $this->redirectAfterCalendar($id, $unitId, $month, $year);
         }
 
-        $calc = BookingService::calculate($unit, $checkIn, $checkOut, 1);
-        $bookingId = BookingService::create([
-            'property_id'        => $id,
-            'unit_id'            => $unitId,
-            'mode'               => 'manual',
-            'guest_name'         => $guestName,
-            'guest_phone'        => $guestPhone,
-            'guest_email'        => null,
-            'guest_count'        => 1,
-            'check_in'           => $checkIn,
-            'check_out'          => $checkOut,
-            'nights'             => $calc['nights'],
-            'subtotal'           => $calc['subtotal'],
-            'discount'           => 0,
-            'total_price'        => $calc['total'],
-            'status'             => 'confirmed',
-            'payment_status'     => 'unpaid',
-            'notes'              => 'บันทึกจากปฏิทินวันว่าง',
-            'source'             => 'manual_phone',
-            'guest_line_user_id' => null,
-            'created_by_user_id' => Auth::id(),
-        ]);
-
-        $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
-        Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');
+        try {
+            $bookingId = OwnerBookingService::createManual([
+                'property_id' => $id,
+                'unit_id'     => $unitId,
+                'guest_name'  => $guestName,
+                'guest_phone' => $guestPhone,
+                'check_in'    => $checkIn,
+                'check_out'   => $checkOut,
+                'notes'       => 'บันทึกจากหน้าแรก (ปฏิทิน)',
+                'source'      => 'manual_phone',
+            ]);
+            $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
+            Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');
+        } catch (\Throwable $e) {
+            error_log('[OwnerBooking] calendar save: ' . $e->getMessage());
+            Session::flash('error', 'บันทึกการจองไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่');
+        }
         $this->redirectAfterCalendar($id, $unitId, $month, $year);
     }
 }

@@ -123,10 +123,13 @@ $csrfToken = \App\Core\Csrf::token();
           </div>
 
           <template x-if="dayBookings.length">
-            <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm">
-              <p class="font-semibold text-amber-900 mb-1">มีการจองในวันนี้</p>
+            <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm space-y-2">
+              <p class="font-semibold text-amber-900">มีการจองในวันนี้</p>
               <template x-for="b in dayBookings" :key="b.id">
-                <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="block text-xs text-core-600 font-medium mt-1" x-text="b.guest_name + ' · ' + b.code"></a>
+                <div class="flex items-center justify-between gap-2 bg-white/70 rounded-lg px-2 py-1.5">
+                  <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="text-xs text-core-600 font-medium min-w-0 truncate" x-text="b.guest_name + ' · ' + b.code"></a>
+                  <button type="button" @click="confirmCancel(b)" class="text-[10px] font-semibold text-rose-600 shrink-0">ยกเลิก</button>
+                </div>
               </template>
             </div>
           </template>
@@ -216,26 +219,28 @@ $csrfToken = \App\Core\Csrf::token();
     </div>
   </div>
 
-  <!-- Hidden forms -->
+  <!-- Hidden forms (ค่าถูกเติมด้วย JS ก่อน submit) -->
   <form id="homeCalCloseForm" method="post" action="<?= url('/owner/properties/' . $pid . '/availability/save') ?>" class="hidden">
     <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
-    <input type="hidden" name="unit_id" :value="formUnitId">
     <input type="hidden" name="month" value="<?= $month ?>">
     <input type="hidden" name="year" value="<?= $year ?>">
     <input type="hidden" name="status" value="closed">
     <input type="hidden" name="return_to" value="dashboard">
-    <input type="hidden" name="dates[]" :value="selectedDate">
   </form>
   <form id="homeCalBookForm" method="post" action="<?= url('/owner/properties/' . $pid . '/availability/booking') ?>" class="hidden">
     <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
-    <input type="hidden" name="unit_id" :value="formUnitId">
     <input type="hidden" name="month" value="<?= $month ?>">
     <input type="hidden" name="year" value="<?= $year ?>">
     <input type="hidden" name="return_to" value="dashboard">
-    <input type="hidden" name="check_in" :value="selectedDate">
-    <input type="hidden" name="check_out" :value="checkOut">
-    <input type="hidden" name="guest_name" :value="guestName">
-    <input type="hidden" name="guest_phone" :value="guestPhone">
+  </form>
+  <form id="homeCalCancelForm" method="post" action="" class="hidden">
+    <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
+    <input type="hidden" name="status" value="cancelled">
+    <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="cal_p" value="<?= $pid ?>">
+    <input type="hidden" name="cal_u" value="<?= $unitId ?>">
+    <input type="hidden" name="cal_m" value="<?= $month ?>">
+    <input type="hidden" name="cal_y" value="<?= $year ?>">
   </form>
 </section>
 
@@ -299,6 +304,21 @@ function homeCalManage() {
     canBook() {
       return this.guestName.trim() && this.guestPhone.trim() && this.selectedDate && this.checkOut;
     },
+    fillForm(formId, fields) {
+      const f = document.getElementById(formId);
+      Object.entries(fields).forEach(([name, val]) => {
+        const isArray = name.endsWith('[]');
+        const key = isArray ? name : name;
+        let input = f.querySelector(`[name="${key}"]`);
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          f.appendChild(input);
+        }
+        input.value = val;
+      });
+    },
     async confirmBook() {
       if (!this.canBook()) return;
       this.syncCheckOut();
@@ -310,7 +330,15 @@ function homeCalManage() {
         <p><strong>พัก:</strong> ${thaiShort(this.selectedDate)} → ${thaiShort(this.checkOut)} (${this.nights} คืน)</p>
       </div>`;
       const ok = await this.swalConfirm('ยืนยันเพิ่มการจอง?', html, 'question');
-      if (ok) document.getElementById('homeCalBookForm').submit();
+      if (!ok) return;
+      this.fillForm('homeCalBookForm', {
+        unit_id: this.formUnitId,
+        check_in: this.selectedDate,
+        check_out: this.checkOut,
+        guest_name: this.guestName.trim(),
+        guest_phone: this.guestPhone.trim(),
+      });
+      document.getElementById('homeCalBookForm').submit();
     },
     async confirmClose() {
       const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
@@ -320,7 +348,20 @@ function homeCalManage() {
         <p class="text-slate-500">วันนี้จะถูกปิดไม่รับจอง</p>
       </div>`;
       const ok = await this.swalConfirm('ยืนยันปิดการจอง?', html, 'warning');
-      if (ok) document.getElementById('homeCalCloseForm').submit();
+      if (!ok) return;
+      this.fillForm('homeCalCloseForm', {
+        unit_id: this.formUnitId,
+        'dates[]': this.selectedDate,
+      });
+      document.getElementById('homeCalCloseForm').submit();
+    },
+    async confirmCancel(b) {
+      const html = `<div class="text-left text-sm"><p>ยกเลิกการจองของ <strong>${b.guest_name}</strong> (${b.code})?</p></div>`;
+      const ok = await this.swalConfirm('ยืนยันยกเลิกการจอง?', html, 'warning');
+      if (!ok) return;
+      const f = document.getElementById('homeCalCancelForm');
+      f.action = '<?= url('/owner/bookings') ?>/' + b.id + '/status';
+      f.submit();
     },
     async swalConfirm(title, html, icon) {
       if (!window.Swal) return confirm(title);
