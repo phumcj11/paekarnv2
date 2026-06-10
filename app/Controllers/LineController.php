@@ -177,10 +177,59 @@ class LineController extends Controller
             }
 
             if ($type === 'follow' || $type === 'message') {
-                // บันทึก/อัปเดต contact
-                $profile = PropertyLineService::userProfile($id, $lineUserId);
-                $displayName = $profile['ok'] ? ($profile['data']['displayName'] ?? null) : null;
-                $pictureUrl  = $profile['ok'] ? ($profile['data']['pictureUrl'] ?? null) : null;
+                $replyToken = $event['replyToken'] ?? '';
+
+                // ตอบกลับทันที — replyToken หมดอายุเร็ว ห้ามเรียก LINE Profile API ก่อน reply
+                if ($replyToken) {
+                    if ($type === 'follow') {
+                        $property = Database::fetch(
+                            "SELECT name FROM properties WHERE id = :i LIMIT 1",
+                            ['i' => $id]
+                        );
+                        $pname = $property ? $property['name'] : 'ที่พักของเรา';
+                        PropertyLineService::reply($id, $replyToken, [[
+                            'type' => 'text',
+                            'text' => "สวัสดีค่ะ ยินดีต้อนรับสู่ {$pname} 🌊\n\n"
+                                   . "สอบถามได้เลยนะคะ เช่น\n"
+                                   . "• \"ราคาเท่าไหร่\"\n"
+                                   . "• \"เสาร์นี้ ว่างไหม 4 คน\"\n"
+                                   . "• \"เช็คอินกี่โมง\"\n"
+                                   . "• \"ที่อยู่อยู่ที่ไหน\"",
+                        ]]);
+                    } elseif ($type === 'message' && ($event['message']['type'] ?? '') === 'text') {
+                        $text = trim((string)($event['message']['text'] ?? ''));
+                        if ($text !== '') {
+                            try {
+                                $replied = PropertyLineBotService::handle($id, $replyToken, $text);
+                                if (!$replied) {
+                                    PropertyLineService::push($id, $lineUserId, [[
+                                        'type' => 'text',
+                                        'text' => 'ขออภัยค่ะ ระบบตอบช้าไปหน่อย — ลองถามอีกครั้งหรือติดต่อเจ้าหน้าที่ได้เลยนะคะ 😊',
+                                    ]]);
+                                }
+                            } catch (\Throwable $e) {
+                                error_log("[Paekarn] PropertyLineBotService error: " . $e->getMessage());
+                                PropertyLineService::push($id, $lineUserId, [[
+                                    'type' => 'text',
+                                    'text' => 'ขออภัยค่ะ ระบบขัดข้องชั่วคราว — กรุณาลองใหม่อีกครั้งนะคะ',
+                                ]]);
+                            }
+                        }
+                    }
+                }
+
+                // บันทึก contact หลัง reply (ดึง profile เฉพาะ contact ใหม่หรือตอน follow)
+                $existing = Database::fetch(
+                    "SELECT id FROM property_line_contacts WHERE property_id = :p AND line_user_id = :l LIMIT 1",
+                    ['p' => $id, 'l' => $lineUserId]
+                );
+                $displayName = null;
+                $pictureUrl  = null;
+                if ($type === 'follow' || !$existing) {
+                    $profile = PropertyLineService::userProfile($id, $lineUserId);
+                    $displayName = $profile['ok'] ? ($profile['data']['displayName'] ?? null) : null;
+                    $pictureUrl  = $profile['ok'] ? ($profile['data']['pictureUrl'] ?? null) : null;
+                }
                 self::upsertContact(
                     $id,
                     $lineUserId,
@@ -189,37 +238,6 @@ class LineController extends Controller
                     null,
                     $type === 'follow' ? 'follow' : 'message'
                 );
-
-                // Bot reply
-                $replyToken = $event['replyToken'] ?? '';
-                if (!$replyToken) continue;
-
-                if ($type === 'follow') {
-                    // ข้อความต้อนรับตอน Add Friend
-                    $property = Database::fetch(
-                        "SELECT name, phone, line_id FROM properties WHERE id = :i LIMIT 1",
-                        ['i' => $id]
-                    );
-                    $pname = $property ? $property['name'] : 'ที่พักของเรา';
-                    PropertyLineService::reply($id, $replyToken, [[
-                        'type' => 'text',
-                        'text' => "สวัสดีค่ะ ยินดีต้อนรับสู่ {$pname} 🌊\n\n"
-                               . "สอบถามได้เลยนะคะ เช่น\n"
-                               . "• \"ราคาเท่าไหร่\"\n"
-                               . "• \"15-16 มิ.ย. ว่างไหม 4 คน\"\n"
-                               . "• \"เช็คอินกี่โมง\"\n"
-                               . "• \"ที่อยู่อยู่ที่ไหน\"",
-                    ]]);
-                } elseif ($type === 'message' && ($event['message']['type'] ?? '') === 'text') {
-                    $text = trim((string)($event['message']['text'] ?? ''));
-                    if ($text !== '') {
-                        try {
-                            PropertyLineBotService::handle($id, $replyToken, $text);
-                        } catch (\Throwable $e) {
-                            error_log("[Paekarn] PropertyLineBotService error: " . $e->getMessage());
-                        }
-                    }
-                }
             }
         }
 

@@ -51,8 +51,9 @@ class PropertyLineBotService
 
     /**
      * Entry point: อ่านข้อความ, ตัดสิน intent, ส่ง reply กลับลูกค้า
+     * @return bool true ถ้า reply สำเร็จ
      */
-    public static function handle(int $propertyId, string $replyToken, string $text): void
+    public static function handle(int $propertyId, string $replyToken, string $text): bool
     {
         $property = Database::fetch(
             "SELECT id, name, type, zone, district, province, address, phone, line_id,
@@ -61,13 +62,13 @@ class PropertyLineBotService
              FROM properties WHERE id = :i LIMIT 1",
             ['i' => $propertyId]
         );
-        if (!$property) return;
+        if (!$property) return false;
 
         $units = Database::fetchAll(
             "SELECT id, name, price, price_weekend, capacity_min, capacity_max,
                     bedrooms, bathrooms, total_units, extra_person_fee
              FROM property_units
-             WHERE property_id = :p AND is_active = 1 AND moderation_status = 'published'
+             WHERE property_id = :p AND is_active = 1
              ORDER BY price ASC",
             ['p' => $propertyId]
         );
@@ -87,7 +88,11 @@ class PropertyLineBotService
             default                  => [self::txtMsg(self::buildFallback($property))],
         };
 
-        PropertyLineService::reply($propertyId, $replyToken, $messages);
+        $ok = PropertyLineService::reply($propertyId, $replyToken, $messages);
+        if (!$ok) {
+            error_log("[Paekarn] PropertyLineBot reply FAIL property={$propertyId} intent={$intent}");
+        }
+        return $ok;
     }
 
     // =========================================================
@@ -152,6 +157,7 @@ class PropertyLineBotService
     /** ตรวจว่ามี date pattern ในข้อความ */
     private static function hasDatePattern(string $t): bool
     {
+        if (self::parseRelativeDates($t) !== null) return true;
         // Thai months
         foreach (self::THAI_MONTHS as $pat => $_) {
             if (preg_match('/' . $pat . '/u', $t)) return true;
@@ -354,9 +360,9 @@ class PropertyLineBotService
         if (!$dates) {
             $msg = "ต้องการเช็กวันว่างค่ะ 🗓️\n\n"
                  . "กรุณาระบุวันที่ต้องการ เช่น\n"
+                 . "• \"เสาร์นี้ ว่างไหม 4 คน\"\n"
                  . "• \"15-16 มิ.ย. 4 คน\"\n"
-                 . "• \"20/6 - 22/6 ผู้ใหญ่ 6 คน\"\n"
-                 . "• \"30 ก.ค. ว่างไหม 2 คน\"";
+                 . "• \"20/6 - 22/6 ผู้ใหญ่ 6 คน\"";
             return [self::txtMsg($msg)];
         }
 
@@ -415,7 +421,7 @@ class PropertyLineBotService
     {
         $units = Database::fetchAll(
             "SELECT * FROM property_units
-             WHERE property_id = :p AND is_active = 1 AND moderation_status = 'published'
+             WHERE property_id = :p AND is_active = 1
              ORDER BY price ASC",
             ['p' => $propertyId]
         );
@@ -460,6 +466,9 @@ class PropertyLineBotService
     /** Parse dates จาก text ภาษาไทย/เลข → ['check_in'=>'Y-m-d', 'check_out'=>'Y-m-d'] หรือ null */
     private static function parseDates(string $text): ?array
     {
+        $relative = self::parseRelativeDates($text);
+        if ($relative !== null) return $relative;
+
         $year = (int)date('Y');
 
         // หา Thai month ในข้อความ
@@ -518,6 +527,53 @@ class PropertyLineBotService
         }
 
         return null;
+    }
+
+    /**
+     * วันที่แบบสัมพัทธ์: เสาร์นี้, พรุ่งนี้, วันนี้ ฯลฯ
+     * คืน 1 คืน (check_out = check_in + 1 วัน) เป็นค่าเริ่มต้น
+     */
+    private static function parseRelativeDates(string $text): ?array
+    {
+        $t = mb_strtolower($text, 'UTF-8');
+
+        // พรุ่งนี้
+        if (preg_match('/พรุ่งนี้/u', $t)) {
+            $ci = date('Y-m-d', strtotime('+1 day'));
+            return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime($ci . ' +1 day'))];
+        }
+
+        // วันนี้ / คืนนี้
+        if (preg_match('/วันนี้|คืนนี้/u', $t)) {
+            $ci = date('Y-m-d');
+            return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime('+1 day'))];
+        }
+
+        // วันในสัปดาห์: เสาร์นี้, ศุกร์นี้, วันอาทิตย์ ฯลฯ
+        $dayMap = [
+            'อาทิตย์' => 0, 'จันทร์' => 1, 'อังคาร' => 2, 'พุธ' => 3,
+            'พฤหัส'   => 4, 'ศุกร์'  => 5, 'เสาร์'  => 6,
+        ];
+        foreach ($dayMap as $thaiDay => $targetDow) {
+            if (!preg_match('/' . $thaiDay . '/u', $t)) continue;
+            $ci = self::nextWeekday($targetDow);
+            return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime($ci . ' +1 day'))];
+        }
+
+        return null;
+    }
+
+    /** หาวันถัดไปที่ตรงกับ day-of-week (0=อา..6=ส) */
+    private static function nextWeekday(int $targetDow): string
+    {
+        $now = strtotime('today');
+        $dow = (int)date('w', $now);
+        if ($dow === $targetDow) {
+            return date('Y-m-d', $now);
+        }
+        $days = ($targetDow - $dow + 7) % 7;
+        if ($days === 0) $days = 7;
+        return date('Y-m-d', strtotime("+{$days} days", $now));
     }
 
     /** ดึงจำนวนคนจาก text */

@@ -197,6 +197,9 @@ class PropertyLineService
         ], JSON_UNESCAPED_UNICODE);
 
         $res = self::post('https://api.line.me/v2/bot/message/reply', $token, $body);
+        if ($res['code'] !== 200) {
+            error_log("[Paekarn] LINE reply FAIL property={$propertyId} HTTP {$res['code']}: {$res['body']}");
+        }
         return $res['code'] === 200;
     }
 
