@@ -331,6 +331,10 @@ function paekanMobileHeroSearch() {
 }
 
 function paekanMobileAiSearch() {
+  const TYPE_LABELS = {
+    raft: 'แพพัก', resort: 'รีสอร์ท', homestay: 'โฮมสเตย์',
+    house: 'บ้านพัก', pool_villa: 'พูลวิลล่า', hotel: 'โรงแรม', camping: 'แคมป์ปิ้ง',
+  };
   return {
     query: '',
     busy: false,
@@ -347,6 +351,7 @@ function paekanMobileAiSearch() {
         if (j.ok) {
           if (j.top_picks && j.top_picks.length > 0) {
             this.result = j;
+            this.$nextTick(() => { if (window.lucide) window.lucide.createIcons(); });
           } else if (j.redirect) {
             window.location.href = j.redirect;
           }
@@ -359,6 +364,13 @@ function paekanMobileAiSearch() {
     },
     fmtPrice(n) {
       return n > 0 ? '฿' + Number(n).toLocaleString('th-TH') : '';
+    },
+    typeLabel(t) {
+      return TYPE_LABELS[t] || t || '';
+    },
+    metaLine(p) {
+      const tl = this.typeLabel(p.type);
+      return tl + (p.zone ? ' · ' + p.zone : '');
     },
   };
 }
@@ -770,37 +782,48 @@ function paekanDesktopHeroSearch() {
           </form>
 
           <!-- AI inline results panel -->
-          <div x-show="result" x-cloak class="mt-2 -mx-3.5 -mb-3 border-t border-slate-100">
-            <!-- Summary bar -->
-            <div class="flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-r from-sky-500 to-teal-500">
-              <span class="text-[11px] font-bold text-white leading-tight" x-text="result && result.summary"></span>
-              <button type="button" @click="result=null" class="text-white/80 hover:text-white text-[11px] leading-none shrink-0 px-1">✕</button>
+          <div x-show="result" x-cloak class="mt-1 -mx-3.5 -mb-3 border-t border-slate-100 overflow-hidden rounded-b-[13px]">
+            <div class="flex items-center justify-between gap-2 px-3 py-2.5 bg-gradient-to-r from-sky-600 via-teal-600 to-emerald-600">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="grid place-items-center w-7 h-7 rounded-lg bg-white/20 text-white shrink-0" aria-hidden="true">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                </span>
+                <span class="text-[11px] font-bold text-white leading-snug line-clamp-2" x-text="result && result.summary"></span>
+              </div>
+              <button type="button" @click="result=null" class="shrink-0 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold grid place-items-center transition" aria-label="ปิด">✕</button>
             </div>
-            <!-- Property cards -->
-            <div class="flex gap-2.5 overflow-x-auto px-3 py-2.5 scroll-snap-x"
-                 style="-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory">
+            <div class="px-3 py-2.5 space-y-2 bg-slate-50/80">
               <template x-for="p in (result && result.top_picks || [])" :key="p.id">
-                <a :href="p.url" class="flex-none w-[min(180px,66vw)] rounded-xl border border-slate-200 overflow-hidden bg-white text-inherit no-underline scroll-snap-align-start hover:shadow-md transition-shadow">
-                  <img x-show="p.cover" :src="p.cover" :alt="p.name" class="w-full aspect-[4/3] object-cover block bg-slate-100" loading="lazy">
-                  <div x-show="!p.cover" class="w-full aspect-[4/3] bg-gradient-to-br from-teal-50 to-sky-100 grid place-items-center text-2xl">🏕️</div>
-                  <div class="px-2 pt-1.5 pb-2 space-y-0.5">
-                    <div class="text-[12px] font-extrabold text-slate-900 leading-tight line-clamp-1" x-text="p.name"></div>
-                    <div class="text-[10px] text-slate-500 line-clamp-1" x-text="p.zone"></div>
-                    <div class="text-[10px] text-sky-700 italic leading-tight line-clamp-2" x-text="'&quot;' + p.reason + '&quot;'"></div>
-                    <div class="flex items-center gap-1.5 pt-0.5 flex-wrap">
-                      <span x-show="p.min_price > 0" class="text-[11px] font-bold text-slate-800"
-                            x-text="'฿' + Number(p.min_price).toLocaleString('th-TH')"></span>
-                      <span x-show="p.coupon_enabled" class="text-[9px] bg-amber-100 text-amber-700 font-bold rounded px-1 py-0.5">🎫 คูปอง</span>
-                      <span x-show="p.rating_avg > 0" class="text-[9px] text-amber-700">⭐ <span x-text="Number(p.rating_avg).toFixed(1)"></span></span>
+                <a :href="p.url"
+                   class="group flex gap-3 p-2.5 rounded-xl border border-slate-200/90 bg-white shadow-[0_6px_22px_-10px_rgba(15,23,42,0.14)] hover:border-sky-300 hover:shadow-[0_12px_32px_-12px_rgba(14,116,144,0.22)] transition no-underline text-inherit">
+                  <div class="relative w-[5.5rem] h-[5.5rem] shrink-0 rounded-lg overflow-hidden bg-slate-100 ring-1 ring-slate-200/80">
+                    <img x-show="p.cover" :src="p.cover" :alt="p.name" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-500" loading="lazy">
+                    <div x-show="!p.cover" class="absolute inset-0 grid place-items-center text-2xl bg-gradient-to-br from-teal-50 to-sky-100">🏕️</div>
+                  </div>
+                  <div class="flex-1 min-w-0 flex flex-col gap-0.5 py-0.5">
+                    <div class="text-[13px] font-extrabold text-slate-900 leading-tight line-clamp-1" x-text="p.name"></div>
+                    <div class="text-[11px] text-slate-500 line-clamp-1" x-text="metaLine(p)"></div>
+                    <div class="text-[11px] text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-2 py-1 leading-snug line-clamp-2 mt-0.5">
+                      <span class="font-semibold text-sky-600">AI:</span>
+                      <span x-text="' ' + p.reason"></span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap mt-auto pt-1">
+                      <span x-show="p.min_price > 0" class="text-[13px] font-extrabold text-slate-900">
+                        <span x-text="'฿' + Number(p.min_price).toLocaleString('th-TH')"></span>
+                        <span class="text-[10px] font-medium text-slate-500">/คืน</span>
+                      </span>
+                      <span x-show="p.rating_avg > 0" class="inline-flex items-center gap-0.5 text-[11px] font-semibold text-amber-700">
+                        ⭐ <span x-text="Number(p.rating_avg).toFixed(1)"></span>
+                      </span>
+                      <span x-show="p.coupon_enabled" class="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.5">🎫 คูปอง</span>
                     </div>
                   </div>
                 </a>
               </template>
             </div>
-            <!-- See all button -->
-            <div x-show="result && result.redirect" class="px-3 pb-3">
+            <div x-show="result && result.redirect" class="px-3 pb-3 bg-slate-50/80">
               <button type="button" @click="goAll()"
-                      class="w-full py-2 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-[12px] font-extrabold">
+                      class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-600 hover:to-teal-600 text-white text-[12px] font-extrabold shadow-md transition">
                 ดูผลทั้งหมด →
               </button>
             </div>
