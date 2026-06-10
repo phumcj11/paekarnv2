@@ -230,30 +230,7 @@ $csrfToken    = \App\Core\Csrf::token();
               <textarea x-model="notes" rows="2" maxlength="1000" placeholder="เช่น ตกลงราคาพิเศษ, โอนมัดจำแล้ว..."
                         class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y"></textarea>
             </div>
-            <!-- LINE section -->
-            <div class="rounded-xl border border-[#06C755]/30 bg-[#06C755]/5 p-3 space-y-2">
-              <p class="text-xs font-semibold text-[#067a2f] flex items-center gap-1.5">
-                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
-                LINE (ไม่จำเป็น — ใช้ส่งใบยืนยัน)
-              </p>
-              <div class="flex gap-2">
-                <input type="text" x-model="lineUserId" maxlength="64" placeholder="Uxxxxxxxxxxxxxxxxxx"
-                       class="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:border-[#06C755] outline-none">
-                <template x-if="lineContacts.length > 0">
-                  <select @change="lineUserId = $event.target.value; $event.target.value = ''"
-                          class="px-2 py-2 rounded-lg border border-slate-200 text-xs text-slate-600 focus:outline-none max-w-[120px]">
-                    <option value="">เลือกจาก OA</option>
-                    <template x-for="c in lineContacts" :key="c.line_user_id">
-                      <option :value="c.line_user_id" x-text="c.display_name || c.line_user_id"></option>
-                    </template>
-                  </select>
-                </template>
-              </div>
-              <label class="flex items-center gap-2 cursor-pointer" :class="lineUserId.trim() ? '' : 'opacity-50 pointer-events-none'">
-                <input type="checkbox" x-model="sendLine" class="rounded accent-[#06C755]">
-                <span class="text-xs text-[#067a2f] font-medium">ส่งใบยืนยันการจองทาง LINE ทันที</span>
-              </label>
-            </div>
+            <?php require __DIR__ . '/line_contact_picker.php'; ?>
             <button type="button" @click="confirmBook()" :disabled="!canBook()"
                     class="ow-btn-primary w-full disabled:opacity-40">บันทึกการจอง</button>
           </div>
@@ -475,6 +452,9 @@ function avCalManage() {
     sendLine: false,
     lineContacts: [],
     lineContactsLoaded: false,
+    lineContactsLoading: false,
+    lineSearch: '',
+    showLineManual: false,
     editBookingId: 0,
     editCode: '',
     editCheckIn: '',
@@ -502,11 +482,48 @@ function avCalManage() {
     async fetchLineContacts() {
       const pid = <?= $pid ?>;
       if (!pid) return;
+      this.lineContactsLoading = true;
       try {
         const r = await fetch(`<?= url('/owner/api/line-contacts') ?>?property_id=${pid}`);
         this.lineContacts = await r.json();
-      } catch(e) {}
+      } catch(e) { this.lineContacts = []; }
+      this.lineContactsLoading = false;
       this.lineContactsLoaded = true;
+    },
+    filteredLineContacts() {
+      const q = this.lineSearch.trim().toLowerCase();
+      if (!q) return this.lineContacts;
+      return this.lineContacts.filter(c =>
+        (c.display_name || '').toLowerCase().includes(q) ||
+        (c.line_user_id || '').toLowerCase().includes(q) ||
+        (c.phone || '').includes(q)
+      );
+    },
+    selectedLineContact() {
+      return this.lineContacts.find(c => c.line_user_id === this.lineUserId) || null;
+    },
+    pickLineContact(c) {
+      if (!c) return;
+      this.lineUserId = c.line_user_id;
+      this.lineSearch = '';
+      if (c.display_name && !this.guestName.trim()) this.guestName = c.display_name;
+      if (c.phone && !this.guestPhone.trim()) this.guestPhone = c.phone;
+      if (c.line_user_id) this.sendLine = true;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    clearLineContact() {
+      this.lineUserId = '';
+      this.sendLine = false;
+    },
+    formatLineLastSeen(ymd) {
+      if (!ymd) return 'ทักแชทผ่าน OA';
+      const d = new Date(String(ymd).replace(' ', 'T'));
+      if (isNaN(d.getTime())) return 'ทักแชทผ่าน OA';
+      const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+      if (diff <= 0) return 'ทักวันนี้';
+      if (diff === 1) return 'ทักเมื่อวาน';
+      if (diff < 7) return 'ทัก ' + diff + ' วันที่แล้ว';
+      return 'ทักแชทผ่าน OA';
     },
     openDay(date, label, key) {
       this.selectedDate = date;
@@ -519,6 +536,8 @@ function avCalManage() {
       this.checkOut = addDays(date, 1);
       this.lineUserId = '';
       this.sendLine = false;
+      this.lineSearch = '';
+      this.showLineManual = false;
       this.step = 'choose';
       this.open = true;
     },

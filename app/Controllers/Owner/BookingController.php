@@ -168,8 +168,9 @@ class BookingController extends Controller
             $this->json([]);
         }
 
+        $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', phone' : '';
         $contacts = Database::fetchAll(
-            "SELECT line_user_id, display_name, picture_url, last_seen_at
+            "SELECT line_user_id, display_name, picture_url, last_seen_at{$phoneCol}
              FROM property_line_contacts
              WHERE property_id = :p AND unfollowed_at IS NULL
              ORDER BY last_seen_at DESC

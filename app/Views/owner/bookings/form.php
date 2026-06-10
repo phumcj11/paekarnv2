@@ -116,47 +116,28 @@ $unitsJson = json_encode($unitsByProperty, JSON_UNESCAPED_UNICODE);
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1">ชื่อผู้จอง <span class="text-rose-500">*</span></label>
-            <input type="text" name="guest_name" required maxlength="120"
+            <input type="text" name="guest_name" required maxlength="120" x-model="guestName"
                    value="<?= e($val('guest_name')) ?>"
                    placeholder="ชื่อ-นามสกุล หรือชื่อเล่น"
                    class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
           </div>
           <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1">เบอร์โทร <span class="text-rose-500">*</span></label>
-            <input type="tel" name="guest_phone" required maxlength="30"
+            <input type="tel" name="guest_phone" required maxlength="30" x-model="guestPhone"
                    value="<?= e($val('guest_phone')) ?>"
                    placeholder="08x-xxx-xxxx"
                    class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
           </div>
         </div>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">อีเมล <span class="text-slate-400 font-normal text-xs">(ไม่จำเป็น)</span></label>
-            <input type="email" name="guest_email" maxlength="160"
-                   value="<?= e($val('guest_email')) ?>"
-                   class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">
-              LINE User ID <span class="text-slate-400 font-normal text-xs">(ไม่จำเป็น — ส่งใบยืนยันได้)</span>
-            </label>
-            <div class="flex gap-2">
-              <input type="text" name="guest_line_user_id" x-model="lineUserId" maxlength="64"
-                     value="<?= e($val('guest_line_user_id')) ?>"
-                     placeholder="Uxxxxxxxxxxxxxxxxxx"
-                     class="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 text-sm font-mono focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
-              <template x-if="lineContacts.length > 0">
-                <select @change="pickContact($event.target.value)"
-                        class="px-2 py-2 rounded-lg border border-slate-300 text-xs text-slate-600 focus:outline-none max-w-[140px]">
-                  <option value="">เลือกจาก OA</option>
-                  <template x-for="c in lineContacts" :key="c.line_user_id">
-                    <option :value="c.line_user_id" x-text="c.display_name || c.line_user_id"></option>
-                  </template>
-                </select>
-              </template>
-            </div>
-            <p class="text-xs text-slate-400 mt-1">ดูได้จาก LINE Developers หรือจากรายชื่อลูกค้าที่ Add OA ของแพไว้แล้ว</p>
-          </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">อีเมล <span class="text-slate-400 font-normal text-xs">(ไม่จำเป็น)</span></label>
+          <input type="email" name="guest_email" maxlength="160"
+                 value="<?= e($val('guest_email')) ?>"
+                 class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-accent-500 focus:ring-2 focus:ring-accent-100 outline-none">
+        </div>
+        <input type="hidden" name="guest_line_user_id" :value="lineUserId">
+        <div>
+          <?php require __DIR__ . '/../partials/line_contact_picker.php'; ?>
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1">หมายเหตุ</label>
@@ -166,17 +147,7 @@ $unitsJson = json_encode($unitsByProperty, JSON_UNESCAPED_UNICODE);
         </div>
       </div>
 
-      <!-- ตัวเลือกส่งยืนยัน -->
-      <div class="rounded-xl border border-teal-200 bg-teal-50 p-4 space-y-2">
-        <label class="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" name="send_line_confirm" value="1"
-                 x-model="sendLine" class="mt-0.5 rounded accent-teal-600">
-          <div>
-            <div class="text-sm font-semibold text-teal-800">ส่งใบยืนยันการจองให้ลูกค้าทาง LINE ทันที</div>
-            <div class="text-xs text-teal-600 mt-0.5">ต้องกรอก LINE User ID และที่พักต้องมีการตั้งค่า LINE OA ไว้</div>
-          </div>
-        </label>
-      </div>
+      <input type="hidden" name="send_line_confirm" :value="sendLine ? '1' : ''">
 
       <div class="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
         <a href="<?= url('/owner/bookings') ?>" class="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 transition">ยกเลิก</a>
@@ -204,7 +175,12 @@ function ownerBookingForm() {
     guestCount:     <?= (int)$val('guest_count', 2) ?>,
     sendLine:       false,
     units:          [],
+    guestName:      '<?= e($val('guest_name','')) ?>',
+    guestPhone:     '<?= e($val('guest_phone','')) ?>',
     lineContacts:   [],
+    lineContactsLoading: false,
+    lineSearch:     '',
+    showLineManual: false,
     lineUserId:     '<?= e($val('guest_line_user_id','')) ?>',
     selectedUnit:   null,
     estimatedNights: 0,
@@ -230,15 +206,50 @@ function ownerBookingForm() {
       this.deposit = '';
       this.lineContacts = [];
       if (pid) {
+        this.lineContactsLoading = true;
         try {
           const r = await fetch(`<?= url('/owner/api/line-contacts') ?>?property_id=${pid}`);
           this.lineContacts = await r.json();
-        } catch(e) {}
+        } catch(e) { this.lineContacts = []; }
+        this.lineContactsLoading = false;
       }
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
-    pickContact(uid) {
-      if (uid) this.lineUserId = uid;
+    filteredLineContacts() {
+      const q = this.lineSearch.trim().toLowerCase();
+      if (!q) return this.lineContacts;
+      return this.lineContacts.filter(c =>
+        (c.display_name || '').toLowerCase().includes(q) ||
+        (c.line_user_id || '').toLowerCase().includes(q) ||
+        (c.phone || '').includes(q)
+      );
+    },
+    selectedLineContact() {
+      return this.lineContacts.find(c => c.line_user_id === this.lineUserId) || null;
+    },
+    pickLineContact(c) {
+      if (!c) return;
+      this.lineUserId = c.line_user_id;
+      this.lineSearch = '';
+      if (c.display_name && !this.guestName.trim()) this.guestName = c.display_name;
+      if (c.phone && !this.guestPhone.trim()) this.guestPhone = c.phone;
+      if (c.line_user_id) this.sendLine = true;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+    clearLineContact() {
+      this.lineUserId = '';
+      this.sendLine = false;
+    },
+    formatLineLastSeen(ymd) {
+      if (!ymd) return 'ทักแชทผ่าน OA';
+      const d = new Date(String(ymd).replace(' ', 'T'));
+      if (isNaN(d.getTime())) return 'ทักแชทผ่าน OA';
+      const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+      if (diff <= 0) return 'ทักวันนี้';
+      if (diff === 1) return 'ทักเมื่อวาน';
+      if (diff < 7) return 'ทัก ' + diff + ' วันที่แล้ว';
+      return 'ทักแชทผ่าน OA';
     },
 
     onUnitChange() {
