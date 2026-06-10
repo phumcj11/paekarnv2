@@ -255,8 +255,16 @@ class PropertyLineService
             return ['ok' => false, 'richMenuId' => '', 'detail' => 'ไม่ได้รับ richMenuId'];
         }
 
-        // อัปโหลด default placeholder image (สี+ข้อความ ด้วย PNG ขนาดเล็ก base64)
-        self::uploadRichMenuDefaultImage($token, $richMenuId);
+        // อัปโหลดรูป Rich Menu — LINE ต้องการรูปก่อน set default ได้
+        $imgResult = self::uploadRichMenuDefaultImage($token, $richMenuId);
+        if (!$imgResult['ok']) {
+            // ลบ menu ที่สร้างไว้ (ไม่มีประโยชน์ถ้าไม่มีรูป)
+            $delCh = curl_init("https://api.line.me/v2/bot/richmenu/{$richMenuId}");
+            curl_setopt_array($delCh, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => 'DELETE', CURLOPT_TIMEOUT => 5, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token]]);
+            curl_exec($delCh); curl_close($delCh);
+
+            return ['ok' => false, 'richMenuId' => '', 'detail' => "อัปโหลดรูป Rich Menu ไม่สำเร็จ (HTTP {$imgResult['code']}): {$imgResult['detail']}"];
+        }
 
         return ['ok' => true, 'richMenuId' => $richMenuId, 'detail' => 'สำเร็จ'];
     }
@@ -341,27 +349,28 @@ class PropertyLineService
     }
 
     /**
-     * อัปโหลดรูป Rich Menu (แพกาญ branded) ให้ LINE
-     * ใช้ไฟล์ PNG จาก public/assets/line_rich_menu_paekarn.png ก่อน
-     * fallback ไป GD placeholder ถ้าไม่มีไฟล์
+     * อัปโหลดรูป Rich Menu (branded) ให้ LINE
+     * @return array{ok:bool,code:int,detail:string}
      */
-    private static function uploadRichMenuDefaultImage(string $token, string $richMenuId): void
+    private static function uploadRichMenuDefaultImage(string $token, string $richMenuId): array
     {
-        // หา branded PNG ที่ generate ไว้
+        // หาไฟล์รูปจากหลาย path
         $candidates = [
             defined('APP_BASE_PATH') ? APP_BASE_PATH . '/public/assets/line_rich_menu_paekarn.png' : null,
             dirname(__DIR__, 2) . '/public/assets/line_rich_menu_paekarn.png',
         ];
 
-        $png = null;
+        $png      = null;
+        $usedPath = '';
         foreach (array_filter($candidates) as $path) {
-            if (file_exists($path)) {
+            if (is_file($path) && is_readable($path)) {
                 $png = file_get_contents($path);
+                $usedPath = $path;
                 break;
             }
         }
 
-        // GD fallback: สีน้ำเงินเรียบ ถ้าหาไฟล์ไม่เจอ
+        // GD fallback: สร้างรูปสีน้ำเงินเรียบๆ
         if (!$png && function_exists('imagecreatetruecolor')) {
             $w = 2500; $h = 843;
             $img = imagecreatetruecolor($w, $h);
@@ -372,33 +381,41 @@ class PropertyLineService
                 imageline($img, 833, 0, 833, $h, $sep);
                 imageline($img, 1667, 0, 1667, $h, $sep);
                 imageline($img, 0, 421, $w, 421, $sep);
-                ob_start();
-                imagepng($img);
-                $png = ob_get_clean();
+                ob_start(); imagepng($img); $png = ob_get_clean();
                 imagedestroy($img);
+                $usedPath = 'GD fallback';
             }
         }
 
-        if (!$png) return;
+        if (!$png) {
+            $tried = implode(', ', array_filter($candidates));
+            error_log("[Paekarn] uploadRichMenuImage: ไม่พบไฟล์รูป tried={$tried}");
+            return ['ok' => false, 'code' => 0, 'detail' => "ไม่พบไฟล์รูป ({$tried})"];
+        }
+
+        error_log("[Paekarn] uploadRichMenuImage: ใช้ไฟล์ {$usedPath} ขนาด " . strlen($png) . " bytes");
 
         $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/{$richMenuId}/content");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT        => 60,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: image/png',
                 'Authorization: Bearer ' . $token,
             ],
             CURLOPT_POSTFIELDS => $png,
         ]);
-        $res  = curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $resBody = (string)curl_exec($ch);
+        $code    = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         if ($code !== 200) {
-            error_log("[Paekarn] uploadRichMenuImage FAIL richmenu={$richMenuId} HTTP {$code}: {$res}");
+            error_log("[Paekarn] uploadRichMenuImage FAIL richmenu={$richMenuId} HTTP {$code}: {$resBody}");
+            return ['ok' => false, 'code' => $code, 'detail' => $resBody];
         }
+
+        return ['ok' => true, 'code' => 200, 'detail' => ''];
     }
 
     /**
