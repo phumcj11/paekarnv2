@@ -393,10 +393,15 @@ class PropertyLineService
             return ['ok' => false, 'code' => 0, 'detail' => "ไม่พบไฟล์รูป ({$tried})"];
         }
 
-        // LINE ต้องการรูปขนาด 2500×843 — resize ด้วย GD ถ้าจำเป็น
-        $png = self::resizeImageTo2500x843($png) ?: $png;
+        // LINE ต้องการ 2500×843 และไฟล์ ≤ 1MB
+        $prepared = self::prepareRichMenuImage($png);
+        if (!$prepared['ok']) {
+            return ['ok' => false, 'code' => 0, 'detail' => $prepared['detail']];
+        }
 
-        error_log("[Paekarn] uploadRichMenuImage: ใช้ไฟล์ {$usedPath} ขนาดหลัง resize=" . strlen($png) . " bytes");
+        $imageBytes  = $prepared['bytes'];
+        $contentType = $prepared['contentType'];
+        error_log("[Paekarn] uploadRichMenuImage: {$usedPath} → {$contentType} " . strlen($imageBytes) . " bytes ({$prepared['detail']})");
 
         $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/{$richMenuId}/content");
         curl_setopt_array($ch, [
@@ -404,10 +409,10 @@ class PropertyLineService
             CURLOPT_POST           => true,
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_HTTPHEADER     => [
-                'Content-Type: image/png',
+                'Content-Type: ' . $contentType,
                 'Authorization: Bearer ' . $token,
             ],
-            CURLOPT_POSTFIELDS => $png,
+            CURLOPT_POSTFIELDS => $imageBytes,
         ]);
         $resBody = (string)curl_exec($ch);
         $code    = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -505,45 +510,69 @@ class PropertyLineService
     }
 
     /**
-     * Resize PNG/JPEG bytes ให้ได้ 2500×843 (LINE Rich Menu full size)
-     * @return string|null PNG bytes หลัง resize, null ถ้า GD ไม่ available
+     * เตรียมรูป Rich Menu: resize 2500×843 + บีบอัด ≤ 1MB (LINE limit)
+     * @return array{ok:bool,bytes:string,contentType:string,detail:string}
      */
-    private static function resizeImageTo2500x843(string $imageData): ?string
+    private static function prepareRichMenuImage(string $imageData): array
     {
-        if (!function_exists('imagecreatefromstring')) return null;
+        $fail = static fn(string $msg) => ['ok' => false, 'bytes' => '', 'contentType' => '', 'detail' => $msg];
 
-        $src = @imagecreatefromstring($imageData);
-        if (!$src) return null;
-
-        $sw = imagesx($src);
-        $sh = imagesy($src);
-
-        // ถ้าขนาดถูกต้องแล้ว ไม่ต้อง resize
-        if ($sw === 2500 && $sh === 843) {
-            imagedestroy($src);
-            return $imageData;
+        if (!function_exists('imagecreatefromstring')) {
+            return $fail('เซิร์ฟเวอร์ไม่มี GD extension สำหรับประมวลผลรูป');
         }
 
-        $tw = 2500; $th = 843;
-        $dst = imagecreatetruecolor($tw, $th);
-        if (!$dst) { imagedestroy($src); return null; }
+        $src = @imagecreatefromstring($imageData);
+        if (!$src) return $fail('อ่านไฟล์รูปไม่ได้');
 
-        // เปิด alpha สำหรับ PNG
-        imagealphablending($dst, false);
-        imagesavealpha($dst, true);
+        $tw = 2500;
+        $th = 843;
+        $dst = imagecreatetruecolor($tw, $th);
+        if (!$dst) {
+            imagedestroy($src);
+            return $fail('สร้าง canvas ไม่ได้');
+        }
+
         $white = imagecolorallocate($dst, 255, 255, 255);
         imagefilledrectangle($dst, 0, 0, $tw - 1, $th - 1, $white);
-        imagealphablending($dst, true);
-
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, imagesx($src), imagesy($src));
         imagedestroy($src);
 
-        ob_start();
-        imagepng($dst, null, 6); // compression 6 — ขนาดเล็กพอ
-        $out = ob_get_clean();
-        imagedestroy($dst);
+        $maxBytes = 950 * 1024; // LINE จำกัด 1MB — เหลือ buffer
 
-        return $out ?: null;
+        // JPEG บีบอัดได้ดีกว่า PNG สำหรับรูป AI
+        for ($q = 88; $q >= 35; $q -= 3) {
+            ob_start();
+            imagejpeg($dst, null, $q);
+            $bytes = ob_get_clean();
+            if ($bytes && strlen($bytes) <= $maxBytes) {
+                imagedestroy($dst);
+                return [
+                    'ok'          => true,
+                    'bytes'       => $bytes,
+                    'contentType' => 'image/jpeg',
+                    'detail'      => "jpeg q={$q}",
+                ];
+            }
+        }
+
+        // fallback PNG บีบอัดสูงสุด
+        for ($level = 9; $level >= 0; $level--) {
+            ob_start();
+            imagepng($dst, null, $level);
+            $bytes = ob_get_clean();
+            if ($bytes && strlen($bytes) <= $maxBytes) {
+                imagedestroy($dst);
+                return [
+                    'ok'          => true,
+                    'bytes'       => $bytes,
+                    'contentType' => 'image/png',
+                    'detail'      => "png level={$level}",
+                ];
+            }
+        }
+
+        imagedestroy($dst);
+        return $fail('บีบอัดรูปแล้วยังใหญ่กว่า 1MB — ลองใช้รูปที่เรียบง่ายกว่านี้');
     }
 
     /** @return array{code:int,body:string} */
