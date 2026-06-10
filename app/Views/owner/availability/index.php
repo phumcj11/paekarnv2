@@ -8,7 +8,6 @@ $prevMonth = $month==1 ? 12 : $month-1; $prevYear = $month==1 ? $year-1 : $year;
 $nextMonth = $month==12 ? 1 : $month+1;  $nextYear = $month==12 ? $year+1 : $year;
 $pid = (int)$property['id'];
 
-// วันที่ในเดือน (สำหรับ JS)
 $futureDates = [];
 for ($d = 1; $d <= $daysInMonth; $d++) {
     $date = sprintf('%04d-%02d-%02d', $year, $month, $d);
@@ -49,11 +48,23 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4 text-xs space-y-2">
+      <h3 class="font-bold text-sm mb-1">โหมดเลือก</h3>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" value="range" x-model="mode" @change="clearSel()" class="accent-accent-600">
+        <span><strong>ช่วงวัน</strong> — เช็คอิน → เช็คเอาท์</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" value="single" x-model="mode" @change="clearSel()" class="accent-accent-600">
+        <span><strong>ทีละวัน</strong> — คลิกหลายวัน</span>
+      </label>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4 text-xs space-y-2">
       <h3 class="font-bold text-sm mb-1">สีในปฏิทิน</h3>
-      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-emerald-100 border border-emerald-300"></span> ว่าง — รับจองได้</div>
-      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-rose-100 border border-rose-300"></span> เต็ม — จองครบแล้ว</div>
-      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-slate-300 border border-slate-400"></span> ปิด — บล็อกโดยเจ้าของ</div>
-      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded ring-2 ring-accent-500 bg-white"></span> วันที่เลือกอยู่</div>
+      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-emerald-100 border border-emerald-300"></span> ว่าง</div>
+      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-rose-100 border border-rose-300"></span> เต็ม</div>
+      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded bg-slate-300 border border-slate-400"></span> ปิด</div>
+      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded ring-2 ring-indigo-500 bg-indigo-50"></span> ช่วงที่เลือก</div>
     </div>
   </div>
 
@@ -76,15 +87,36 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
         <a href="?unit=<?= $unitId ?>&month=<?= $nextMonth ?>&year=<?= $nextYear ?>" class="px-3 py-1.5 border rounded-lg text-sm hover:bg-slate-50"><i data-lucide="chevron-right" class="w-4 h-4"></i></a>
       </div>
 
-      <!-- Quick actions -->
+      <!-- ช่วงที่เลือก -->
+      <div class="mb-3 p-3 rounded-xl border text-sm"
+           :class="selected.length ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-500'">
+        <template x-if="mode === 'range'">
+          <div>
+            <span class="font-semibold">ช่วงพัก: </span>
+            <span x-text="rangeSummary()"></span>
+          </div>
+        </template>
+        <template x-if="mode === 'single'">
+          <div>
+            <span class="font-semibold">เลือกแล้ว: </span>
+            <span x-text="selected.length ? selected.length + ' วัน' : 'ยังไม่ได้เลือก'"></span>
+          </div>
+        </template>
+      </div>
+
       <div class="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-        <span class="text-xs text-slate-500 w-full mb-0.5">คลิกวันที่เพื่อเลือก แล้วกดปุ่มด้านล่าง</span>
+        <span class="text-xs text-slate-500 w-full" x-show="mode==='range'">
+          คลิกวันแรก = เช็คอิน · คลิกวันที่สอง = เช็คเอาท์ (ระบบเลือกทุกคืนในช่วงให้)
+        </span>
+        <span class="text-xs text-slate-500 w-full" x-show="mode==='single'">
+          คลิกวันที่ทีละวันเพื่อเลือกหลายวัน
+        </span>
         <button type="button" @click="apply('closed')" :disabled="selected.length===0"
-                class="px-3 py-1.5 text-xs font-semibold bg-slate-600 text-white rounded-lg disabled:opacity-40">ปิดวันที่เลือก</button>
+                class="px-3 py-1.5 text-xs font-semibold bg-slate-600 text-white rounded-lg disabled:opacity-40">ปิดช่วงที่เลือก</button>
         <button type="button" @click="apply('open')" :disabled="selected.length===0"
-                class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg disabled:opacity-40">เปิดวันที่เลือก</button>
+                class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg disabled:opacity-40">เปิดช่วงที่เลือก</button>
         <button type="button" @click="selectWeekends()" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg hover:bg-white">เลือกเสาร์-อาทิตย์</button>
-        <button type="button" @click="clearSel()" class="px-3 py-1.5 text-xs text-slate-600 rounded-lg hover:bg-white">ล้าง (<span x-text="selected.length"></span>)</button>
+        <button type="button" @click="clearSel()" class="px-3 py-1.5 text-xs text-slate-600 rounded-lg hover:bg-white">ล้าง</button>
       </div>
 
       <div class="grid grid-cols-7 gap-1 mb-1 text-center text-xs font-semibold text-slate-500">
@@ -100,8 +132,8 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
           ?>
           <button type="button"
                   <?php if (!$isPast): ?>
-                  @click="toggle('<?= $date ?>')"
-                  :class="isSelected('<?= $date ?>') ? 'ring-2 ring-accent-500 ring-offset-1 scale-[1.02]' : ''"
+                  @click="pick('<?= $date ?>')"
+                  :class="cellClass('<?= $date ?>')"
                   <?php else: ?>disabled<?php endif; ?>
                   class="aspect-square rounded-xl border-2 <?= e($meta['cls']) ?> flex flex-col items-center justify-center relative transition <?= $isPast ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md' ?>">
             <span class="text-base font-bold"><?= $d ?></span>
@@ -114,7 +146,7 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
       </div>
 
       <p class="text-xs text-slate-500 mt-4">
-        💡 <strong>ง่ายๆ:</strong> ไม่ต้องตั้งทุกวัน — วันที่ไม่ได้ปิดและยังไม่จองเต็ม ลูกค้าจะเห็นว่า «ว่าง» ใน LINE อัตโนมัติ
+        💡 โหมด <strong>ช่วงวัน</strong> เหมือนลูกค้าเลือกใน LINE — เช่น เช็คอิน 15 มิ.ย. เช็คเอาท์ 18 มิ.ย. = ปิด/เปิด 3 คืน (15–17 มิ.ย.)
       </p>
     </form>
   </div>
@@ -127,18 +159,95 @@ function availabilityCal() {
     const dow = new Date(d + 'T12:00:00').getDay();
     return dow === 0 || dow === 6;
   });
+
+  const thaiShort = (ymd) => {
+    const [y, m, d] = ymd.split('-').map(Number);
+    const months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return `${d} ${months[m]}`;
+  };
+
+  const addDays = (ymd, n) => {
+    const dt = new Date(ymd + 'T12:00:00');
+    dt.setDate(dt.getDate() + n);
+    return dt.toISOString().slice(0, 10);
+  };
+
+  const nightsBetween = (checkIn, checkOut) => {
+    if (!checkIn) return [];
+    if (!checkOut || checkOut <= checkIn) return [checkIn];
+    const out = [];
+    let d = checkIn;
+    while (d < checkOut) {
+      out.push(d);
+      d = addDays(d, 1);
+    }
+    return out;
+  };
+
   return {
+    mode: 'range',
+    rangeStart: null,
+    rangeEnd: null,
     selected: [],
     pendingStatus: 'open',
     init() {},
-    toggle(date) {
-      const i = this.selected.indexOf(date);
-      if (i >= 0) this.selected.splice(i, 1);
-      else this.selected.push(date);
+    pick(date) {
+      if (this.mode === 'single') {
+        const i = this.selected.indexOf(date);
+        if (i >= 0) this.selected.splice(i, 1);
+        else this.selected.push(date);
+        this.rangeStart = null;
+        this.rangeEnd = null;
+        return;
+      }
+      // ช่วงวัน: คลิก 1 = เช็คอิน, คลิก 2 = เช็คเอาท์
+      if (!this.rangeStart || (this.rangeStart && this.rangeEnd)) {
+        this.rangeStart = date;
+        this.rangeEnd = null;
+      } else if (date <= this.rangeStart) {
+        this.rangeEnd = addDays(this.rangeStart, 1);
+        this.rangeStart = date;
+      } else {
+        this.rangeEnd = date;
+      }
+      this.syncRange();
     },
-    isSelected(date) { return this.selected.includes(date); },
-    clearSel() { this.selected = []; },
-    selectWeekends() { this.selected = [...weekendDates]; },
+    syncRange() {
+      this.selected = nightsBetween(this.rangeStart, this.rangeEnd);
+    },
+    cellClass(date) {
+      if (!this.isHighlighted(date)) return '';
+      if (this.mode === 'range' && this.rangeStart === date) {
+        return 'ring-2 ring-indigo-600 ring-offset-1 bg-indigo-100 scale-[1.03]';
+      }
+      if (this.mode === 'range' && this.rangeEnd === date) {
+        return 'ring-2 ring-violet-600 ring-offset-1 bg-violet-100 scale-[1.03]';
+      }
+      return 'ring-2 ring-indigo-400 ring-offset-1 bg-indigo-50 scale-[1.02]';
+    },
+    isHighlighted(date) {
+      if (this.mode === 'single') return this.selected.includes(date);
+      if (!this.rangeStart) return false;
+      if (!this.rangeEnd) return date === this.rangeStart;
+      return date >= this.rangeStart && date < this.rangeEnd;
+    },
+    rangeSummary() {
+      if (!this.rangeStart) return 'คลิกวันแรก (เช็คอิน)';
+      if (!this.rangeEnd) return `เช็คอิน ${thaiShort(this.rangeStart)} — คลิกวันเช็คเอาท์`;
+      const n = this.selected.length;
+      return `${thaiShort(this.rangeStart)} → ${thaiShort(this.rangeEnd)} (${n} คืน)`;
+    },
+    clearSel() {
+      this.selected = [];
+      this.rangeStart = null;
+      this.rangeEnd = null;
+    },
+    selectWeekends() {
+      this.mode = 'single';
+      this.rangeStart = null;
+      this.rangeEnd = null;
+      this.selected = [...weekendDates];
+    },
     apply(status) {
       if (!this.selected.length) return;
       this.pendingStatus = status;
