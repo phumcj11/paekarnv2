@@ -123,7 +123,7 @@ class OwnerAvailabilityCalendar
         return Database::fetchAll(
             "SELECT b.id, b.code, b.guest_name, b.guest_phone,
                     DATE(b.check_in) AS check_in, DATE(b.check_out) AS check_out,
-                    b.status, b.total_price, b.nights, b.unit_id,
+                    b.status, b.total_price, b.nights, b.unit_id, b.notes,
                     u.name AS unit_name,
                     COALESCE((
                         SELECT SUM(bp.amount) FROM booking_payments bp
@@ -174,6 +174,7 @@ class OwnerAvailabilityCalendar
             'nights'      => (int)$b['nights'],
             'unit_id'     => (int)($b['unit_id'] ?? 0),
             'unit_name'   => $b['unit_name'] ?? '',
+            'notes'       => $b['notes'] ?? '',
         ];
     }
 

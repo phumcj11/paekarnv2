@@ -178,18 +178,33 @@ $csrfToken    = \App\Core\Csrf::token();
                       <i data-lucide="phone" class="w-4 h-4"></i>
                     </a>
                   </div>
-                  <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="grid grid-cols-3 gap-1.5 text-xs">
                     <div class="rounded-lg bg-slate-50 px-2 py-1.5">
                       <div class="text-slate-500">ยอดทั้งหมด</div>
                       <div class="font-semibold text-slate-800" x-text="formatMoney(b.total_price)"></div>
+                    </div>
+                    <div class="rounded-lg bg-emerald-50 px-2 py-1.5">
+                      <div class="text-emerald-600">มัดจำ</div>
+                      <div class="font-semibold text-emerald-800" x-text="formatMoney(bookingDeposit(b))"></div>
                     </div>
                     <div class="rounded-lg bg-core-50 px-2 py-1.5">
                       <div class="text-slate-500">คงเหลือ</div>
                       <div class="font-bold text-core-700" x-text="formatMoney(bookingBalance(b))"></div>
                     </div>
                   </div>
-                  <div class="flex justify-end">
-                    <button type="button" @click="confirmCancel(b)" class="text-[10px] font-semibold text-rose-600">ยกเลิกการจอง</button>
+                  <div class="flex items-center justify-end gap-2 pt-0.5">
+                    <template x-if="canEditBooking(b)">
+                      <button type="button" @click="openEdit(b)"
+                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-core-700 bg-core-50 border border-core-200 hover:bg-core-100">
+                        <i data-lucide="pencil" class="w-3 h-3"></i> แก้ไข
+                      </button>
+                    </template>
+                    <template x-if="canCancelBooking(b)">
+                      <button type="button" @click="confirmCancel(b)"
+                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> ยกเลิก
+                      </button>
+                    </template>
                   </div>
                 </div>
               </template>
@@ -305,6 +320,65 @@ $csrfToken    = \App\Core\Csrf::token();
         </div>
       </template>
 
+      <!-- Step: แก้ไขการจอง -->
+      <template x-if="step === 'edit'">
+        <div>
+          <button type="button" @click="step='choose'" class="text-sm text-slate-500 mb-3 inline-flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> กลับ</button>
+          <h3 class="font-bold text-lg mb-1">แก้ไขการจอง</h3>
+          <p class="text-sm text-slate-500 mb-1" x-text="editCode"></p>
+          <p class="text-xs text-slate-400 mb-4" x-text="dayLabel"></p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
+              <select x-model="formUnitId" @change="fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="u in units" :key="u.id">
+                  <option :value="String(u.id)" x-text="u.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ชื่อผู้จอง <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="guestName" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">เบอร์โทร <span class="text-rose-500">*</span></label>
+              <input type="tel" x-model="guestPhone" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">จำนวนคืน</label>
+              <select x-model="nights" @change="syncCheckOutFromCheckIn(); fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="n in 14" :key="n">
+                  <option :value="n" x-text="n + ' คืน'"></option>
+                </template>
+              </select>
+              <p class="text-xs text-slate-500 mt-1" x-text="formatDate(editCheckIn) + ' → ' + formatDate(checkOut)"></p>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ราคา (บาท)</label>
+              <input type="number" min="0" step="1" x-model="totalPrice" @input="priceEdited = true"
+                     class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">มัดจำ (บาท)</label>
+              <input type="number" min="0" step="1" x-model="deposit" placeholder="0"
+                     class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div class="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+              <span class="text-slate-600 font-medium">ยอดคงเหลือ</span>
+              <span class="font-bold text-core-700" x-text="formatMoney(balance)"></span>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">หมายเหตุ</label>
+              <textarea x-model="notes" rows="2" maxlength="1000"
+                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y"></textarea>
+            </div>
+            <button type="button" @click="confirmEdit()" :disabled="!canBook()"
+                    class="ow-btn-primary w-full disabled:opacity-40">บันทึกการแก้ไข</button>
+          </div>
+        </div>
+      </template>
+
       <!-- Step: ปิดการจอง -->
       <template x-if="step === 'close'">
         <div>
@@ -343,6 +417,15 @@ $csrfToken    = \App\Core\Csrf::token();
     <input type="hidden" name="month" value="<?= $month ?>">
     <input type="hidden" name="year" value="<?= $year ?>">
     <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
+  </form>
+  <form id="homeCalEditForm" method="post" action="" class="hidden">
+    <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
+    <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="cal_p" value="<?= $pid ?>">
+    <input type="hidden" name="cal_u" value="<?= $unitId ?>">
+    <input type="hidden" name="cal_m" value="<?= $month ?>">
+    <input type="hidden" name="cal_y" value="<?= $year ?>">
     <input type="hidden" name="cal_view" value="<?= e($viewMode) ?>">
   </form>
   <form id="homeCalCancelForm" method="post" action="" class="hidden">
@@ -402,6 +485,9 @@ function homeCalManage() {
     sendLine: false,
     lineContacts: [],
     lineContactsLoaded: false,
+    editBookingId: 0,
+    editCode: '',
+    editCheckIn: '',
     init() {
       this.$watch('open', v => { if (v) this.$nextTick(() => lucide.createIcons()); });
       this.$watch('step', v => {
@@ -413,6 +499,10 @@ function homeCalManage() {
           this.totalPrice = '';
           this.$nextTick(() => this.fetchQuote());
           if (!this.lineContactsLoaded) this.fetchLineContacts();
+        }
+        if (v === 'edit') {
+          this.priceEdited = true;
+          this.$nextTick(() => this.fetchQuote());
         }
       });
     },
@@ -446,6 +536,34 @@ function homeCalManage() {
     syncCheckOut() {
       this.checkOut = addDays(this.selectedDate, parseInt(this.nights, 10) || 1);
     },
+    syncCheckOutFromCheckIn() {
+      const base = this.editCheckIn || this.selectedDate;
+      this.checkOut = addDays(base, parseInt(this.nights, 10) || 1);
+    },
+    bookingDeposit(b) {
+      return parseFloat(b.paid_amount) || 0;
+    },
+    canEditBooking(b) {
+      return ['pending', 'confirmed'].includes(b.status);
+    },
+    canCancelBooking(b) {
+      return ['pending', 'confirmed'].includes(b.status);
+    },
+    openEdit(b) {
+      this.editBookingId = b.id;
+      this.editCode = '#' + b.code;
+      this.editCheckIn = b.check_in;
+      this.formUnitId = String(b.unit_id || defaultUnitId);
+      this.guestName = b.guest_name || '';
+      this.guestPhone = b.guest_phone || '';
+      this.nights = b.nights || 1;
+      this.checkOut = b.check_out;
+      this.totalPrice = String(Math.round(parseFloat(b.total_price) || 0));
+      this.deposit = String(Math.round(this.bookingDeposit(b)));
+      this.notes = b.notes || '';
+      this.priceEdited = true;
+      this.step = 'edit';
+    },
     formatDate(ymd) { return thaiShort(ymd); },
     formatMoney(n) {
       return '฿' + Number(n || 0).toLocaleString('th-TH');
@@ -462,12 +580,13 @@ function homeCalManage() {
       return Math.max(0, t - d);
     },
     async fetchQuote() {
-      if (!this.selectedDate || !this.checkOut || !this.formUnitId) return;
+      const checkIn = this.step === 'edit' ? this.editCheckIn : this.selectedDate;
+      if (!checkIn || !this.checkOut || !this.formUnitId) return;
       this.priceLoading = true;
       try {
         const q = new URLSearchParams({
           unit_id:     this.formUnitId,
-          check_in:    this.selectedDate,
+          check_in:    checkIn,
           check_out:   this.checkOut,
           guest_count: '1',
         });
@@ -481,7 +600,8 @@ function homeCalManage() {
       this.priceLoading = false;
     },
     canBook() {
-      return this.guestName.trim() && this.guestPhone.trim() && this.selectedDate && this.checkOut;
+      const checkIn = this.step === 'edit' ? this.editCheckIn : this.selectedDate;
+      return this.guestName.trim() && this.guestPhone.trim() && checkIn && this.checkOut;
     },
     fillForm(formId, fields) {
       const f = document.getElementById(formId);
@@ -532,6 +652,38 @@ function homeCalManage() {
       if (lineUid && this.sendLine) fields['send_line_confirm'] = '1';
       this.fillForm('homeCalBookForm', fields);
       document.getElementById('homeCalBookForm').submit();
+    },
+    async confirmEdit() {
+      if (!this.canBook() || !this.editBookingId) return;
+      this.syncCheckOutFromCheckIn();
+      const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
+      const price    = parseFloat(this.totalPrice) || 0;
+      const dep      = parseFloat(this.deposit) || 0;
+      const html = `<div class="text-left text-sm space-y-1">
+        <p><strong>รหัส:</strong> ${this.editCode}</p>
+        <p><strong>ยูนิต:</strong> ${unitName}</p>
+        <p><strong>ผู้จอง:</strong> ${this.guestName}</p>
+        <p><strong>โทร:</strong> ${this.guestPhone}</p>
+        <p><strong>พัก:</strong> ${thaiShort(this.editCheckIn)} → ${thaiShort(this.checkOut)} (${this.nights} คืน)</p>
+        <p><strong>ราคา:</strong> ${this.formatMoney(price)}</p>
+        <p><strong>มัดจำ:</strong> ${this.formatMoney(dep)} · <strong>คงเหลือ:</strong> ${this.formatMoney(this.balance)}</p>
+        ${this.notes.trim() ? `<p><strong>หมายเหตุ:</strong> ${this.notes.trim()}</p>` : ''}
+      </div>`;
+      const ok = await this.swalConfirm('ยืนยันแก้ไขการจอง?', html, 'question');
+      if (!ok) return;
+      const f = document.getElementById('homeCalEditForm');
+      f.action = '<?= url('/owner/bookings') ?>/' + this.editBookingId;
+      this.fillForm('homeCalEditForm', {
+        unit_id:        this.formUnitId,
+        check_in:       this.editCheckIn,
+        check_out:      this.checkOut,
+        guest_name:     this.guestName.trim(),
+        guest_phone:    this.guestPhone.trim(),
+        total_price:    this.totalPrice,
+        deposit_amount: this.deposit,
+        notes:          this.notes.trim(),
+      });
+      f.submit();
     },
     async confirmClose() {
       const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';

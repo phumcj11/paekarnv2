@@ -67,6 +67,7 @@ return function (Router $r): void {
         $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');
         $r->get('/bookings/{id:[0-9]+}',           [OwnerBooking::class, 'show']);
+        $r->post('/bookings/{id:[0-9]+}',          [OwnerBooking::class, 'update'])->middleware('csrf');
         $r->post('/bookings/{id:[0-9]+}/status',   [OwnerBooking::class, 'updateStatus'])->middleware('csrf');
         $r->post('/bookings/{id:[0-9]+}/payment',  [OwnerBooking::class, 'verifyPayment'])->middleware('csrf');
 

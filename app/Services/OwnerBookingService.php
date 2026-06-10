@@ -126,6 +126,122 @@ class OwnerBookingService
         return $bookingId;
     }
 
+    /**
+     * แก้ไขการจองที่เจ้าของบันทึกเอง (หรือจองมือทุกประเภทที่ยังไม่ completed/cancelled)
+     *
+     * @param array{unit_id?:int,guest_name?:string,guest_phone?:string,check_in?:string,check_out?:string,guest_count?:int,notes?:?string,total_price?:float|string|null,deposit_amount?:float|string|null,guest_line_user_id?:?string} $params
+     */
+    public static function updateManual(int $bookingId, int $ownerId, array $params): bool
+    {
+        $booking = self::findOwned($bookingId, $ownerId);
+        if (!$booking) {
+            return false;
+        }
+        if (in_array((string)$booking['status'], ['cancelled', 'completed'], true)) {
+            throw new \InvalidArgumentException('ไม่สามารถแก้ไขการจองที่ยกเลิกหรือเสร็จสิ้นแล้ว');
+        }
+
+        $unitId     = (int)($params['unit_id'] ?? $booking['unit_id']);
+        $guestName  = trim((string)($params['guest_name'] ?? $booking['guest_name']));
+        $guestPhone = trim((string)($params['guest_phone'] ?? $booking['guest_phone']));
+        $checkIn    = trim((string)($params['check_in'] ?? $booking['check_in']));
+        $checkOut   = trim((string)($params['check_out'] ?? $booking['check_out']));
+        $guestCount = max(1, (int)($params['guest_count'] ?? $booking['guest_count'] ?? 1));
+
+        if (!$guestName || !$guestPhone || !$checkIn || !$checkOut) {
+            throw new \InvalidArgumentException('ข้อมูลการจองไม่ครบ');
+        }
+        if (strtotime($checkOut) <= strtotime($checkIn)) {
+            throw new \InvalidArgumentException('วันเช็คเอาท์ต้องหลังวันเช็คอิน');
+        }
+
+        $unit = PropertyUnit::find($unitId);
+        if (!$unit || (int)$unit['property_id'] !== (int)$booking['property_id']) {
+            throw new \InvalidArgumentException('ไม่พบยูนิตของที่พักนี้');
+        }
+
+        $calc = BookingService::calculate($unit, $checkIn, $checkOut, $guestCount);
+
+        $chargedTotal = array_key_exists('total_price', $params) && $params['total_price'] !== '' && $params['total_price'] !== null
+            ? max(0, (float)$params['total_price'])
+            : (float)$booking['total_price'];
+
+        $deposit = array_key_exists('deposit_amount', $params) && $params['deposit_amount'] !== '' && $params['deposit_amount'] !== null
+            ? max(0, (float)$params['deposit_amount'])
+            : null;
+        if ($deposit !== null && $deposit > $chargedTotal) {
+            $deposit = $chargedTotal;
+        }
+
+        $notes = array_key_exists('notes', $params)
+            ? (trim((string)($params['notes'] ?? '')) ?: null)
+            : ($booking['notes'] ?: null);
+
+        $paymentStatus = (string)($booking['payment_status'] ?? 'unpaid');
+        if ($deposit !== null) {
+            if ($deposit > 0 && $deposit < $chargedTotal) {
+                $paymentStatus = 'partial';
+            } elseif ($chargedTotal > 0 && $deposit >= $chargedTotal) {
+                $paymentStatus = 'paid';
+            } else {
+                $paymentStatus = 'unpaid';
+            }
+        }
+
+        $payload = [
+            'unit_id'        => $unitId,
+            'guest_name'     => $guestName,
+            'guest_phone'    => $guestPhone,
+            'guest_count'    => $guestCount,
+            'check_in'       => $checkIn,
+            'check_out'      => $checkOut,
+            'nights'         => $calc['nights'],
+            'subtotal'       => $calc['subtotal'],
+            'discount'       => max(0, $calc['subtotal'] - $chargedTotal),
+            'total_price'    => $chargedTotal,
+            'payment_status' => $paymentStatus,
+            'notes'          => $notes,
+        ];
+
+        if (array_key_exists('guest_line_user_id', $params) && Database::tableHasColumn('bookings', 'guest_line_user_id')) {
+            $lineUid = trim((string)($params['guest_line_user_id'] ?? ''));
+            $payload['guest_line_user_id'] = $lineUid ?: null;
+        }
+
+        Database::update('bookings', $payload, 'id = :i', ['i' => $bookingId]);
+
+        if ($deposit !== null) {
+            self::syncCashDeposit($bookingId, $deposit);
+        }
+
+        return true;
+    }
+
+    private static function syncCashDeposit(int $bookingId, float $amount): void
+    {
+        Database::query(
+            "DELETE FROM booking_payments WHERE booking_id = :b AND method = 'cash' AND status = 'verified'",
+            ['b' => $bookingId]
+        );
+        if ($amount <= 0) {
+            return;
+        }
+        $payRow = [
+            'booking_id' => $bookingId,
+            'amount'     => $amount,
+            'method'     => 'cash',
+            'paid_at'    => date('Y-m-d H:i:s'),
+            'status'     => 'verified',
+        ];
+        if (Database::tableHasColumn('booking_payments', 'verified_at')) {
+            $payRow['verified_at'] = date('Y-m-d H:i:s');
+        }
+        if (Database::tableHasColumn('booking_payments', 'verified_by')) {
+            $payRow['verified_by'] = Auth::id();
+        }
+        Database::insert('booking_payments', $payRow);
+    }
+
     public static function cancelOwned(int $bookingId, int $ownerId): bool
     {
         $row = Database::fetch(

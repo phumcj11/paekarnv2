@@ -302,6 +302,65 @@ class BookingController extends Controller
         }
     }
 
+    /** POST /owner/bookings/{id} — แก้ไขการจอง */
+    public function update(int $id): void
+    {
+        $row = $this->fetchOwnedBooking($id);
+        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+
+        $input = $this->input();
+        $returnTo = ($_POST['return_to'] ?? '') === 'dashboard' ? 'dashboard' : 'booking';
+
+        try {
+            $ownerId = Auth::ownerId();
+            if (!$ownerId && !Auth::isAdmin()) {
+                Session::flash('error', 'ไม่มีสิทธิ์');
+                back();
+            }
+            $oid = $ownerId ?: (int)Database::fetch(
+                "SELECT owner_id FROM properties WHERE id = :i",
+                ['i' => $row['property_id']]
+            )['owner_id'];
+
+            $totalPrice = isset($input['total_price']) && $input['total_price'] !== ''
+                ? max(0, (float)$input['total_price']) : null;
+            $deposit = isset($input['deposit_amount']) && $input['deposit_amount'] !== ''
+                ? max(0, (float)$input['deposit_amount']) : null;
+
+            OwnerBookingService::updateManual($id, (int)$oid, [
+                'unit_id'            => (int)($input['unit_id'] ?? $row['unit_id']),
+                'guest_name'         => trim((string)($input['guest_name'] ?? '')),
+                'guest_phone'        => trim((string)($input['guest_phone'] ?? '')),
+                'check_in'           => trim((string)($input['check_in'] ?? '')),
+                'check_out'          => trim((string)($input['check_out'] ?? '')),
+                'guest_count'        => max(1, (int)($input['guest_count'] ?? 1)),
+                'total_price'        => $totalPrice,
+                'deposit_amount'     => $deposit,
+                'notes'              => trim((string)($input['notes'] ?? '')),
+                'guest_line_user_id' => trim((string)($input['guest_line_user_id'] ?? '')) ?: null,
+            ]);
+
+            Session::flash('success', 'แก้ไขการจอง #' . $row['code'] . ' เรียบร้อย');
+        } catch (\Throwable $e) {
+            error_log('[OwnerBooking] update: ' . $e->getMessage());
+            Session::flash('error', 'แก้ไขไม่สำเร็จ — ' . $e->getMessage());
+        }
+
+        if ($returnTo === 'dashboard') {
+            $q = array_filter([
+                'cal_p' => (int)($_POST['cal_p'] ?? 0),
+                'cal_u' => (int)($_POST['cal_u'] ?? 0),
+                'cal_m' => (int)($_POST['cal_m'] ?? 0),
+                'cal_y' => (int)($_POST['cal_y'] ?? 0),
+            ]);
+            if (($_POST['cal_view'] ?? '') === 'unit') {
+                $q['cal_view'] = 'unit';
+            }
+            redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
+        }
+        redirect(url('/owner/bookings/' . $id));
+    }
+
     private function fetchOwnedBooking(int $id): ?array
     {
         [$ownerWhere, $ownerParams] = $this->whereOwner();
