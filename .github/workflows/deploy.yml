@@ -85,6 +85,15 @@ jobs:
             if [ -f "$APP/scripts/migrate_line_contact_phone.sh" ]; then
               bash "$APP/scripts/migrate_line_contact_phone.sh" || echo "WARN: migrate_line_contact_phone failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_analytics.sh" ]; then
+              bash "$APP/scripts/migrate_analytics.sh" || echo "WARN: migrate_analytics failed (may already be applied)"
+            fi
+            if [ -f "$APP/scripts/migrate_line_crm_tags.sh" ]; then
+              bash "$APP/scripts/migrate_line_crm_tags.sh" || echo "WARN: migrate_line_crm_tags failed (may already be applied)"
+            fi
+            if [ -f "$APP/scripts/migrate_message_templates.sh" ]; then
+              bash "$APP/scripts/migrate_message_templates.sh" || echo "WARN: migrate_message_templates failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"
