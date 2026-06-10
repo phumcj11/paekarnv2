@@ -64,6 +64,7 @@ return function (Router $r): void {
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
         $r->get('/bookings/create',                [OwnerBooking::class, 'create']);
         $r->get('/api/line-contacts',              [OwnerBooking::class, 'lineContacts']);
+        $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');
         $r->get('/bookings/{id:[0-9]+}',           [OwnerBooking::class, 'show']);
         $r->post('/bookings/{id:[0-9]+}/status',   [OwnerBooking::class, 'updateStatus'])->middleware('csrf');

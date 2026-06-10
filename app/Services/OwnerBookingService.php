@@ -17,7 +17,7 @@ class OwnerBookingService
     }
 
     /**
-     * @param array{property_id:int,unit_id:int,guest_name:string,guest_phone:string,check_in:string,check_out:string,guest_count?:int,guest_email?:?string,notes?:?string,source?:string,guest_line_user_id?:?string,status?:string,send_line_confirm?:bool} $params
+     * @param array{property_id:int,unit_id:int,guest_name:string,guest_phone:string,check_in:string,check_out:string,guest_count?:int,guest_email?:?string,notes?:?string,system_note?:?string,total_price?:float|string|null,deposit_amount?:float|string|null,source?:string,guest_line_user_id?:?string,status?:string,send_line_confirm?:bool} $params
      */
     public static function createManual(array $params): int
     {
@@ -42,6 +42,29 @@ class OwnerBookingService
         }
 
         $calc = BookingService::calculate($unit, $checkIn, $checkOut, $guestCount);
+
+        $chargedTotal = array_key_exists('total_price', $params) && $params['total_price'] !== '' && $params['total_price'] !== null
+            ? max(0, (float)$params['total_price'])
+            : $calc['total'];
+        $deposit = array_key_exists('deposit_amount', $params) && $params['deposit_amount'] !== '' && $params['deposit_amount'] !== null
+            ? max(0, (float)$params['deposit_amount'])
+            : 0;
+        if ($deposit > $chargedTotal) {
+            $deposit = $chargedTotal;
+        }
+
+        $userNotes  = trim((string)($params['notes'] ?? ''));
+        $systemNote = trim((string)($params['system_note'] ?? ''));
+        $noteParts  = array_values(array_filter([$userNotes, $systemNote], static fn(string $s): bool => $s !== ''));
+        $notes      = $noteParts ? implode("\n", $noteParts) : null;
+
+        $paymentStatus = 'unpaid';
+        if ($deposit > 0 && $deposit < $chargedTotal) {
+            $paymentStatus = 'partial';
+        } elseif ($chargedTotal > 0 && $deposit >= $chargedTotal) {
+            $paymentStatus = 'paid';
+        }
+
         $source = in_array($params['source'] ?? '', ['manual_phone', 'manual_line', 'admin'], true)
             ? $params['source'] : 'manual_phone';
         $status = in_array($params['status'] ?? '', ['pending', 'confirmed'], true)
@@ -59,11 +82,11 @@ class OwnerBookingService
             'check_out'      => $checkOut,
             'nights'         => $calc['nights'],
             'subtotal'       => $calc['subtotal'],
-            'discount'       => 0,
-            'total_price'    => $calc['total'],
+            'discount'       => max(0, $calc['subtotal'] - $chargedTotal),
+            'total_price'    => $chargedTotal,
             'status'         => $status,
-            'payment_status' => 'unpaid',
-            'notes'          => trim((string)($params['notes'] ?? '')) ?: null,
+            'payment_status' => $paymentStatus,
+            'notes'          => $notes,
         ];
 
         if (Database::tableHasColumn('bookings', 'source')) {
@@ -78,6 +101,23 @@ class OwnerBookingService
         }
 
         $bookingId = BookingService::create($payload);
+
+        if ($deposit > 0) {
+            $payRow = [
+                'booking_id' => $bookingId,
+                'amount'     => $deposit,
+                'method'     => 'cash',
+                'paid_at'    => date('Y-m-d H:i:s'),
+                'status'     => 'verified',
+            ];
+            if (Database::tableHasColumn('booking_payments', 'verified_at')) {
+                $payRow['verified_at'] = date('Y-m-d H:i:s');
+            }
+            if (Database::tableHasColumn('booking_payments', 'verified_by')) {
+                $payRow['verified_by'] = Auth::id();
+            }
+            Database::insert('booking_payments', $payRow);
+        }
 
         if (!empty($params['send_line_confirm'])) {
             BookingService::confirmAndNotify($bookingId, true);

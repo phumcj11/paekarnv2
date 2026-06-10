@@ -133,16 +133,28 @@ class AvailabilityController extends Controller
             $this->redirectAfterCalendar($id, $unitId, $month, $year);
         }
 
+        $totalPrice = isset($_POST['total_price']) && $_POST['total_price'] !== ''
+            ? max(0, (float)$_POST['total_price']) : null;
+        $deposit = isset($_POST['deposit_amount']) && $_POST['deposit_amount'] !== ''
+            ? max(0, (float)$_POST['deposit_amount']) : null;
+        $userNotes = trim((string)($_POST['notes'] ?? ''));
+        $returnTo  = ($_POST['return_to'] ?? '') === 'dashboard' ? 'dashboard' : 'availability';
+
         try {
             $bookingId = OwnerBookingService::createManual([
-                'property_id' => $id,
-                'unit_id'     => $unitId,
-                'guest_name'  => $guestName,
-                'guest_phone' => $guestPhone,
-                'check_in'    => $checkIn,
-                'check_out'   => $checkOut,
-                'notes'       => 'บันทึกจากหน้าแรก (ปฏิทิน)',
-                'source'      => 'manual_phone',
+                'property_id'    => $id,
+                'unit_id'        => $unitId,
+                'guest_name'     => $guestName,
+                'guest_phone'    => $guestPhone,
+                'check_in'       => $checkIn,
+                'check_out'      => $checkOut,
+                'total_price'    => $totalPrice,
+                'deposit_amount' => $deposit,
+                'notes'          => $userNotes ?: null,
+                'system_note'    => $returnTo === 'dashboard'
+                    ? 'บันทึกจากหน้าแรก (ปฏิทิน)'
+                    : 'บันทึกจากปฏิทินที่พัก',
+                'source'         => 'manual_phone',
             ]);
             $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
             Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');

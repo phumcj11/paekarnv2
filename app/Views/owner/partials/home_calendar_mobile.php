@@ -166,7 +166,7 @@ $csrfToken = \App\Core\Csrf::token();
           <div class="space-y-3">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
-              <select x-model="formUnitId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+              <select x-model="formUnitId" @change="fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
                 <template x-for="u in units" :key="u.id">
                   <option :value="String(u.id)" x-text="u.name"></option>
                 </template>
@@ -182,12 +182,36 @@ $csrfToken = \App\Core\Csrf::token();
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">จำนวนคืน</label>
-              <select x-model="nights" @change="syncCheckOut()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+              <select x-model="nights" @change="syncCheckOut(); fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
                 <template x-for="n in 7" :key="n">
                   <option :value="n" x-text="n + ' คืน'"></option>
                 </template>
               </select>
               <p class="text-xs text-slate-500 mt-1" x-text="'เช็คเอาท์ ' + formatDate(checkOut)"></p>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ราคา (บาท)</label>
+              <div class="relative">
+                <input type="number" min="0" step="1" x-model="totalPrice" @input="priceEdited = true"
+                       class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm pr-10"
+                       placeholder="ดึงอัตโนมัติจากอัตราค่าพัก">
+                <span x-show="priceLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">...</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">ดึงราคาจากระบบก่อน — แก้ได้ตามตกลงหน้างาน</p>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">มัดจำ (บาท)</label>
+              <input type="number" min="0" step="1" x-model="deposit" placeholder="0"
+                     class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div class="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+              <span class="text-slate-600 font-medium">ยอดคงเหลือ</span>
+              <span class="font-bold text-core-700" x-text="formatMoney(balance)"></span>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">หมายเหตุ</label>
+              <textarea x-model="notes" rows="2" maxlength="1000" placeholder="เช่น ตกลงราคาพิเศษ, โอนมัดจำแล้ว..."
+                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y"></textarea>
             </div>
             <button type="button" @click="confirmBook()" :disabled="!canBook()"
                     class="ow-btn-primary w-full disabled:opacity-40">บันทึกการจอง</button>
@@ -205,7 +229,7 @@ $csrfToken = \App\Core\Csrf::token();
           <div class="space-y-3">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
-              <select x-model="formUnitId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+              <select x-model="formUnitId" @change="fetchQuote()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
                 <template x-for="u in units" :key="u.id">
                   <option :value="String(u.id)" x-text="u.name"></option>
                 </template>
@@ -277,9 +301,24 @@ function homeCalManage() {
     guestPhone: '',
     nights: 1,
     checkOut: '',
+    totalPrice: '',
+    suggestedTotal: 0,
+    priceEdited: false,
+    priceLoading: false,
+    deposit: '',
+    notes: '',
     init() {
       this.$watch('open', v => { if (v) this.$nextTick(() => lucide.createIcons()); });
-      this.$watch('step', () => this.$nextTick(() => lucide.createIcons()));
+      this.$watch('step', v => {
+        this.$nextTick(() => lucide.createIcons());
+        if (v === 'book') {
+          this.priceEdited = false;
+          this.deposit = '';
+          this.notes = '';
+          this.totalPrice = '';
+          this.$nextTick(() => this.fetchQuote());
+        }
+      });
     },
     openDay(date, label, key) {
       this.selectedDate = date;
@@ -301,6 +340,33 @@ function homeCalManage() {
       this.checkOut = addDays(this.selectedDate, parseInt(this.nights, 10) || 1);
     },
     formatDate(ymd) { return thaiShort(ymd); },
+    formatMoney(n) {
+      return '฿' + Number(n || 0).toLocaleString('th-TH');
+    },
+    get balance() {
+      const t = parseFloat(this.totalPrice) || 0;
+      const d = parseFloat(this.deposit) || 0;
+      return Math.max(0, t - d);
+    },
+    async fetchQuote() {
+      if (!this.selectedDate || !this.checkOut || !this.formUnitId) return;
+      this.priceLoading = true;
+      try {
+        const q = new URLSearchParams({
+          unit_id: this.formUnitId,
+          check_in: this.selectedDate,
+          check_out: this.checkOut,
+          guest_count: '1',
+        });
+        const r = await fetch('<?= url('/owner/api/booking-quote') ?>?' + q);
+        const data = await r.json();
+        if (data.total != null && !this.priceEdited) {
+          this.suggestedTotal = data.total;
+          this.totalPrice = String(Math.round(data.total));
+        }
+      } catch (e) {}
+      this.priceLoading = false;
+    },
     canBook() {
       return this.guestName.trim() && this.guestPhone.trim() && this.selectedDate && this.checkOut;
     },
@@ -323,11 +389,16 @@ function homeCalManage() {
       if (!this.canBook()) return;
       this.syncCheckOut();
       const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
+      const price = parseFloat(this.totalPrice) || 0;
+      const dep = parseFloat(this.deposit) || 0;
       const html = `<div class="text-left text-sm space-y-1">
         <p><strong>ยูนิต:</strong> ${unitName}</p>
         <p><strong>ผู้จอง:</strong> ${this.guestName}</p>
         <p><strong>โทร:</strong> ${this.guestPhone}</p>
         <p><strong>พัก:</strong> ${thaiShort(this.selectedDate)} → ${thaiShort(this.checkOut)} (${this.nights} คืน)</p>
+        <p><strong>ราคา:</strong> ${this.formatMoney(price)}</p>
+        ${dep > 0 ? `<p><strong>มัดจำ:</strong> ${this.formatMoney(dep)} · <strong>คงเหลือ:</strong> ${this.formatMoney(this.balance)}</p>` : ''}
+        ${this.notes.trim() ? `<p><strong>หมายเหตุ:</strong> ${this.notes.trim()}</p>` : ''}
       </div>`;
       const ok = await this.swalConfirm('ยืนยันเพิ่มการจอง?', html, 'question');
       if (!ok) return;
@@ -337,6 +408,9 @@ function homeCalManage() {
         check_out: this.checkOut,
         guest_name: this.guestName.trim(),
         guest_phone: this.guestPhone.trim(),
+        total_price: this.totalPrice,
+        deposit_amount: this.deposit,
+        notes: this.notes.trim(),
       });
       document.getElementById('homeCalBookForm').submit();
     },

@@ -129,6 +129,42 @@ class BookingController extends Controller
         redirect(url('/owner/bookings/' . $id));
     }
 
+    /** GET /owner/api/booking-quote?unit_id=&check_in=&check_out=&guest_count= */
+    public function quote(): void
+    {
+        $unitId     = (int)($_GET['unit_id'] ?? 0);
+        $checkIn    = trim((string)($_GET['check_in'] ?? ''));
+        $checkOut   = trim((string)($_GET['check_out'] ?? ''));
+        $guestCount = max(1, (int)($_GET['guest_count'] ?? 1));
+
+        if (!$unitId || !$checkIn || !$checkOut) {
+            $this->json(['error' => 'ข้อมูลไม่ครบ'], 400);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkIn) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkOut)
+            || strtotime($checkOut) <= strtotime($checkIn)) {
+            $this->json(['error' => 'วันที่ไม่ถูกต้อง'], 400);
+        }
+
+        $unit = PropertyUnit::find($unitId);
+        if (!$unit) {
+            $this->json(['error' => 'ไม่พบยูนิต'], 404);
+        }
+
+        $ownerId  = Auth::ownerId();
+        $property = Database::fetch('SELECT owner_id FROM properties WHERE id = :i LIMIT 1', ['i' => $unit['property_id']]);
+        if (!$property || (!Auth::isAdmin() && $ownerId && (int)$property['owner_id'] !== $ownerId)) {
+            $this->json(['error' => 'ไม่มีสิทธิ์'], 403);
+        }
+
+        $calc = BookingService::calculate($unit, $checkIn, $checkOut, $guestCount);
+        $this->json([
+            'total'    => $calc['total'],
+            'subtotal' => $calc['subtotal'],
+            'nights'   => $calc['nights'],
+            'discount' => $calc['discount'],
+        ]);
+    }
+
     /** GET /owner/api/line-contacts?property_id=N — ลูกค้า LINE ที่รู้จักจาก property OA */
     public function lineContacts(): void
     {
@@ -231,6 +267,11 @@ class BookingController extends Controller
         $sendLine = !empty($input['send_line_confirm']);
 
         try {
+            $totalPrice = isset($input['total_price']) && $input['total_price'] !== ''
+                ? max(0, (float)$input['total_price']) : null;
+            $deposit = isset($input['deposit_amount']) && $input['deposit_amount'] !== ''
+                ? max(0, (float)$input['deposit_amount']) : null;
+
             $bookingId = OwnerBookingService::createManual([
                 'property_id'        => $propertyId,
                 'unit_id'            => $unitId,
@@ -240,6 +281,8 @@ class BookingController extends Controller
                 'guest_count'        => $guestCount,
                 'check_in'           => $checkIn,
                 'check_out'          => $checkOut,
+                'total_price'        => $totalPrice,
+                'deposit_amount'     => $deposit,
                 'notes'              => trim((string)($input['notes'] ?? '')) ?: null,
                 'source'             => $source,
                 'guest_line_user_id' => trim((string)($input['guest_line_user_id'] ?? '')) ?: null,

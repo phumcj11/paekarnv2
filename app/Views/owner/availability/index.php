@@ -183,7 +183,7 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
 
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลังที่จอง <span class="text-rose-500">*</span></label>
-          <select name="unit_id" x-model="bookingUnitId" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none">
+          <select name="unit_id" x-model="bookingUnitId" @change="fetchQuote()" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none">
             <?php foreach ($units as $u): ?>
             <option value="<?= $u['id'] ?>"><?= e($u['name']) ?></option>
             <?php endforeach; ?>
@@ -198,6 +198,28 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
           <label class="block text-sm font-semibold text-slate-700 mb-1">เบอร์โทร <span class="text-rose-500">*</span></label>
           <input type="tel" name="guest_phone" x-model="guestPhone" required placeholder="08x-xxx-xxxx"
                  class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">ราคา (บาท)</label>
+          <input type="number" name="total_price" min="0" step="1" x-model="totalPrice" @input="priceEdited = true"
+                 class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none"
+                 placeholder="ดึงอัตโนมัติจากอัตราค่าพัก">
+          <p class="text-xs text-slate-500 mt-1">ดึงราคาจากระบบก่อน — แก้ได้ตามตกลงหน้างาน</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">มัดจำ (บาท)</label>
+          <input type="number" name="deposit_amount" min="0" step="1" x-model="deposit" placeholder="0"
+                 class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none">
+        </div>
+        <div class="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+          <span class="text-slate-600 font-medium">ยอดคงเหลือ</span>
+          <span class="font-bold text-core-700" x-text="formatMoney(balance)"></span>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">หมายเหตุ</label>
+          <textarea name="notes" rows="2" maxlength="1000" x-model="notes"
+                    placeholder="เช่น ตกลงราคาพิเศษ, โอนมัดจำแล้ว..."
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-core-500 outline-none resize-y"></textarea>
         </div>
         <div class="flex gap-2 pt-1">
           <button type="button" @click="showBookingModal=false" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">ยกเลิก</button>
@@ -295,10 +317,51 @@ function availabilityCal() {
     bookingUnitId: String(defaultUnitId),
     guestName: '',
     guestPhone: '',
+    totalPrice: '',
+    priceEdited: false,
+    priceLoading: false,
+    deposit: '',
+    notes: '',
     init() {
       this.$watch('showCloseModal', v => v && this.$nextTick(() => lucide.createIcons()));
-      this.$watch('showBookingModal', v => v && this.$nextTick(() => lucide.createIcons()));
+      this.$watch('showBookingModal', v => {
+        if (v) {
+          this.priceEdited = false;
+          this.deposit = '';
+          this.notes = '';
+          this.totalPrice = '';
+          this.$nextTick(() => { lucide.createIcons(); this.fetchQuote(); });
+        }
+      });
       this.$watch('showDetailModal', v => v && this.$nextTick(() => lucide.createIcons()));
+      this.$watch('bookingCheckIn', () => this.fetchQuote());
+      this.$watch('bookingCheckOut', () => this.fetchQuote());
+    },
+    formatMoney(n) {
+      return '฿' + Number(n || 0).toLocaleString('th-TH');
+    },
+    get balance() {
+      const t = parseFloat(this.totalPrice) || 0;
+      const d = parseFloat(this.deposit) || 0;
+      return Math.max(0, t - d);
+    },
+    async fetchQuote() {
+      if (!this.bookingCheckIn || !this.bookingCheckOut || !this.bookingUnitId) return;
+      this.priceLoading = true;
+      try {
+        const q = new URLSearchParams({
+          unit_id: this.bookingUnitId,
+          check_in: this.bookingCheckIn,
+          check_out: this.bookingCheckOut,
+          guest_count: '1',
+        });
+        const r = await fetch('<?= url('/owner/api/booking-quote') ?>?' + q);
+        const data = await r.json();
+        if (data.total != null && !this.priceEdited) {
+          this.totalPrice = String(Math.round(data.total));
+        }
+      } catch (e) {}
+      this.priceLoading = false;
     },
     pick(date, hasBooking) {
       if (hasBooking && bookingsOnDate[date]) {
