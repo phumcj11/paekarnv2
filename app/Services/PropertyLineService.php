@@ -470,6 +470,93 @@ class PropertyLineService
     }
 
     /**
+     * Sync followers จาก LINE OA → upsert เข้า property_line_contacts
+     * ใช้ GET /v2/bot/followers/ids (max 300/page) แล้ว fetch profile แต่ละคน
+     * @return array{imported:int,skipped:int,error:string}
+     */
+    public static function syncFollowers(int $propertyId, int $maxPages = 10): array
+    {
+        $token = self::token($propertyId);
+        if (!$token) {
+            return ['imported' => 0, 'skipped' => 0, 'error' => 'ไม่มี Channel Access Token'];
+        }
+
+        $imported = 0;
+        $skipped  = 0;
+        $cursor   = null;
+        $phoneCol = \App\Core\Database::tableHasColumn('property_line_contacts', 'phone');
+
+        for ($page = 0; $page < $maxPages; $page++) {
+            $url = 'https://api.line.me/v2/bot/followers/ids?limit=300';
+            if ($cursor) $url .= '&start=' . rawurlencode($cursor);
+
+            $res  = self::get($url, $token);
+            $data = json_decode($res['body'], true);
+
+            if ($res['code'] !== 200 || !is_array($data)) {
+                return ['imported' => $imported, 'skipped' => $skipped,
+                        'error' => "LINE API error {$res['code']}: {$res['body']}"];
+            }
+
+            $userIds = $data['userIds'] ?? [];
+            $cursor  = $data['next'] ?? null;
+
+            foreach ($userIds as $uid) {
+                $uid = (string)$uid;
+                if (!$uid) continue;
+
+                // ดึง profile จาก LINE
+                $profRes  = self::get('https://api.line.me/v2/bot/profile/' . rawurlencode($uid), $token);
+                $profData = json_decode($profRes['body'], true);
+
+                $displayName = null;
+                $pictureUrl  = null;
+                if ($profRes['code'] === 200 && is_array($profData)) {
+                    $displayName = $profData['displayName'] ?? null;
+                    $pictureUrl  = $profData['pictureUrl'] ?? null;
+                }
+
+                $now      = date('Y-m-d H:i:s');
+                $existing = \App\Core\Database::fetch(
+                    "SELECT id, display_name, picture_url FROM property_line_contacts
+                     WHERE property_id = :p AND line_user_id = :l LIMIT 1",
+                    ['p' => $propertyId, 'l' => $uid]
+                );
+
+                if ($existing) {
+                    $upd = [];
+                    if ($displayName !== null && $displayName !== ($existing['display_name'] ?? '')) {
+                        $upd['display_name'] = $displayName;
+                    }
+                    if ($pictureUrl !== null && $pictureUrl !== ($existing['picture_url'] ?? '')) {
+                        $upd['picture_url'] = $pictureUrl;
+                    }
+                    if ($upd) {
+                        \App\Core\Database::update('property_line_contacts', $upd, 'id = :i', ['i' => $existing['id']]);
+                    }
+                    $skipped++;
+                } else {
+                    $row = [
+                        'property_id'  => $propertyId,
+                        'line_user_id' => $uid,
+                        'display_name' => $displayName,
+                        'picture_url'  => $pictureUrl,
+                        'followed_at'  => $now,
+                        'last_seen_at' => $now,
+                    ];
+                    if ($phoneCol) $row['phone'] = null;
+                    \App\Core\Database::insert('property_line_contacts', $row);
+                    $imported++;
+                }
+            }
+
+            if (!$cursor) break;
+        }
+
+        return ['imported' => $imported, 'skipped' => $skipped, 'error' => ''];
+    }
+
+    /**
      * Reply กลับลูกค้าผ่าน replyToken + per-property token
      * $messages = LINE messages array (text/flex)
      */

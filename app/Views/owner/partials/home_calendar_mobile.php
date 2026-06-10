@@ -523,6 +523,8 @@ function homeCalManage() {
     lineContacts: [],
     lineContactsLoaded: false,
     lineContactsLoading: false,
+    lineContactsSyncing: false,
+    lineContactsSyncMsg: '',
     lineSearch: '',
     showLineManual: false,
     editBookingId: 0,
@@ -569,6 +571,23 @@ function homeCalManage() {
     },
     searchLineContacts() {
       this.fetchLineContacts(this.lineSearch);
+    },
+    async syncLineContacts() {
+      const pid = <?= $pid ?>;
+      if (!pid || this.lineContactsSyncing) return;
+      this.lineContactsSyncing = true;
+      this.lineContactsSyncMsg = '';
+      try {
+        const r = await fetch(`<?= url('/owner/api/line-contacts/sync') ?>?property_id=${pid}`, { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) {
+          this.lineContactsSyncMsg = `ซิงค์สำเร็จ — นำเข้าใหม่ ${d.imported} คน, อัปเดต ${d.skipped} คน`;
+          await this.fetchLineContacts('');
+        } else {
+          this.lineContactsSyncMsg = 'ซิงค์ไม่สำเร็จ: ' + (d.error || 'ไม่ทราบสาเหตุ');
+        }
+      } catch(e) { this.lineContactsSyncMsg = 'เกิดข้อผิดพลาด กรุณาลองใหม่'; }
+      this.lineContactsSyncing = false;
     },
     selectedLineContact() {
       return this.lineContacts.find(c => c.line_user_id === this.lineUserId) || null;

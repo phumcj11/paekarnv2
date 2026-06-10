@@ -2,7 +2,8 @@
 /**
  * LINE contact picker — ใช้ภายใน Alpine component ที่มี:
  * lineContacts, lineUserId, lineSearch, lineContactsLoading, showLineManual,
- * pickLineContact(c), filteredLineContacts(), clearLineContact(), searchLineContacts()
+ * lineContactsSyncing, lineContactsSyncMsg (state สำหรับปุ่ม sync)
+ * pickLineContact(c), clearLineContact(), searchLineContacts(), syncLineContacts()
  * (optional) guestName, guestPhone สำหรับ auto-fill
  */
 ?>
@@ -12,8 +13,19 @@
       <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
       แชทล่าสุด 10 คน
     </p>
-    <span class="text-[10px] text-[#067a2f]/70" x-show="!lineSearch.trim() && lineContacts.length" x-text="lineContacts.length + ' คน'"></span>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-[#067a2f]/70" x-show="!lineSearch.trim() && lineContacts.length" x-text="lineContacts.length + ' คน'"></span>
+      <button type="button" @click="syncLineContacts()"
+              :disabled="lineContactsSyncing"
+              class="text-[10px] text-[#06C755] underline underline-offset-2 disabled:opacity-50"
+              title="ดึงรายชื่อทั้งหมดจาก LINE OA">
+        <span x-show="!lineContactsSyncing">↻ ซิงค์จาก LINE</span>
+        <span x-show="lineContactsSyncing">กำลังซิงค์...</span>
+      </button>
+    </div>
   </div>
+  <p x-show="lineContactsSyncMsg" x-text="lineContactsSyncMsg"
+     class="text-[10px] text-[#067a2f] bg-[#06C755]/10 rounded px-2 py-1"></p>
 
   <!-- แสดงคนที่เลือกแล้ว -->
   <template x-if="lineUserId && selectedLineContact()">

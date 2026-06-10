@@ -198,6 +198,29 @@ class BookingController extends Controller
         $this->json($contacts);
     }
 
+    /** POST /owner/api/line-contacts/sync?property_id=N — ดึง follower IDs จาก LINE แล้ว upsert */
+    public function syncLineContacts(): void
+    {
+        $propertyId = (int)($_GET['property_id'] ?? 0);
+        if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ไม่ระบุ property_id']); return; }
+
+        $ownerId  = Auth::ownerId();
+        $property = Database::fetch("SELECT id, owner_id FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
+        if (!$property || (!Auth::isAdmin() && $ownerId && (int)$property['owner_id'] !== $ownerId)) {
+            $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
+        }
+
+        $result = \App\Services\PropertyLineService::syncFollowers($propertyId);
+
+        if ($result['error']) {
+            $this->json(['ok' => false, 'error' => $result['error'],
+                         'imported' => $result['imported'], 'skipped' => $result['skipped']]);
+            return;
+        }
+
+        $this->json(['ok' => true, 'imported' => $result['imported'], 'skipped' => $result['skipped'], 'error' => '']);
+    }
+
     /** GET /owner/bookings/create */
     public function create(): void
     {
