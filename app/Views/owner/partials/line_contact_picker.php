@@ -2,7 +2,7 @@
 /**
  * LINE contact picker — ใช้ภายใน Alpine component ที่มี:
  * lineContacts, lineUserId, lineSearch, lineContactsLoading, showLineManual,
- * pickLineContact(c), filteredLineContacts(), clearLineContact()
+ * pickLineContact(c), filteredLineContacts(), clearLineContact(), searchLineContacts()
  * (optional) guestName, guestPhone สำหรับ auto-fill
  */
 ?>
@@ -10,9 +10,9 @@
   <div class="flex items-center justify-between gap-2">
     <p class="text-xs font-semibold text-[#067a2f] flex items-center gap-1.5">
       <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
-      เลือกลูกค้าจากแชท LINE
+      แชทล่าสุด 10 คน
     </p>
-    <span class="text-[10px] text-[#067a2f]/70" x-show="lineContacts.length" x-text="lineContacts.length + ' คน'"></span>
+    <span class="text-[10px] text-[#067a2f]/70" x-show="!lineSearch.trim() && lineContacts.length" x-text="lineContacts.length + ' คน'"></span>
   </div>
 
   <!-- แสดงคนที่เลือกแล้ว -->
@@ -34,14 +34,16 @@
 
   <template x-if="!lineUserId">
     <div class="space-y-2">
-      <input type="search" x-model="lineSearch" placeholder="ค้นหาชื่อหรือเบอร์..."
+      <input type="search" x-model="lineSearch" @input.debounce.350ms="searchLineContacts()"
+             placeholder="ค้นหาชื่อหรือเบอร์ (หาคนเก่า)..."
              class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-[#06C755] outline-none">
+      <p x-show="!lineSearch.trim()" class="text-[10px] text-[#067a2f]/60">แสดง 10 คนที่ทักล่าสุด · พิมพ์ค้นหาเพื่อหาชื่อเก่า</p>
 
       <div x-show="lineContactsLoading" class="text-center text-xs text-slate-400 py-3">กำลังโหลดรายชื่อ...</div>
 
       <div x-show="!lineContactsLoading && lineContacts.length > 0"
            class="max-h-40 overflow-y-auto space-y-1 rounded-lg border border-slate-100 bg-white/60 p-1">
-        <template x-for="c in filteredLineContacts()" :key="c.line_user_id">
+        <template x-for="c in lineContacts" :key="c.line_user_id">
           <button type="button" @click="pickLineContact(c)"
                   class="w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-[#06C755]/10 active:bg-[#06C755]/15 transition">
             <img x-show="c.picture_url" :src="c.picture_url" class="w-9 h-9 rounded-full object-cover shrink-0" alt="">
@@ -55,7 +57,7 @@
             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 shrink-0"></i>
           </button>
         </template>
-        <p x-show="filteredLineContacts().length === 0" class="text-xs text-slate-400 text-center py-3">ไม่พบชื่อที่ค้นหา</p>
+        <p x-show="lineContacts.length === 0 && lineSearch.trim()" class="text-xs text-slate-400 text-center py-3">ไม่พบชื่อที่ค้นหา</p>
       </div>
 
       <p x-show="!lineContactsLoading && lineContacts.length === 0"

@@ -168,14 +168,32 @@ class BookingController extends Controller
             $this->json([]);
         }
 
+        $limit = min(50, max(1, (int)($_GET['limit'] ?? 10)));
+        $q     = trim((string)($_GET['q'] ?? ''));
+
         $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', phone' : '';
+        $where    = 'property_id = :p AND unfollowed_at IS NULL';
+        $params   = ['p' => $propertyId];
+
+        if ($q !== '') {
+            $like = '%' . $q . '%';
+            $where .= ' AND (display_name LIKE :q1 OR line_user_id LIKE :q2';
+            $params['q1'] = $like;
+            $params['q2'] = $like;
+            if ($phoneCol !== '') {
+                $where .= ' OR phone LIKE :q3';
+                $params['q3'] = $like;
+            }
+            $where .= ')';
+        }
+
         $contacts = Database::fetchAll(
             "SELECT line_user_id, display_name, picture_url, last_seen_at{$phoneCol}
              FROM property_line_contacts
-             WHERE property_id = :p AND unfollowed_at IS NULL
+             WHERE {$where}
              ORDER BY last_seen_at DESC
-             LIMIT 200",
-            ['p' => $propertyId]
+             LIMIT {$limit}",
+            $params
         );
         $this->json($contacts);
     }

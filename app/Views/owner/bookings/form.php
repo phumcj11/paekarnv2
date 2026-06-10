@@ -205,25 +205,30 @@ function ownerBookingForm() {
       this.priceEdited = false;
       this.deposit = '';
       this.lineContacts = [];
-      if (pid) {
-        this.lineContactsLoading = true;
-        try {
-          const r = await fetch(`<?= url('/owner/api/line-contacts') ?>?property_id=${pid}`);
-          this.lineContacts = await r.json();
-        } catch(e) { this.lineContacts = []; }
-        this.lineContactsLoading = false;
-      }
+      this.lineSearch = '';
+      if (pid) await this.fetchLineContacts('');
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
-    filteredLineContacts() {
-      const q = this.lineSearch.trim().toLowerCase();
-      if (!q) return this.lineContacts;
-      return this.lineContacts.filter(c =>
-        (c.display_name || '').toLowerCase().includes(q) ||
-        (c.line_user_id || '').toLowerCase().includes(q) ||
-        (c.phone || '').includes(q)
-      );
+    async fetchLineContacts(search = '') {
+      const pid = parseInt(this.propertyId);
+      if (!pid) { this.lineContacts = []; return; }
+      this.lineContactsLoading = true;
+      try {
+        const q = new URLSearchParams({ property_id: String(pid), limit: '10' });
+        const s = String(search !== undefined ? search : this.lineSearch).trim();
+        if (s) {
+          q.set('q', s);
+          q.set('limit', '20');
+        }
+        const r = await fetch(`<?= url('/owner/api/line-contacts') ?>?` + q);
+        this.lineContacts = await r.json();
+      } catch(e) { this.lineContacts = []; }
+      this.lineContactsLoading = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+    searchLineContacts() {
+      this.fetchLineContacts(this.lineSearch);
     },
     selectedLineContact() {
       return this.lineContacts.find(c => c.line_user_id === this.lineUserId) || null;
