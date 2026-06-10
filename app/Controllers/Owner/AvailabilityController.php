@@ -90,7 +90,17 @@ class AvailabilityController extends Controller
         Session::flash('success', 'อัปเดตวันว่างเรียบร้อย ' . count($dates) . ' วัน');
         $month = (int)($_POST['month'] ?? date('n'));
         $year  = (int)($_POST['year']  ?? date('Y'));
-        redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+        $this->redirectAfterCalendar($id, $unitId, $month, $year);
+    }
+
+    private function redirectAfterCalendar(int $propertyId, int $unitId, int $month, int $year): void
+    {
+        if (($_POST['return_to'] ?? '') === 'dashboard') {
+            redirect(url('/owner/dashboard') . '?' . http_build_query([
+                'cal_p' => $propertyId, 'cal_u' => $unitId, 'cal_m' => $month, 'cal_y' => $year,
+            ]));
+        }
+        redirect(url('/owner/properties/' . $propertyId . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
     }
 
     /** POST — บันทึกการจองจากปฏิทิน (มีลูกค้าจอง) */
@@ -110,17 +120,17 @@ class AvailabilityController extends Controller
         $unit = PropertyUnit::find($unitId);
         if (!$unit || (int)$unit['property_id'] !== $id) {
             Session::flash('error', 'กรุณาเลือกยูนิตให้ถูกต้อง');
-            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+            $this->redirectAfterCalendar($id, $unitId, $month, $year);
         }
 
         if (!$guestName || !$guestPhone || !$checkIn || !$checkOut) {
             Session::flash('error', 'กรุณากรอกชื่อ โทรศัพท์ และช่วงวันพักให้ครบ');
-            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+            $this->redirectAfterCalendar($id, $unitId, $month, $year);
         }
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkIn) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkOut)
             || strtotime($checkOut) <= strtotime($checkIn)) {
             Session::flash('error', 'วันเช็คเอาท์ต้องหลังวันเช็คอิน');
-            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+            $this->redirectAfterCalendar($id, $unitId, $month, $year);
         }
 
         $calc = BookingService::calculate($unit, $checkIn, $checkOut, 1);
@@ -148,6 +158,6 @@ class AvailabilityController extends Controller
 
         $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
         Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');
-        redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+        $this->redirectAfterCalendar($id, $unitId, $month, $year);
     }
 }

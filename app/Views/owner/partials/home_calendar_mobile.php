@@ -19,9 +19,12 @@ $baseQ = static fn(array $extra = []) => url('/owner/dashboard') . '?' . http_bu
     'cal_p' => $pid, 'cal_u' => $unitId, 'cal_m' => $month, 'cal_y' => $year,
 ], $extra));
 $fullCalUrl = url('/owner/properties/' . $pid . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year;
+$unitsJson = json_encode(array_values($homeCalendar['units'] ?? []), JSON_UNESCAPED_UNICODE);
+$bookingsJson = json_encode($bookings, JSON_UNESCAPED_UNICODE);
+$csrfToken = \App\Core\Csrf::token();
 ?>
 
-<section class="ow-card p-4 mb-5 lg:hidden">
+<section class="ow-card p-4 mb-5 lg:hidden" x-data="homeCalManage()" x-init="init()">
   <div class="flex items-start justify-between gap-2 mb-3">
     <div class="min-w-0">
       <h3 class="font-bold text-slate-800 flex items-center gap-2">
@@ -30,7 +33,7 @@ $fullCalUrl = url('/owner/properties/' . $pid . '/availability') . '?unit=' . $u
       </h3>
       <p class="text-xs text-slate-500 mt-0.5 truncate"><?= e($homeCalendar['property_name']) ?></p>
     </div>
-    <a href="<?= e($fullCalUrl) ?>" class="ow-btn-primary !py-1.5 !px-3 !text-xs shrink-0">จัดการ</a>
+    <a href="<?= e($fullCalUrl) ?>" class="ow-btn-primary !py-1.5 !px-3 !text-xs shrink-0">จัดการเต็ม</a>
   </div>
 
   <?php if (count($calProperties) > 1): ?>
@@ -85,27 +88,253 @@ $fullCalUrl = url('/owner/properties/' . $pid . '/availability') . '?unit=' . $u
       $date = sprintf('%04d-%02d-%02d', $year, $month, $d);
       $meta = $dayMeta[$date] ?? ['key'=>'open','label'=>'ว่าง','cls'=>'bg-emerald-100 border-emerald-300 text-emerald-800'];
       $isPast = ($meta['key'] ?? '') === 'past';
-      $dayBookings = $bookings[$date] ?? [];
-      $firstBookingId = !empty($dayBookings) ? (int)$dayBookings[0]['id'] : 0;
-      $href = $firstBookingId
-        ? url('/owner/bookings/' . $firstBookingId)
-        : $fullCalUrl;
     ?>
     <?php if ($isPast): ?>
     <div class="aspect-square rounded-lg border border-slate-100 bg-slate-50 flex flex-col items-center justify-center opacity-50">
       <span class="text-xs font-bold text-slate-400"><?= $d ?></span>
     </div>
     <?php else: ?>
-    <a href="<?= e($href) ?>"
-       class="aspect-square rounded-lg border <?= e($meta['cls']) ?> flex flex-col items-center justify-center hover:shadow-sm transition active:scale-95">
+    <button type="button" @click="openDay('<?= $date ?>', '<?= e($meta['label']) ?>', '<?= e($meta['key']) ?>')"
+            class="aspect-square rounded-lg border <?= e($meta['cls']) ?> flex flex-col items-center justify-center hover:shadow-sm transition active:scale-95">
       <span class="text-xs font-bold leading-none"><?= $d ?></span>
       <?php if (!empty($meta['label'])): ?>
       <span class="text-[8px] font-medium leading-tight mt-0.5"><?= e($meta['label']) ?></span>
       <?php endif; ?>
-    </a>
+    </button>
     <?php endif; ?>
     <?php endfor; ?>
   </div>
 
-  <p class="text-[10px] text-slate-500 mt-3 text-center">แตะวัน «จอง» ดูรายละเอียด · แตะวันอื่นเพื่อจัดการปฏิทิน</p>
+  <p class="text-[10px] text-slate-500 mt-3 text-center">แตะวันที่เพื่อจัดการ — ปิดการจอง หรือ เพิ่มการจอง</p>
+
+  <!-- Modal จัดการวัน -->
+  <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50" @keydown.escape.window="closeModal()">
+    <div @click.outside="closeModal()" class="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] overflow-y-auto p-5 pb-8">
+
+      <!-- Step: เลือกการทำงาน -->
+      <template x-if="step === 'choose'">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-lg">จัดการที่พัก</h3>
+              <p class="text-sm text-slate-500" x-text="dayLabel"></p>
+            </div>
+            <button type="button" @click="closeModal()" class="p-2 rounded-lg hover:bg-slate-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+
+          <template x-if="dayBookings.length">
+            <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm">
+              <p class="font-semibold text-amber-900 mb-1">มีการจองในวันนี้</p>
+              <template x-for="b in dayBookings" :key="b.id">
+                <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="block text-xs text-core-600 font-medium mt-1" x-text="b.guest_name + ' · ' + b.code"></a>
+              </template>
+            </div>
+          </template>
+
+          <p class="text-sm font-medium text-slate-700 mb-3">ต้องการทำอะไร?</p>
+          <div class="space-y-2">
+            <button type="button" @click="step='book'"
+                    class="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-core-200 bg-core-50 hover:bg-core-100 text-left">
+              <div class="w-10 h-10 rounded-xl bg-core-600 text-white grid place-items-center shrink-0"><i data-lucide="calendar-plus" class="w-5 h-5"></i></div>
+              <div>
+                <div class="font-semibold">เพิ่มการจอง</div>
+                <div class="text-xs text-slate-500">บันทึกลูกค้าที่จองวันนี้</div>
+              </div>
+            </button>
+            <button type="button" @click="step='close'"
+                    class="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-left">
+              <div class="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 grid place-items-center shrink-0"><i data-lucide="ban" class="w-5 h-5"></i></div>
+              <div>
+                <div class="font-semibold">ปิดการจอง</div>
+                <div class="text-xs text-slate-500">บล็อกวันนี้ไม่รับจอง</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Step: เพิ่มการจอง -->
+      <template x-if="step === 'book'">
+        <div>
+          <button type="button" @click="step='choose'" class="text-sm text-slate-500 mb-3 inline-flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> กลับ</button>
+          <h3 class="font-bold text-lg mb-1">เพิ่มการจอง</h3>
+          <p class="text-sm text-slate-500 mb-4" x-text="dayLabel"></p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
+              <select x-model="formUnitId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="u in units" :key="u.id">
+                  <option :value="String(u.id)" x-text="u.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ชื่อผู้จอง <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="guestName" placeholder="ชื่อ-นามสกุล" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">เบอร์โทร <span class="text-rose-500">*</span></label>
+              <input type="tel" x-model="guestPhone" placeholder="08x-xxx-xxxx" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">จำนวนคืน</label>
+              <select x-model="nights" @change="syncCheckOut()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="n in 7" :key="n">
+                  <option :value="n" x-text="n + ' คืน'"></option>
+                </template>
+              </select>
+              <p class="text-xs text-slate-500 mt-1" x-text="'เช็คเอาท์ ' + formatDate(checkOut)"></p>
+            </div>
+            <button type="button" @click="confirmBook()" :disabled="!canBook()"
+                    class="ow-btn-primary w-full disabled:opacity-40">บันทึกการจอง</button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Step: ปิดการจอง -->
+      <template x-if="step === 'close'">
+        <div>
+          <button type="button" @click="step='choose'" class="text-sm text-slate-500 mb-3 inline-flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> กลับ</button>
+          <h3 class="font-bold text-lg mb-1">ปิดการจอง</h3>
+          <p class="text-sm text-slate-500 mb-4" x-text="dayLabel"></p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">ยูนิต / หลัง <span class="text-rose-500">*</span></label>
+              <select x-model="formUnitId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
+                <template x-for="u in units" :key="u.id">
+                  <option :value="String(u.id)" x-text="u.name"></option>
+                </template>
+              </select>
+            </div>
+            <p class="text-xs text-slate-500 p-3 bg-slate-50 rounded-xl">ระบบจะปิดรับจองวันนี้สำหรับยูนิตที่เลือก</p>
+            <button type="button" @click="confirmClose()" class="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold">ปิดการจองวันนี้</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Hidden forms -->
+  <form id="homeCalCloseForm" method="post" action="<?= url('/owner/properties/' . $pid . '/availability/save') ?>" class="hidden">
+    <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
+    <input type="hidden" name="unit_id" :value="formUnitId">
+    <input type="hidden" name="month" value="<?= $month ?>">
+    <input type="hidden" name="year" value="<?= $year ?>">
+    <input type="hidden" name="status" value="closed">
+    <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="dates[]" :value="selectedDate">
+  </form>
+  <form id="homeCalBookForm" method="post" action="<?= url('/owner/properties/' . $pid . '/availability/booking') ?>" class="hidden">
+    <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
+    <input type="hidden" name="unit_id" :value="formUnitId">
+    <input type="hidden" name="month" value="<?= $month ?>">
+    <input type="hidden" name="year" value="<?= $year ?>">
+    <input type="hidden" name="return_to" value="dashboard">
+    <input type="hidden" name="check_in" :value="selectedDate">
+    <input type="hidden" name="check_out" :value="checkOut">
+    <input type="hidden" name="guest_name" :value="guestName">
+    <input type="hidden" name="guest_phone" :value="guestPhone">
+  </form>
 </section>
+
+<script>
+function homeCalManage() {
+  const units = <?= $unitsJson ?>;
+  const bookingsOnDate = <?= $bookingsJson ?>;
+  const defaultUnitId = String(<?= $unitId ?>);
+  const thaiShort = (ymd) => {
+    if (!ymd) return '';
+    const [, m, d] = ymd.split('-').map(Number);
+    const months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return `${d} ${months[m]}`;
+  };
+  const addDays = (ymd, n) => {
+    const dt = new Date(ymd + 'T12:00:00');
+    dt.setDate(dt.getDate() + n);
+    return dt.toISOString().slice(0, 10);
+  };
+  const uniqueBookings = (list) => {
+    const seen = new Set();
+    return (list || []).filter(b => { if (seen.has(b.id)) return false; seen.add(b.id); return true; });
+  };
+
+  return {
+    open: false,
+    step: 'choose',
+    selectedDate: '',
+    dayLabel: '',
+    dayBookings: [],
+    units,
+    formUnitId: defaultUnitId,
+    guestName: '',
+    guestPhone: '',
+    nights: 1,
+    checkOut: '',
+    init() {
+      this.$watch('open', v => { if (v) this.$nextTick(() => lucide.createIcons()); });
+      this.$watch('step', () => this.$nextTick(() => lucide.createIcons()));
+    },
+    openDay(date, label, key) {
+      this.selectedDate = date;
+      this.dayLabel = thaiShort(date) + (label ? ' · ' + label : '');
+      this.dayBookings = uniqueBookings(bookingsOnDate[date] || []);
+      this.formUnitId = defaultUnitId;
+      this.guestName = '';
+      this.guestPhone = '';
+      this.nights = 1;
+      this.checkOut = addDays(date, 1);
+      this.step = 'choose';
+      this.open = true;
+    },
+    closeModal() {
+      this.open = false;
+      this.step = 'choose';
+    },
+    syncCheckOut() {
+      this.checkOut = addDays(this.selectedDate, parseInt(this.nights, 10) || 1);
+    },
+    formatDate(ymd) { return thaiShort(ymd); },
+    canBook() {
+      return this.guestName.trim() && this.guestPhone.trim() && this.selectedDate && this.checkOut;
+    },
+    async confirmBook() {
+      if (!this.canBook()) return;
+      this.syncCheckOut();
+      const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
+      const html = `<div class="text-left text-sm space-y-1">
+        <p><strong>ยูนิต:</strong> ${unitName}</p>
+        <p><strong>ผู้จอง:</strong> ${this.guestName}</p>
+        <p><strong>โทร:</strong> ${this.guestPhone}</p>
+        <p><strong>พัก:</strong> ${thaiShort(this.selectedDate)} → ${thaiShort(this.checkOut)} (${this.nights} คืน)</p>
+      </div>`;
+      const ok = await this.swalConfirm('ยืนยันเพิ่มการจอง?', html, 'question');
+      if (ok) document.getElementById('homeCalBookForm').submit();
+    },
+    async confirmClose() {
+      const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
+      const html = `<div class="text-left text-sm space-y-1">
+        <p><strong>ยูนิต:</strong> ${unitName}</p>
+        <p><strong>วันที่:</strong> ${thaiShort(this.selectedDate)}</p>
+        <p class="text-slate-500">วันนี้จะถูกปิดไม่รับจอง</p>
+      </div>`;
+      const ok = await this.swalConfirm('ยืนยันปิดการจอง?', html, 'warning');
+      if (ok) document.getElementById('homeCalCloseForm').submit();
+    },
+    async swalConfirm(title, html, icon) {
+      if (!window.Swal) return confirm(title);
+      const r = await Swal.fire({
+        title, html, icon,
+        showCancelButton: true,
+        confirmButtonColor: '#0e7490',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก',
+        reverseButtons: true,
+      });
+      return r.isConfirmed;
+    },
+  };
+}
+</script>

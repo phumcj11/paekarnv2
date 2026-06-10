@@ -59,6 +59,7 @@ $calendarUrl = $firstPropertyId
 <title><?= e($meta_title ?? $page_title ?? 'พอร์ทัลเจ้าของแพ — แพกาญ.com') ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>body{font-family:'Kanit','Be Vietnam Pro','Sarabun',system-ui;-webkit-font-smoothing:antialiased}[x-cloak]{display:none}</style>
@@ -191,6 +192,7 @@ $calendarUrl = $firstPropertyId
   </div>
 </nav>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>document.addEventListener('DOMContentLoaded',()=>lucide.createIcons());document.addEventListener('alpine:initialized',()=>lucide.createIcons());</script>
 </body>
 </html>
