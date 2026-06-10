@@ -48,12 +48,31 @@ module.exports = {
         },
         ink: '#0F172A',
         cloud: '#F9FAFB',
+        core: {
+          DEFAULT: '#0e7490',
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0e7490',
+          700: '#005a71',
+          800: '#004d62',
+          900: '#001f29',
+        },
+        surface: {
+          DEFAULT: '#f7f9fb',
+          canvas: '#f8fafc',
+        },
       },
       fontFamily: {
-        sans: ['Kanit', 'Sarabun', 'Inter', 'ui-sans-serif', 'system-ui'],
+        sans: ['Kanit', 'Be Vietnam Pro', 'Sarabun', 'Inter', 'ui-sans-serif', 'system-ui'],
+        display: ['Be Vietnam Pro', 'Kanit', 'Sarabun', 'ui-sans-serif', 'system-ui'],
       },
       boxShadow: {
         soft: '0 4px 24px rgba(15,23,42,.06)',
+        cloud: '0 4px 20px rgba(15, 23, 42, 0.05)',
       },
       gridTemplateColumns: {
         14: 'repeat(14, minmax(0, 1fr))',

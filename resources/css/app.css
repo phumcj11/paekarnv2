@@ -285,3 +285,112 @@
     .pai-cards { padding: 1rem 1.25rem; gap: 1rem; }
   }
 }
+
+/* Owner Portal — Modern Booking Dashboard */
+@layer components {
+  .ow-shell {
+    @apply bg-surface-canvas text-slate-800 min-h-screen;
+  }
+
+  .ow-card {
+    @apply bg-white rounded-2xl shadow-cloud;
+  }
+
+  .ow-quick-btn {
+    @apply ow-card flex flex-col items-center justify-center gap-2 p-5 text-center transition hover:shadow-md hover:border-core-100 border border-transparent;
+  }
+
+  .ow-quick-btn__icon {
+    @apply w-12 h-12 rounded-2xl grid place-items-center;
+  }
+
+  .ow-metric {
+    @apply ow-card relative overflow-hidden p-5;
+  }
+
+  .ow-metric__icon {
+    @apply w-10 h-10 rounded-xl grid place-items-center;
+  }
+
+  .ow-metric__watermark {
+    @apply absolute right-3 top-1/2 -translate-y-1/2 w-16 h-16 opacity-[0.08] pointer-events-none;
+  }
+
+  .ow-membership {
+    @apply rounded-2xl p-5 text-white shadow-cloud;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #0c4a6e 100%);
+  }
+
+  .ow-prop-card {
+    @apply ow-card flex items-center gap-3 p-3 hover:border-core-200 border border-transparent transition;
+  }
+
+  .ow-status-pill {
+    @apply inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full;
+  }
+
+  .ow-status-pill--published {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+
+  .ow-status-pill--draft,
+  .ow-status-pill--pending {
+    @apply bg-slate-100 text-slate-600;
+  }
+
+  .ow-status-pill--rejected {
+    @apply bg-rose-50 text-rose-700;
+  }
+
+  .ow-status-dot {
+    @apply w-1.5 h-1.5 rounded-full bg-current;
+  }
+
+  .ow-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-core-600 hover:bg-core-700 text-white text-sm font-semibold transition;
+  }
+
+  .ow-btn-ghost {
+    @apply inline-flex items-center gap-1 text-sm font-semibold text-core-600 hover:text-core-700 transition;
+  }
+
+  .ow-section-head {
+    @apply flex items-center justify-between mb-3;
+  }
+
+  .ow-section-title {
+    @apply font-bold text-slate-800 flex items-center gap-2;
+  }
+
+  .ow-empty {
+    @apply ow-card p-8 text-center text-slate-500;
+  }
+
+  .ow-bottom-nav {
+    @apply fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 lg:hidden;
+  }
+
+  .ow-bottom-nav__item {
+    @apply flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 transition;
+  }
+
+  .ow-bottom-nav__item--active {
+    @apply text-core-600;
+  }
+
+  .ow-sidebar {
+    @apply fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col transition-transform;
+  }
+
+  .ow-sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-core-50 hover:text-core-700 transition;
+  }
+
+  .ow-sidebar-link--active {
+    @apply bg-core-50 text-core-700 font-semibold;
+  }
+
+  .ow-header {
+    @apply bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-20;
+  }
+}
