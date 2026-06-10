@@ -24,7 +24,11 @@ class OwnerAvailabilityCalendar
 
             $bookings = Database::fetchAll(
                 "SELECT b.id, b.code, b.guest_name, b.guest_phone, b.check_in, b.check_out,
-                        b.status, b.total_price, b.nights, u.name AS unit_name
+                        b.status, b.total_price, b.nights, u.name AS unit_name,
+                        COALESCE((
+                            SELECT SUM(bp.amount) FROM booking_payments bp
+                            WHERE bp.booking_id = b.id AND bp.status = 'verified'
+                        ), 0) AS paid_amount
                  FROM bookings b
                  LEFT JOIN property_units u ON u.id = b.unit_id
                  WHERE b.unit_id = :u AND b.status IN ('pending','confirmed','completed')
@@ -33,6 +37,8 @@ class OwnerAvailabilityCalendar
                 ['u' => $unitId, 's' => $start, 'e' => $end]
             );
             foreach ($bookings as $b) {
+                $total = (float)$b['total_price'];
+                $paid  = (float)$b['paid_amount'];
                 $summary = [
                     'id'          => (int)$b['id'],
                     'code'        => $b['code'],
@@ -41,7 +47,9 @@ class OwnerAvailabilityCalendar
                     'check_in'    => $b['check_in'],
                     'check_out'   => $b['check_out'],
                     'status'      => $b['status'],
-                    'total_price' => (float)$b['total_price'],
+                    'total_price' => $total,
+                    'paid_amount' => $paid,
+                    'balance'     => max(0, $total - $paid),
                     'nights'      => (int)$b['nights'],
                     'unit_name'   => $b['unit_name'] ?? '',
                 ];

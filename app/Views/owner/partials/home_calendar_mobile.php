@@ -126,9 +126,31 @@ $csrfToken = \App\Core\Csrf::token();
             <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm space-y-2">
               <p class="font-semibold text-amber-900">มีการจองในวันนี้</p>
               <template x-for="b in dayBookings" :key="b.id">
-                <div class="flex items-center justify-between gap-2 bg-white/70 rounded-lg px-2 py-1.5">
-                  <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="text-xs text-core-600 font-medium min-w-0 truncate" x-text="b.guest_name + ' · ' + b.code"></a>
-                  <button type="button" @click="confirmCancel(b)" class="text-[10px] font-semibold text-rose-600 shrink-0">ยกเลิก</button>
+                <div class="bg-white/80 rounded-xl px-3 py-2.5 space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="text-sm font-semibold text-core-700 truncate block" x-text="b.guest_name"></a>
+                      <p class="text-[10px] text-slate-500 font-mono mt-0.5" x-text="b.code"></p>
+                    </div>
+                    <a x-show="b.guest_phone" :href="'tel:' + b.guest_phone"
+                       class="shrink-0 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white grid place-items-center"
+                       title="โทรหาลูกค้า">
+                      <i data-lucide="phone" class="w-4 h-4"></i>
+                    </a>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="rounded-lg bg-slate-50 px-2 py-1.5">
+                      <div class="text-slate-500">ยอดทั้งหมด</div>
+                      <div class="font-semibold text-slate-800" x-text="formatMoney(b.total_price)"></div>
+                    </div>
+                    <div class="rounded-lg bg-core-50 px-2 py-1.5">
+                      <div class="text-slate-500">คงเหลือ</div>
+                      <div class="font-bold text-core-700" x-text="formatMoney(bookingBalance(b))"></div>
+                    </div>
+                  </div>
+                  <div class="flex justify-end">
+                    <button type="button" @click="confirmCancel(b)" class="text-[10px] font-semibold text-rose-600">ยกเลิกการจอง</button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -342,6 +364,12 @@ function homeCalManage() {
     formatDate(ymd) { return thaiShort(ymd); },
     formatMoney(n) {
       return '฿' + Number(n || 0).toLocaleString('th-TH');
+    },
+    bookingBalance(b) {
+      if (b.balance != null) return b.balance;
+      const total = parseFloat(b.total_price) || 0;
+      const paid = parseFloat(b.paid_amount) || 0;
+      return Math.max(0, total - paid);
     },
     get balance() {
       const t = parseFloat(this.totalPrice) || 0;

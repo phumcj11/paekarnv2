@@ -243,8 +243,13 @@ for ($d = 1; $d <= $daysInMonth; $d++) {
           <div class="flex justify-between"><span class="text-slate-500">โทร</span><a :href="'tel:'+detailBookings[0].guest_phone" class="text-core-600 font-medium" x-text="detailBookings[0].guest_phone"></a></div>
           <div class="flex justify-between"><span class="text-slate-500">ยูนิต</span><span x-text="detailBookings[0].unit_name || '—'"></span></div>
           <div class="flex justify-between"><span class="text-slate-500">วันพัก</span><span x-text="formatStay(detailBookings[0])"></span></div>
-          <div class="flex justify-between"><span class="text-slate-500">รวม</span><span class="font-bold text-core-700" x-text="formatMoney(detailBookings[0].total_price)"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">ยอดทั้งหมด</span><span class="font-bold text-slate-800" x-text="formatMoney(detailBookings[0].total_price)"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">คงเหลือ</span><span class="font-bold text-core-700" x-text="formatMoney(bookingBalance(detailBookings[0]))"></span></div>
           <div class="flex justify-between items-center"><span class="text-slate-500">สถานะ</span><span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800" x-text="detailBookings[0].status"></span></div>
+          <a x-show="detailBookings[0].guest_phone" :href="'tel:' + detailBookings[0].guest_phone"
+             class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-2">
+            <i data-lucide="phone" class="w-4 h-4"></i> โทรหาลูกค้า
+          </a>
           <a :href="'<?= url('/owner/bookings') ?>/' + detailBookings[0].id" class="ow-btn-primary w-full mt-2">ดูรายละเอียดเต็ม</a>
         </div>
       </template>
@@ -479,8 +484,14 @@ function availabilityCal() {
     formatStay(b) {
       return `${thaiShort(b.check_in)} → ${thaiShort(b.check_out)} (${b.nights} คืน)`;
     },
+    bookingBalance(b) {
+      if (b.balance != null) return b.balance;
+      const total = parseFloat(b.total_price) || 0;
+      const paid = parseFloat(b.paid_amount) || 0;
+      return Math.max(0, total - paid);
+    },
     formatMoney(n) {
-      return '฿' + Number(n).toLocaleString('th-TH');
+      return '฿' + Number(n || 0).toLocaleString('th-TH');
     },
   };
 }

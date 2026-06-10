@@ -57,6 +57,7 @@ $calendarUrl = $firstPropertyId
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($meta_title ?? $page_title ?? 'พอร์ทัลเจ้าของแพ — แพกาญ.com') ?></title>
+<link rel="icon" href="<?= asset('site-logo.png') ?>" type="image/png">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
