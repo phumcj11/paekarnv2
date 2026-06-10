@@ -86,6 +86,7 @@ $calendarUrl = $firstPropertyId
       ['/owner/properties',  'hotel',            'ที่พักของฉัน', null],
       ['/owner/units',       'bed-double',       'ห้อง / ยูนิต', 'units_hub'],
       ['/owner/bookings',    'calendar-check',   'การจอง', null],
+      ['/owner/line-contacts', 'message-circle', 'แชท LINE', null],
       ['/owner/content-plans', 'calendar-days',  'ปฏิทินโพสต์', null],
       ['/owner/coupons/verify','ticket',         'ตรวจคูปอง', null],
       ['/owner/coupons/scan', 'camera',          'สแกนคูปอง', null],

@@ -14,6 +14,7 @@ use App\Controllers\Owner\ProfileController;
 use App\Controllers\Owner\MembershipController;
 use App\Controllers\Owner\ContentPlanController;
 use App\Controllers\Owner\LineHubController;
+use App\Controllers\Owner\LineContactController;
 
 return function (Router $r): void {
     // Auth (no middleware)
@@ -65,6 +66,12 @@ return function (Router $r): void {
         $r->get('/bookings/create',                [OwnerBooking::class, 'create']);
         $r->get('/api/line-contacts',              [OwnerBooking::class, 'lineContacts']);
         $r->post('/api/line-contacts/sync',        [OwnerBooking::class, 'syncLineContacts']);
+
+        // LINE Contacts management page
+        $r->get('/line-contacts',                              [LineContactController::class, 'index']);
+        $r->post('/line-contacts/{id:[0-9]+}/phone',           [LineContactController::class, 'updatePhone']);
+        $r->post('/line-contacts/{id:[0-9]+}/message',         [LineContactController::class, 'sendMessage']);
+        $r->post('/line-contacts/broadcast',                   [LineContactController::class, 'broadcast']);
         $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');
         $r->get('/bookings/{id:[0-9]+}',           [OwnerBooking::class, 'show']);
