@@ -7,6 +7,8 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\View;
 use App\Models\Property;
+use App\Models\PropertyUnit;
+use App\Services\BookingService;
 
 class AvailabilityController extends Controller
 {
@@ -42,8 +44,9 @@ class AvailabilityController extends Controller
         $start = sprintf('%04d-%02d-01', $year, $month);
         $end   = date('Y-m-t', strtotime($start));
 
-        // Load availability rows
+        // Load availability rows + bookings on calendar
         $availMap = [];
+        $bookingsByDate = [];
         if ($unitId) {
             $rows = Database::fetchAll(
                 "SELECT date, status, available_units, note FROM availability WHERE unit_id = :u AND date BETWEEN :s AND :e",
@@ -51,18 +54,35 @@ class AvailabilityController extends Controller
             );
             foreach ($rows as $r) $availMap[$r['date']] = $r;
 
-            // Load existing bookings to mark dates booked
             $bookings = Database::fetchAll(
-                "SELECT check_in, check_out FROM bookings
-                 WHERE unit_id = :u AND status IN ('pending','confirmed','completed')
-                 AND check_in <= :e AND check_out > :s",
+                "SELECT b.id, b.code, b.guest_name, b.guest_phone, b.check_in, b.check_out,
+                        b.status, b.total_price, b.nights, u.name AS unit_name
+                 FROM bookings b
+                 LEFT JOIN property_units u ON u.id = b.unit_id
+                 WHERE b.unit_id = :u AND b.status IN ('pending','confirmed','completed')
+                 AND b.check_in <= :e AND b.check_out > :s
+                 ORDER BY b.check_in ASC",
                 ['u' => $unitId, 's' => $start, 'e' => $end]
             );
             foreach ($bookings as $b) {
-                $cur = $b['check_in']; $stop = $b['check_out'];
+                $summary = [
+                    'id'          => (int)$b['id'],
+                    'code'        => $b['code'],
+                    'guest_name'  => $b['guest_name'],
+                    'guest_phone' => $b['guest_phone'],
+                    'check_in'    => $b['check_in'],
+                    'check_out'   => $b['check_out'],
+                    'status'      => $b['status'],
+                    'total_price' => (float)$b['total_price'],
+                    'nights'      => (int)$b['nights'],
+                    'unit_name'   => $b['unit_name'] ?? '',
+                ];
+                $cur = $b['check_in'];
+                $stop = $b['check_out'];
                 while ($cur < $stop) {
                     if ($cur >= $start && $cur <= $end) {
                         $availMap[$cur]['booked'] = ($availMap[$cur]['booked'] ?? 0) + 1;
+                        $bookingsByDate[$cur][] = $summary;
                     }
                     $cur = date('Y-m-d', strtotime($cur . ' +1 day'));
                 }
@@ -82,6 +102,7 @@ class AvailabilityController extends Controller
             'property' => $property, 'units' => $units, 'unitId' => $unitId,
             'month' => $month, 'year' => $year, 'availMap' => $availMap,
             'dayMeta' => $dayMeta, 'totalUnits' => $totalUnits,
+            'bookingsByDate' => $bookingsByDate,
         ], 'layouts/owner');
     }
 
@@ -97,9 +118,12 @@ class AvailabilityController extends Controller
         }
         $booked = (int)($row['booked'] ?? 0);
         if ($booked >= $totalUnits) {
-            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800'];
+            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800', 'booked' => $booked];
         }
-        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800'];
+        if ($booked > 0) {
+            return ['key' => 'booked', 'label' => 'จอง', 'cls' => 'bg-amber-100 border-amber-300 text-amber-900', 'booked' => $booked];
+        }
+        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800', 'booked' => 0];
     }
 
     public function save(int $id): void
@@ -134,6 +158,64 @@ class AvailabilityController extends Controller
         Session::flash('success', 'อัปเดตวันว่างเรียบร้อย ' . count($dates) . ' วัน');
         $month = (int)($_POST['month'] ?? date('n'));
         $year  = (int)($_POST['year']  ?? date('Y'));
+        redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+    }
+
+    /** POST — บันทึกการจองจากปฏิทิน (มีลูกค้าจอง) */
+    public function storeBooking(int $id): void
+    {
+        $property = $this->findOwn($id);
+        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+
+        $unitId     = (int)($_POST['unit_id'] ?? 0);
+        $guestName  = trim((string)($_POST['guest_name'] ?? ''));
+        $guestPhone = trim((string)($_POST['guest_phone'] ?? ''));
+        $checkIn    = trim((string)($_POST['check_in'] ?? ''));
+        $checkOut   = trim((string)($_POST['check_out'] ?? ''));
+        $month      = (int)($_POST['month'] ?? date('n'));
+        $year       = (int)($_POST['year'] ?? date('Y'));
+
+        $unit = PropertyUnit::find($unitId);
+        if (!$unit || (int)$unit['property_id'] !== $id) {
+            Session::flash('error', 'กรุณาเลือกยูนิตให้ถูกต้อง');
+            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+        }
+
+        if (!$guestName || !$guestPhone || !$checkIn || !$checkOut) {
+            Session::flash('error', 'กรุณากรอกชื่อ โทรศัพท์ และช่วงวันพักให้ครบ');
+            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkIn) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $checkOut)
+            || strtotime($checkOut) <= strtotime($checkIn)) {
+            Session::flash('error', 'วันเช็คเอาท์ต้องหลังวันเช็คอิน');
+            redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
+        }
+
+        $calc = BookingService::calculate($unit, $checkIn, $checkOut, 1);
+        $bookingId = BookingService::create([
+            'property_id'        => $id,
+            'unit_id'            => $unitId,
+            'mode'               => 'manual',
+            'guest_name'         => $guestName,
+            'guest_phone'        => $guestPhone,
+            'guest_email'        => null,
+            'guest_count'        => 1,
+            'check_in'           => $checkIn,
+            'check_out'          => $checkOut,
+            'nights'             => $calc['nights'],
+            'subtotal'           => $calc['subtotal'],
+            'discount'           => 0,
+            'total_price'        => $calc['total'],
+            'status'             => 'confirmed',
+            'payment_status'     => 'unpaid',
+            'notes'              => 'บันทึกจากปฏิทินวันว่าง',
+            'source'             => 'manual_phone',
+            'guest_line_user_id' => null,
+            'created_by_user_id' => Auth::id(),
+        ]);
+
+        $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
+        Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');
         redirect(url('/owner/properties/' . $id . '/availability') . '?unit=' . $unitId . '&month=' . $month . '&year=' . $year);
     }
 }

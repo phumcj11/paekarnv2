@@ -56,8 +56,9 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/units/{uid:[0-9]+}/images/{img:[0-9]+}/delete', [UnitController::class, 'deleteUnitImage'])->middleware('csrf');
 
         // Availability
-        $r->get('/properties/{id:[0-9]+}/availability',        [AvailabilityController::class, 'index']);
-        $r->post('/properties/{id:[0-9]+}/availability/save',  [AvailabilityController::class, 'save'])->middleware('csrf');
+        $r->get('/properties/{id:[0-9]+}/availability',           [AvailabilityController::class, 'index']);
+        $r->post('/properties/{id:[0-9]+}/availability/save',     [AvailabilityController::class, 'save'])->middleware('csrf');
+        $r->post('/properties/{id:[0-9]+}/availability/booking', [AvailabilityController::class, 'storeBooking'])->middleware('csrf');
 
         // Bookings
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
