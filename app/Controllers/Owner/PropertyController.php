@@ -306,6 +306,39 @@ class PropertyController extends Controller
         ]);
     }
 
+    /** POST /owner/properties/{id}/line-rich-menu — สร้าง/ลบ Rich Menu */
+    public function lineRichMenu(int $id): void
+    {
+        $property = $this->findOwn($id);
+        if (!$property) { $this->json(['ok' => false, 'message' => 'ไม่พบที่พัก'], 403); }
+
+        $action = trim((string)($_POST['action'] ?? 'create'));
+
+        if ($action === 'delete') {
+            $ok = PropertyLineService::deleteRichMenu($id);
+            $this->json([
+                'ok'      => $ok,
+                'message' => $ok ? 'ลบ Rich Menu สำเร็จ' : 'ลบ Rich Menu ไม่สำเร็จ (อาจยังไม่มี Rich Menu)',
+            ]);
+        }
+
+        // create
+        $result = PropertyLineService::createPropertyRichMenu($id, (string)$property['name']);
+        if (!$result['ok']) {
+            $this->json([
+                'ok'      => false,
+                'message' => 'สร้าง Rich Menu ไม่สำเร็จ: ' . PropertyLineService::parseLineError($result['detail']),
+            ]);
+        }
+
+        $setOk = PropertyLineService::setDefaultRichMenu($id, $result['richMenuId']);
+        $this->json([
+            'ok'      => true,
+            'message' => 'สร้างและตั้งค่า Rich Menu สำเร็จ' . ($setOk ? '' : ' (แต่ set default ไม่สำเร็จ)'),
+            'richMenuId' => $result['richMenuId'],
+        ]);
+    }
+
     public function delete(int $id): void
     {
         $property = $this->findOwn($id);

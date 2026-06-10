@@ -182,6 +182,196 @@ class PropertyLineService
         return self::push((int)$b['property_id'], (string)$b['guest_line_user_id'], [$flex]);
     }
 
+    // =========================================================
+    //  RICH MENU
+    // =========================================================
+
+    /**
+     * สร้าง Rich Menu มาตรฐาน 6 ปุ่มสำหรับที่พัก
+     * @return array{ok:bool,richMenuId:string,detail:string}
+     */
+    public static function createPropertyRichMenu(int $propertyId, string $propertyName): array
+    {
+        $token = self::token($propertyId);
+        if (!$token) return ['ok' => false, 'richMenuId' => '', 'detail' => 'ไม่มี token'];
+
+        $menu = [
+            'size'        => ['width' => 2500, 'height' => 843],
+            'selected'    => true,
+            'name'        => 'Paekarn Menu — ' . mb_substr($propertyName, 0, 30),
+            'chatBarText' => 'เมนูสอบถาม',
+            'areas'       => [
+                // แถวบน: ราคา | เช็ควันว่าง | ที่อยู่
+                [
+                    'bounds' => ['x' => 0,    'y' => 0, 'width' => 833,  'height' => 421],
+                    'action' => ['type' => 'message', 'label' => 'ราคา', 'text' => 'ราคาเท่าไหร่'],
+                ],
+                [
+                    'bounds' => ['x' => 833,  'y' => 0, 'width' => 834,  'height' => 421],
+                    'action' => [
+                        'type'    => 'datetimepicker',
+                        'label'   => 'เช็ควันว่าง',
+                        'data'    => 'avail_date',
+                        'mode'    => 'date',
+                        'initial' => date('Y-m-d', strtotime('+1 day')),
+                        'min'     => date('Y-m-d'),
+                        'max'     => date('Y-m-d', strtotime('+6 month')),
+                    ],
+                ],
+                [
+                    'bounds' => ['x' => 1667, 'y' => 0, 'width' => 833,  'height' => 421],
+                    'action' => ['type' => 'message', 'label' => 'ที่อยู่', 'text' => 'ที่อยู่'],
+                ],
+                // แถวล่าง: เช็คอิน | ติดต่อ | วิธีจอง
+                [
+                    'bounds' => ['x' => 0,    'y' => 421, 'width' => 833,  'height' => 422],
+                    'action' => ['type' => 'message', 'label' => 'เช็คอิน-เอาท์', 'text' => 'เช็คอินกี่โมง'],
+                ],
+                [
+                    'bounds' => ['x' => 833,  'y' => 421, 'width' => 834,  'height' => 422],
+                    'action' => ['type' => 'message', 'label' => 'ติดต่อ', 'text' => 'เบอร์โทร'],
+                ],
+                [
+                    'bounds' => ['x' => 1667, 'y' => 421, 'width' => 833,  'height' => 422],
+                    'action' => ['type' => 'message', 'label' => 'วิธีจอง', 'text' => 'วิธีจองยังไง'],
+                ],
+            ],
+        ];
+
+        $res  = self::post(
+            'https://api.line.me/v2/bot/richmenu',
+            $token,
+            (string)json_encode($menu, JSON_UNESCAPED_UNICODE)
+        );
+        $data = json_decode($res['body'], true);
+
+        if ($res['code'] !== 200) {
+            error_log("[Paekarn] createRichMenu FAIL property={$propertyId} HTTP {$res['code']}: {$res['body']}");
+            return ['ok' => false, 'richMenuId' => '', 'detail' => $res['body']];
+        }
+
+        $richMenuId = (string)($data['richMenuId'] ?? '');
+        if (!$richMenuId) {
+            return ['ok' => false, 'richMenuId' => '', 'detail' => 'ไม่ได้รับ richMenuId'];
+        }
+
+        // อัปโหลด default placeholder image (สี+ข้อความ ด้วย PNG ขนาดเล็ก base64)
+        self::uploadRichMenuDefaultImage($token, $richMenuId);
+
+        return ['ok' => true, 'richMenuId' => $richMenuId, 'detail' => 'สำเร็จ'];
+    }
+
+    /**
+     * ตั้ง Rich Menu เป็น default ของ OA
+     */
+    public static function setDefaultRichMenu(int $propertyId, string $richMenuId): bool
+    {
+        $token = self::token($propertyId);
+        if (!$token) return false;
+        $res = self::post(
+            "https://api.line.me/v2/bot/user/all/richmenu/{$richMenuId}",
+            $token, ''
+        );
+        if ($res['code'] === 200) {
+            Database::update('properties', ['line_rich_menu_id' => $richMenuId], 'id = :i', ['i' => $propertyId]);
+        }
+        return $res['code'] === 200;
+    }
+
+    /**
+     * ลบ Rich Menu
+     */
+    public static function deleteRichMenu(int $propertyId): bool
+    {
+        $token = self::token($propertyId);
+        if (!$token) return false;
+
+        $prop = Database::fetch(
+            "SELECT line_rich_menu_id FROM properties WHERE id = :i LIMIT 1",
+            ['i' => $propertyId]
+        );
+        $menuId = $prop['line_rich_menu_id'] ?? '';
+        if (!$menuId) return false;
+
+        // unlink default
+        $ch = curl_init("https://api.line.me/v2/bot/user/all/richmenu");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => 'DELETE',
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+
+        // delete menu
+        $ch = curl_init("https://api.line.me/v2/bot/richmenu/{$menuId}");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => 'DELETE',
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        ]);
+        curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code === 200) {
+            Database::update('properties', ['line_rich_menu_id' => null], 'id = :i', ['i' => $propertyId]);
+        }
+        return $code === 200;
+    }
+
+    /**
+     * อัปโหลดรูป placeholder (สีน้ำเงินทึบ) ให้ Rich Menu
+     * LINE ต้องการรูป PNG/JPEG ขนาด 2500x843 — ถ้าไม่มีรูปปุ่มยังใช้งานได้ (เห็นเป็นพื้นสีขาว)
+     */
+    private static function uploadRichMenuDefaultImage(string $token, string $richMenuId): void
+    {
+        // สร้าง PNG 2500x843 สีฟ้า (#0D98BA) + ข้อความ 6 ปุ่มด้วย GD
+        if (!function_exists('imagecreatetruecolor')) return;
+
+        $w = 2500; $h = 843;
+        $img = imagecreatetruecolor($w, $h);
+        if (!$img) return;
+        $bg  = imagecolorallocate($img, 13, 152, 186);
+        $wh  = imagecolorallocate($img, 255, 255, 255);
+        $sep = imagecolorallocate($img, 255, 255, 255);
+        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
+        // เส้นแบ่ง
+        imageline($img, 833, 0, 833, $h, $sep);
+        imageline($img, 1667, 0, 1667, $h, $sep);
+        imageline($img, 0, 421, $w, 421, $sep);
+        // ข้อความกลางแต่ละปุ่ม
+        $labels = ['💰 ราคา', '📅 เช็ควันว่าง', '📍 ที่อยู่', '🕐 เช็คอิน', '📞 ติดต่อ', '📋 วิธีจอง'];
+        $xs = [416, 1250, 2083, 416, 1250, 2083];
+        $ys = [210, 210, 210, 632, 632, 632];
+        foreach ($labels as $i => $lbl) {
+            imagestring($img, 5, $xs[$i] - 40, $ys[$i], $lbl, $wh);
+        }
+
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+
+        if (!$png) return;
+
+        $ch = curl_init("https://api-data.line.me/v2/bot/richmenu/{$richMenuId}/content");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: image/png',
+                'Authorization: Bearer ' . $token,
+            ],
+            CURLOPT_POSTFIELDS => $png,
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+
     /**
      * Reply กลับลูกค้าผ่าน replyToken + per-property token
      * $messages = LINE messages array (text/flex)

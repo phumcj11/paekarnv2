@@ -40,6 +40,7 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/images',          [PropertyController::class, 'uploadImage'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/images/{img:[0-9]+}/delete', [PropertyController::class, 'deleteImage'])->middleware('csrf');
         $r->post('/properties/{id:[0-9]+}/line-test',       [PropertyController::class, 'lineTest'])->middleware('csrf');
+        $r->post('/properties/{id:[0-9]+}/line-rich-menu', [PropertyController::class, 'lineRichMenu'])->middleware('csrf');
 
         // Units: nested CRUD + ทางลัดจากเมนู
         $r->get('/units', [UnitController::class, 'hub']);

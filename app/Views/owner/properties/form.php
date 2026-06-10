@@ -598,6 +598,29 @@ $bookingCaps = $property
         <span class="text-xs text-slate-500">หรือกด «บันทึก» ด้านขวาบนก็ได้</span>
       </div>
 
+      <!-- Rich Menu -->
+      <div class="border-t border-slate-100 pt-3">
+        <div class="text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+          <svg class="w-4 h-4 text-[#06C755]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Rich Menu (6 ปุ่ม — ราคา, เช็ควันว่าง, ที่อยู่, เช็คอิน, ติดต่อ, วิธีจอง)
+        </div>
+        <p class="text-xs text-slate-500 mb-2">Rich Menu จะแสดงที่ด้านล่างหน้าจอแชท LINE ของลูกค้า — ปุ่ม «เช็ควันว่าง» เป็น Date Picker</p>
+        <?php if (!empty($property['line_rich_menu_id'])): ?>
+        <p class="text-xs text-emerald-700 mb-2">✅ มี Rich Menu อยู่แล้ว: <code class="text-[10px] bg-slate-100 px-1 rounded"><?= e($property['line_rich_menu_id']) ?></code></p>
+        <?php endif; ?>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" @click="richMenuAction('create')" :disabled="rmBusy"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#06C755] hover:bg-[#05a847] text-white text-xs font-semibold rounded-lg transition disabled:opacity-50">
+            <span x-show="!rmBusy">สร้าง / อัปเดต Rich Menu</span><span x-show="rmBusy">กำลังสร้าง...</span>
+          </button>
+          <button type="button" @click="richMenuAction('delete')" :disabled="rmBusy"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50">
+            ลบ Rich Menu
+          </button>
+        </div>
+        <div x-show="rmResult" x-text="rmResult" :class="rmOk ? 'text-emerald-600' : 'text-rose-600'" class="text-xs mt-1.5"></div>
+      </div>
+
       <!-- Test push -->
       <div class="border-t border-slate-100 pt-3">
         <div class="text-xs font-semibold text-slate-600 mb-1">ทดสอบส่ง (LINE User ID ขึ้นต้น U... — ไม่ใช่ @username)</div>
@@ -637,7 +660,29 @@ $bookingCaps = $property
       pushing: false,
       testResult: '',
       testOk: false,
+      rmBusy: false,
+      rmResult: '',
+      rmOk: false,
       init() {},
+      async richMenuAction(action) {
+        this.rmBusy = true;
+        this.rmResult = '';
+        try {
+          const fd = new FormData();
+          fd.append('_csrf', document.querySelector('#propertyForm [name="_csrf"]')?.value ?? '');
+          fd.append('action', action);
+          const r = await fetch('<?= url('/owner/properties/' . (int)$property['id'] . '/line-rich-menu') ?>', {method:'POST', body:fd});
+          const j = await r.json().catch(() => null);
+          if (!j) {
+            this.rmOk = false;
+            this.rmResult = r.status === 419 ? 'เซสชันหมดอายุ — รีเฟรชหน้าแล้วลองใหม่' : 'เกิดข้อผิดพลาด (HTTP ' + r.status + ')';
+          } else {
+            this.rmOk = j.ok;
+            this.rmResult = j.message ?? (j.ok ? 'สำเร็จ!' : 'ไม่สำเร็จ');
+          }
+        } catch(e) { this.rmOk = false; this.rmResult = 'เกิดข้อผิดพลาด'; }
+        this.rmBusy = false;
+      },
       onPasteUid(e) {
         const text = (e.clipboardData?.getData('text') || '').trim();
         const m = text.match(/\/chat\/(U[0-9a-f]{32})/i) || text.match(/(U[0-9a-f]{32})/i);

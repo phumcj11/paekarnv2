@@ -50,6 +50,70 @@ class PropertyLineBotService
     ];
 
     /**
+     * Phase 3C — รับ postback (datetimepicker จาก Quick Reply / Rich Menu)
+     * $data  = postback data string เช่น "avail_date"
+     * $params = postback.params เช่น ["date" => "2026-06-15"]
+     */
+    public static function handlePostback(int $propertyId, string $replyToken, string $data, array $params): bool
+    {
+        $property = Database::fetch(
+            "SELECT id, name, type, zone, district, province, address, phone, line_id,
+                    check_in, check_out, pet_policy, description, latitude, longitude,
+                    facebook_url, website_url
+             FROM properties WHERE id = :i LIMIT 1",
+            ['i' => $propertyId]
+        );
+        if (!$property) return false;
+
+        $units = Database::fetchAll(
+            "SELECT id, name, price, price_weekend, capacity_min, capacity_max,
+                    bedrooms, bathrooms, total_units, extra_person_fee
+             FROM property_units WHERE property_id = :p AND is_active = 1 ORDER BY price ASC",
+            ['p' => $propertyId]
+        );
+
+        // date picker — avail_date
+        if ($data === 'avail_date' && !empty($params['date'])) {
+            $dateStr  = $params['date'];          // "2026-06-15"
+            $checkIn  = new \DateTime($dateStr);
+            $checkOut = (clone $checkIn)->modify('+1 day');
+
+            $available = self::queryAvailableUnits($propertyId, $checkIn, $checkOut, 1);
+            $label     = self::thaiDateShort($checkIn) . ' – ' . self::thaiDateShort($checkOut) . ' (1 คืน)';
+
+            if (empty($available)) {
+                $msgs = [self::txtMsg("📅 {$label}\nเสียใจด้วย ไม่มียูนิตว่างในวันที่เลือก\nลองเลือกวันอื่นได้เลยครับ")];
+            } else {
+                $lines = ["📅 {$label}\nยูนิตที่ว่าง:"];
+                foreach ($available as $u) {
+                    $price = self::calcPrice($u, $checkIn);
+                    $lines[] = "• {$u['name']} — ฿" . number_format($price) . '/คืน'
+                        . ' (รับ ' . $u['capacity_min'] . '–' . $u['capacity_max'] . ' คน)';
+                }
+                $lines[] = "\nสอบถามเพิ่มเติมหรือต้องการจอง ทักเลยครับ";
+                $msgs = [self::txtMsg(implode("\n", $lines))];
+            }
+
+            // Quick Reply หลังผลลัพธ์
+            $qr = ['items' => [
+                self::qrDatepicker('📅 เลือกวันอื่น', 'avail_date'),
+                self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+            ]];
+            $last = array_pop($msgs);
+            $last['quickReply'] = $qr;
+            $msgs[] = $last;
+
+            return PropertyLineService::reply($propertyId, $replyToken, $msgs);
+        }
+
+        // fallback postback
+        return PropertyLineService::reply($propertyId, $replyToken, [
+            self::txtMsg("ได้รับข้อมูลแล้วครับ ✅"),
+        ]);
+    }
+
+    /**
      * Entry point: อ่านข้อความ, ตัดสิน intent, ส่ง reply กลับลูกค้า
      * @return bool true ถ้า reply สำเร็จ
      */
@@ -88,11 +152,90 @@ class PropertyLineBotService
             default                  => [self::txtMsg(self::buildFallback($property))],
         };
 
+        // ติด Quick Reply ใน intent ที่เหมาะสม
+        $qr = self::quickReplyFor($intent);
+        if ($qr && !empty($messages)) {
+            $last = array_pop($messages);
+            $last['quickReply'] = $qr;
+            $messages[] = $last;
+        }
+
         $ok = PropertyLineService::reply($propertyId, $replyToken, $messages);
         if (!$ok) {
             error_log("[Paekarn] PropertyLineBot reply FAIL property={$propertyId} intent={$intent}");
         }
         return $ok;
+    }
+
+    /**
+     * Quick Reply buttons ตาม intent
+     * @return array|null LINE quickReply object
+     */
+    private static function quickReplyFor(string $intent): ?array
+    {
+        $all = [
+            self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+            self::qrText('📅 ว่างไหม', 'เสาร์นี้ ว่างไหม'),
+            self::qrText('📅 เสาร์ทั้งเดือน', 'เดือนนี้ เสาร์ไหน ว่างบ้าง'),
+            self::qrText('📍 ที่อยู่', 'ที่อยู่'),
+            self::qrText('🕐 เช็คอิน', 'เช็คอินกี่โมง'),
+            self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+        ];
+
+        $avail = [
+            self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+            self::qrText('เสาร์นี้', 'เสาร์นี้ ว่างไหม'),
+            self::qrText('พรุ่งนี้', 'พรุ่งนี้ ว่างไหม'),
+            self::qrText('เสาร์ทั้งเดือน', 'เดือนนี้ เสาร์ไหน ว่างบ้าง'),
+            self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+        ];
+
+        return match ($intent) {
+            self::INTENT_GREETING    => ['items' => $all],
+            self::INTENT_FALLBACK    => ['items' => $all],
+            self::INTENT_PRICE       => ['items' => [
+                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('เสาร์นี้ ว่างไหม', 'เสาร์นี้ ว่างไหม'),
+                self::qrText('📍 ที่อยู่', 'ที่อยู่'),
+                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+            ]],
+            self::INTENT_AVAIL       => ['items' => $avail],
+            self::INTENT_LOCATION    => ['items' => [
+                self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+            ]],
+            self::INTENT_CONTACT     => ['items' => [
+                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+                self::qrText('📍 ที่อยู่', 'ที่อยู่'),
+            ]],
+            default => null,
+        };
+    }
+
+    private static function qrText(string $label, string $text): array
+    {
+        return [
+            'type'   => 'action',
+            'action' => ['type' => 'message', 'label' => mb_substr($label, 0, 20), 'text' => $text],
+        ];
+    }
+
+    private static function qrDatepicker(string $label, string $dataKey): array
+    {
+        return [
+            'type'   => 'action',
+            'action' => [
+                'type'   => 'datetimepicker',
+                'label'  => mb_substr($label, 0, 20),
+                'data'   => $dataKey,
+                'mode'   => 'date',
+                'initial'=> date('Y-m-d', strtotime('+1 day')),
+                'min'    => date('Y-m-d'),
+                'max'    => date('Y-m-d', strtotime('+6 month')),
+            ],
+        ];
     }
 
     // =========================================================

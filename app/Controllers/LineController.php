@@ -176,6 +176,20 @@ class LineController extends Controller
                 continue;
             }
 
+            // postback (datetimepicker จาก Quick Reply / Rich Menu)
+            if ($type === 'postback') {
+                $replyToken   = $event['replyToken'] ?? '';
+                $pbData       = $event['postback']['data'] ?? '';
+                $pbParams     = $event['postback']['params'] ?? [];
+                if ($replyToken && $pbData) {
+                    try {
+                        PropertyLineBotService::handlePostback($id, $replyToken, $pbData, $pbParams);
+                    } catch (\Throwable $e) {
+                        error_log("[Paekarn] postback error property={$id}: " . $e->getMessage());
+                    }
+                }
+            }
+
             if ($type === 'follow' || $type === 'message') {
                 $replyToken = $event['replyToken'] ?? '';
 

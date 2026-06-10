@@ -51,7 +51,11 @@ CREATE TABLE IF NOT EXISTS `property_line_contacts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SQL
 
+echo "=== properties Rich Menu column ==="
+add_column properties line_rich_menu_id "VARCHAR(64) NULL DEFAULT NULL"
+
 echo "=== verify ==="
 $MYSQL -e "SHOW COLUMNS FROM properties LIKE 'line_messaging_enabled';"
+$MYSQL -e "SHOW COLUMNS FROM properties LIKE 'line_rich_menu_id';"
 $MYSQL -e "SHOW TABLES LIKE 'property_line_contacts';"
 echo "=== migration complete ==="
