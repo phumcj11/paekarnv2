@@ -542,25 +542,16 @@ class PropertyLineService
         $white = imagecolorallocate($dst, 255, 255, 255);
         imagefilledrectangle($dst, 0, 0, $tw - 1, $th - 1, $white);
 
-        // center-crop ให้ได้สัดส่วน 2500:843 — ไม่บีบรูป
+        // fit ทั้งรูปใน 2500×843 (letterbox) — ไม่ crop ตัดแถวบน/ล่างทิ้ง
         $sw = imagesx($src);
         $sh = imagesy($src);
-        $targetRatio = $tw / $th;
-        $srcRatio    = $sw / $sh;
+        $scale = min($tw / $sw, $th / $sh);
+        $nw    = max(1, (int)round($sw * $scale));
+        $nh    = max(1, (int)round($sh * $scale));
+        $dx    = (int)(($tw - $nw) / 2);
+        $dy    = (int)(($th - $nh) / 2);
 
-        if ($srcRatio > $targetRatio) {
-            $cropH = $sh;
-            $cropW = (int)round($sh * $targetRatio);
-            $srcX  = (int)(($sw - $cropW) / 2);
-            $srcY  = 0;
-        } else {
-            $cropW = $sw;
-            $cropH = (int)round($sw / $targetRatio);
-            $srcX  = 0;
-            $srcY  = (int)(($sh - $cropH) / 2);
-        }
-
-        imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $tw, $th, $cropW, $cropH);
+        imagecopyresampled($dst, $src, $dx, $dy, 0, 0, $nw, $nh, $sw, $sh);
         imagedestroy($src);
 
         $maxBytes = 950 * 1024; // LINE จำกัด 1MB — เหลือ buffer
