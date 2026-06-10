@@ -252,6 +252,19 @@ class LineController extends Controller
                     null,
                     $type === 'follow' ? 'follow' : 'message'
                 );
+
+                // ถ้าลูกค้าส่งเบอร์โทรมาทางแชท → เก็บไว้ใน property_line_contacts.phone
+                if ($type === 'message' && Database::tableHasColumn('property_line_contacts', 'phone')) {
+                    $msgText = trim((string)($event['message']['text'] ?? ''));
+                    $normalized = PropertyLineService::normalizePhone($msgText);
+                    if (strlen($normalized) >= 9 && strlen($normalized) <= 15 && ctype_digit(ltrim($normalized, '+'))) {
+                        Database::query(
+                            "UPDATE property_line_contacts SET phone = :ph
+                             WHERE property_id = :p AND line_user_id = :l AND (phone IS NULL OR phone = '')",
+                            ['ph' => $normalized, 'p' => $id, 'l' => $lineUserId]
+                        );
+                    }
+                }
             }
         }
 

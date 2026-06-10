@@ -55,6 +55,20 @@ class BookingService
     public static function create(array $data): int
     {
         $data['code'] = Booking::generateCode();
+
+        // Auto-match LINE contact by phone if no guest_line_user_id was provided
+        if (empty($data['guest_line_user_id']) && !empty($data['guest_phone']) && !empty($data['property_id'])) {
+            try {
+                $matched = PropertyLineService::matchContactByPhone(
+                    (int)$data['property_id'],
+                    (string)$data['guest_phone']
+                );
+                if ($matched) {
+                    $data['guest_line_user_id'] = $matched;
+                }
+            } catch (\Throwable) { /* never block */ }
+        }
+
         $bookingId = Booking::create($data);
 
         // Phase 3: notify owner of new booking

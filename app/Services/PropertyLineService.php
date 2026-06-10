@@ -79,6 +79,42 @@ class PropertyLineService
     }
 
     /**
+     * ปรับเบอร์โทรให้อยู่ในรูปแบบมาตรฐาน (ตัวเลขล้วน 10 หลัก หรือ +66…)
+     * ใช้สำหรับ match ระหว่าง property_line_contacts.phone กับ bookings.guest_phone
+     */
+    public static function normalizePhone(string $phone): string
+    {
+        $p = preg_replace('/[^0-9+]/', '', $phone);
+        if (str_starts_with($p, '+66')) {
+            $p = '0' . substr($p, 3);
+        } elseif (str_starts_with($p, '66') && strlen($p) >= 11) {
+            $p = '0' . substr($p, 2);
+        }
+        return $p;
+    }
+
+    /**
+     * หา LINE User ID จากเบอร์โทรใน property_line_contacts ของที่พัก
+     * คืนค่า line_user_id ถ้าพบ, null ถ้าไม่พบ หรือยังไม่มีคอลัมน์ phone
+     */
+    public static function matchContactByPhone(int $propertyId, string $phone): ?string
+    {
+        if (!\App\Core\Database::tableHasColumn('property_line_contacts', 'phone')) {
+            return null;
+        }
+        $normalized = self::normalizePhone($phone);
+        if (strlen($normalized) < 9) return null;
+
+        $row = \App\Core\Database::fetch(
+            "SELECT line_user_id FROM property_line_contacts
+             WHERE property_id = :p AND phone = :ph AND unfollowed_at IS NULL
+             LIMIT 1",
+            ['p' => $propertyId, 'ph' => $normalized]
+        );
+        return $row ? (string)$row['line_user_id'] : null;
+    }
+
+    /**
      * Flex Message สรุปการจอง + ปุ่มดูใบยืนยัน
      */
     public static function sendBookingConfirmation(int $bookingId): bool

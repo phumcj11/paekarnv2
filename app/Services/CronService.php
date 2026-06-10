@@ -111,25 +111,62 @@ class CronService
         if ($days < 1) $days = 2;
         $target = date('Y-m-d', strtotime("+$days day"));
         $rows = Database::fetchAll(
-            "SELECT b.*, p.name AS pname, p.phone AS pphone FROM bookings b
+            "SELECT b.*, p.id AS property_id, p.name AS pname, p.phone AS pphone, p.check_in AS pci, p.check_out AS pco
+             FROM bookings b
              JOIN properties p ON p.id = b.property_id
              WHERE b.status='confirmed' AND b.check_in = :d", ['d' => $target]
         );
         $n = 0;
+        $lineN = 0;
         foreach ($rows as $b) {
+            // In-app notification สำหรับลูกค้าที่ login ผ่านเว็บ
             if ($b['customer_id']) {
                 $u = Database::fetch("SELECT user_id FROM customers WHERE id = :c", ['c' => $b['customer_id']]);
                 if ($u) {
                     NotificationService::send((int)$u['user_id'], 'checkin_reminder',
-                        "เตือน: เช็คอินอีก $days วัน 📅",
+                        "เตือน: เช็คอินอีก $days วัน",
                         sprintf('การจอง #%s ที่ "%s" — เช็คอินวันที่ %s\nเบอร์ติดต่อที่พัก: %s',
                             $b['code'], $b['pname'], format_date_th($b['check_in']), $b['pphone'] ?: '-'),
                         '/account/bookings');
                     $n++;
                 }
             }
+
+            // LINE push สำหรับจองที่ผูก guest_line_user_id ไว้
+            if (!empty($b['guest_line_user_id'])) {
+                try {
+                    $checkInThai = self::thaiDate($b['check_in']);
+                    $checkOutThai = self::thaiDate($b['check_out']);
+                    $daysWord = $days === 1 ? 'พรุ่งนี้' : "อีก $days วัน";
+                    $msg = "แจ้งเตือน: เช็คอิน{$daysWord} 🏕️\n\n"
+                         . "📋 การจอง #{$b['code']}\n"
+                         . "🏡 {$b['pname']}\n"
+                         . "📅 เช็คอิน: {$checkInThai}\n"
+                         . "📅 เช็คเอาท์: {$checkOutThai}\n";
+                    if ($b['pci']) $msg .= "🕐 เวลาเช็คอิน: {$b['pci']} น.\n";
+                    if ($b['pphone']) $msg .= "📞 ติดต่อที่พัก: {$b['pphone']}";
+
+                    $sent = PropertyLineService::push(
+                        (int)$b['property_id'],
+                        (string)$b['guest_line_user_id'],
+                        [['type' => 'text', 'text' => $msg]]
+                    );
+                    if ($sent) $lineN++;
+                } catch (\Throwable) { /* never block */ }
+            }
         }
-        return ['affected' => $n, 'output' => "Sent $n check-in reminders for $target"];
+        return [
+            'affected' => $n + $lineN,
+            'output'   => "Sent $n in-app + $lineN LINE check-in reminders for $target",
+        ];
+    }
+
+    private static function thaiDate(string $ymd): string
+    {
+        if (!$ymd) return $ymd;
+        $ts = strtotime($ymd);
+        $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        return (int)date('j', $ts) . ' ' . $thaiMonths[(int)date('n', $ts)] . ' ' . ((int)date('Y', $ts) + 543);
     }
 
     public static function ownerWeeklyReport(): array
