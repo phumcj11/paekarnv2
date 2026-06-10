@@ -323,37 +323,43 @@ class PropertyLineService
     }
 
     /**
-     * อัปโหลดรูป placeholder (สีน้ำเงินทึบ) ให้ Rich Menu
-     * LINE ต้องการรูป PNG/JPEG ขนาด 2500x843 — ถ้าไม่มีรูปปุ่มยังใช้งานได้ (เห็นเป็นพื้นสีขาว)
+     * อัปโหลดรูป Rich Menu (แพกาญ branded) ให้ LINE
+     * ใช้ไฟล์ PNG จาก public/assets/line_rich_menu_paekarn.png ก่อน
+     * fallback ไป GD placeholder ถ้าไม่มีไฟล์
      */
     private static function uploadRichMenuDefaultImage(string $token, string $richMenuId): void
     {
-        // สร้าง PNG 2500x843 สีฟ้า (#0D98BA) + ข้อความ 6 ปุ่มด้วย GD
-        if (!function_exists('imagecreatetruecolor')) return;
+        // หา branded PNG ที่ generate ไว้
+        $candidates = [
+            defined('APP_BASE_PATH') ? APP_BASE_PATH . '/public/assets/line_rich_menu_paekarn.png' : null,
+            dirname(__DIR__, 2) . '/public/assets/line_rich_menu_paekarn.png',
+        ];
 
-        $w = 2500; $h = 843;
-        $img = imagecreatetruecolor($w, $h);
-        if (!$img) return;
-        $bg  = imagecolorallocate($img, 13, 152, 186);
-        $wh  = imagecolorallocate($img, 255, 255, 255);
-        $sep = imagecolorallocate($img, 255, 255, 255);
-        imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
-        // เส้นแบ่ง
-        imageline($img, 833, 0, 833, $h, $sep);
-        imageline($img, 1667, 0, 1667, $h, $sep);
-        imageline($img, 0, 421, $w, 421, $sep);
-        // ข้อความกลางแต่ละปุ่ม
-        $labels = ['💰 ราคา', '📅 เช็ควันว่าง', '📍 ที่อยู่', '🕐 เช็คอิน', '📞 ติดต่อ', '📋 วิธีจอง'];
-        $xs = [416, 1250, 2083, 416, 1250, 2083];
-        $ys = [210, 210, 210, 632, 632, 632];
-        foreach ($labels as $i => $lbl) {
-            imagestring($img, 5, $xs[$i] - 40, $ys[$i], $lbl, $wh);
+        $png = null;
+        foreach (array_filter($candidates) as $path) {
+            if (file_exists($path)) {
+                $png = file_get_contents($path);
+                break;
+            }
         }
 
-        ob_start();
-        imagepng($img);
-        $png = ob_get_clean();
-        imagedestroy($img);
+        // GD fallback: สีน้ำเงินเรียบ ถ้าหาไฟล์ไม่เจอ
+        if (!$png && function_exists('imagecreatetruecolor')) {
+            $w = 2500; $h = 843;
+            $img = imagecreatetruecolor($w, $h);
+            if ($img) {
+                $bg  = imagecolorallocate($img, 11, 77, 107);
+                $sep = imagecolorallocate($img, 255, 255, 255);
+                imagefilledrectangle($img, 0, 0, $w - 1, $h - 1, $bg);
+                imageline($img, 833, 0, 833, $h, $sep);
+                imageline($img, 1667, 0, 1667, $h, $sep);
+                imageline($img, 0, 421, $w, 421, $sep);
+                ob_start();
+                imagepng($img);
+                $png = ob_get_clean();
+                imagedestroy($img);
+            }
+        }
 
         if (!$png) return;
 
@@ -361,15 +367,20 @@ class PropertyLineService
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_TIMEOUT        => 30,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: image/png',
                 'Authorization: Bearer ' . $token,
             ],
             CURLOPT_POSTFIELDS => $png,
         ]);
-        curl_exec($ch);
+        $res  = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($code !== 200) {
+            error_log("[Paekarn] uploadRichMenuImage FAIL richmenu={$richMenuId} HTTP {$code}: {$res}");
+        }
     }
 
     /**
