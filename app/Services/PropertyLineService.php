@@ -201,13 +201,9 @@ class PropertyLineService
             'name'        => 'Paekarn Menu — ' . mb_substr($propertyName, 0, 30),
             'chatBarText' => 'เมนูสอบถาม',
             'areas'       => [
-                // แถวบน: ราคา | เช็ควันว่าง | ที่อยู่
+                // แถวบน: เช็ควันว่าง (date picker) | ราคา & โปรโมชั่น | ดูห้องพัก
                 [
                     'bounds' => ['x' => 0,    'y' => 0, 'width' => 833,  'height' => 421],
-                    'action' => ['type' => 'message', 'label' => 'ราคา', 'text' => 'ราคาเท่าไหร่'],
-                ],
-                [
-                    'bounds' => ['x' => 833,  'y' => 0, 'width' => 834,  'height' => 421],
                     'action' => [
                         'type'    => 'datetimepicker',
                         'label'   => 'เช็ควันว่าง',
@@ -219,21 +215,25 @@ class PropertyLineService
                     ],
                 ],
                 [
-                    'bounds' => ['x' => 1667, 'y' => 0, 'width' => 833,  'height' => 421],
-                    'action' => ['type' => 'message', 'label' => 'ที่อยู่', 'text' => 'ที่อยู่'],
+                    'bounds' => ['x' => 833,  'y' => 0, 'width' => 834,  'height' => 421],
+                    'action' => ['type' => 'message', 'label' => 'ราคา & โปรโมชั่น', 'text' => 'ราคาเท่าไหร่'],
                 ],
-                // แถวล่าง: เช็คอิน | ติดต่อ | วิธีจอง
+                [
+                    'bounds' => ['x' => 1667, 'y' => 0, 'width' => 833,  'height' => 421],
+                    'action' => ['type' => 'message', 'label' => 'ดูห้องพัก', 'text' => 'ดูห้องพัก'],
+                ],
+                // แถวล่าง: ที่อยู่ | ติดต่อเรา | จองเลย
                 [
                     'bounds' => ['x' => 0,    'y' => 421, 'width' => 833,  'height' => 422],
-                    'action' => ['type' => 'message', 'label' => 'เช็คอิน-เอาท์', 'text' => 'เช็คอินกี่โมง'],
+                    'action' => ['type' => 'message', 'label' => 'ที่อยู่', 'text' => 'ที่อยู่'],
                 ],
                 [
                     'bounds' => ['x' => 833,  'y' => 421, 'width' => 834,  'height' => 422],
-                    'action' => ['type' => 'message', 'label' => 'ติดต่อ', 'text' => 'เบอร์โทร'],
+                    'action' => ['type' => 'message', 'label' => 'ติดต่อเรา', 'text' => 'เบอร์โทร'],
                 ],
                 [
                     'bounds' => ['x' => 1667, 'y' => 421, 'width' => 833,  'height' => 422],
-                    'action' => ['type' => 'message', 'label' => 'วิธีจอง', 'text' => 'วิธีจองยังไง'],
+                    'action' => ['type' => 'message', 'label' => 'จองเลย', 'text' => 'จองเลย'],
                 ],
             ],
         ];

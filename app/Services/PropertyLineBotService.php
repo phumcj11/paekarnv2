@@ -21,6 +21,8 @@ class PropertyLineBotService
     private const INTENT_CONTACT     = 'contact';
     private const INTENT_BOOKING_HOW = 'booking_how';
     private const INTENT_AVAIL       = 'availability';
+    private const INTENT_VIEW_ROOMS  = 'view_rooms';
+    private const INTENT_BOOK_NOW    = 'book_now';
     private const INTENT_FALLBACK    = 'fallback';
 
     /** Thai month abbreviation → month number */
@@ -149,6 +151,8 @@ class PropertyLineBotService
             self::INTENT_CONTACT     => [self::txtMsg(self::buildContact($property))],
             self::INTENT_BOOKING_HOW => [self::txtMsg(self::buildBookingHow($property))],
             self::INTENT_AVAIL       => self::buildAvailabilityMsgs($propertyId, $property, $units, $text),
+            self::INTENT_VIEW_ROOMS  => self::buildViewRoomsMsgs($propertyId, $property, $units),
+            self::INTENT_BOOK_NOW    => [self::txtMsg(self::buildBookNow($property))],
             default                  => [self::txtMsg(self::buildFallback($property))],
         };
 
@@ -209,6 +213,16 @@ class PropertyLineBotService
                 self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
                 self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
                 self::qrText('📍 ที่อยู่', 'ที่อยู่'),
+            ]],
+            self::INTENT_VIEW_ROOMS  => ['items' => [
+                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('💰 ราคา', 'ราคาเท่าไหร่'),
+                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
+            ]],
+            self::INTENT_BOOK_NOW    => ['items' => [
+                self::qrDatepicker('📅 เลือกวันเช็คอิน', 'avail_date'),
+                self::qrText('🏠 ดูห้องพัก', 'ดูห้องพัก'),
+                self::qrText('📞 ติดต่อ', 'เบอร์โทร'),
             ]],
             default => null,
         };
@@ -289,9 +303,19 @@ class PropertyLineBotService
             return self::INTENT_CONTACT;
         }
 
+        // Book now (กดปุ่ม "จองเลย" จาก Rich Menu — ต้องการจองทันที)
+        if (preg_match('/^จองเลย$|^จองเลยค่ะ$|^จองเลยครับ$/u', $t)) {
+            return self::INTENT_BOOK_NOW;
+        }
+
         // How to book
         if (preg_match('/จองอย่างไร|วิธีจอง|จองได้|จองยังไง|จองเลย|ขั้นตอน.*จอง|จอง.*ยังไง/u', $t)) {
             return self::INTENT_BOOKING_HOW;
+        }
+
+        // View rooms
+        if (preg_match('/ดูห้อง|ดูแพ|ห้องพัก|ยูนิต|มีห้องอะไร|มีกี่ห้อง|room|unit|ประเภทห้อง/u', $t)) {
+            return self::INTENT_VIEW_ROOMS;
         }
 
         return self::INTENT_FALLBACK;
@@ -488,6 +512,46 @@ class PropertyLineBotService
              . "• \"ที่อยู่อยู่ที่ไหน\"\n"
              . "• \"มีอะไรบ้าง\"\n"
              . "• \"รับสัตว์เลี้ยงไหม\"\n\n"
+             . self::contactLine($p);
+    }
+
+    /** ดูห้องพัก — แสดงรายชื่อและราคาทุก unit */
+    private static function buildViewRoomsMsgs(int $propertyId, array $property, array $units): array
+    {
+        $name = $property['name'];
+        if (empty($units)) {
+            return [self::txtMsg("ขณะนี้ยังไม่มีข้อมูลห้องพักของ {$name} ค่ะ\nกรุณาติดต่อเจ้าหน้าที่โดยตรง\n\n" . self::contactLine($property))];
+        }
+
+        $lines = ["🏠 ห้องพักของ {$name}\n"];
+        foreach ($units as $u) {
+            $price = number_format((float)($u['price'] ?? 0));
+            $priceWknd = !empty($u['price_weekend']) ? ' (เสาร์-อาทิตย์ ฿' . number_format((float)$u['price_weekend']) . ')' : '';
+            $cap   = ($u['capacity_min'] ?? 1) . '–' . ($u['capacity_max'] ?? '?') . ' คน';
+            $bed   = !empty($u['bedrooms'])  ? " | {$u['bedrooms']} ห้องนอน" : '';
+            $lines[] = "🛏 {$u['name']}\n   ฿{$price}/คืน{$priceWknd}\n   รับ {$cap}{$bed}";
+        }
+
+        $msg = implode("\n\n", $lines);
+        $msg .= "\n\n📅 กดปุ่ม «เช็ควันว่าง» หรือพิมพ์วันที่ที่ต้องการได้เลยค่ะ";
+
+        return [self::txtMsg($msg)];
+    }
+
+    /** จองเลย — ข้อมูลและ CTA สำหรับลูกค้าที่พร้อมจอง */
+    private static function buildBookNow(array $p): string
+    {
+        $name = $p['name'];
+        return "ยินดีต้อนรับค่ะ! 🎉\n"
+             . "ขอบคุณที่สนใจ {$name}\n\n"
+             . "📋 ขั้นตอนการจอง:\n"
+             . "1️⃣ แจ้งวันเช็คอิน-เช็คเอาท์\n"
+             . "2️⃣ จำนวนผู้เข้าพัก\n"
+             . "3️⃣ เจ้าหน้าที่ยืนยันและแจ้งราคา\n"
+             . "4️⃣ โอนมัดจำเพื่อล็อคห้อง\n"
+             . "5️⃣ รับใบยืนยันการจอง\n\n"
+             . "💬 พิมพ์ตอบเลยเช่น:\n"
+             . "\"15-16 มิ.ย. 4 คน\"\n\n"
              . self::contactLine($p);
     }
 
