@@ -140,24 +140,28 @@ class AvailabilityController extends Controller
             ? max(0, (float)$_POST['total_price']) : null;
         $deposit = isset($_POST['deposit_amount']) && $_POST['deposit_amount'] !== ''
             ? max(0, (float)$_POST['deposit_amount']) : null;
-        $userNotes = trim((string)($_POST['notes'] ?? ''));
+        $userNotes      = trim((string)($_POST['notes'] ?? ''));
+        $lineUserId     = trim((string)($_POST['guest_line_user_id'] ?? '')) ?: null;
+        $sendLineConfirm = !empty($_POST['send_line_confirm']);
         $returnTo  = ($_POST['return_to'] ?? '') === 'dashboard' ? 'dashboard' : 'availability';
 
         try {
             $bookingId = OwnerBookingService::createManual([
-                'property_id'    => $id,
-                'unit_id'        => $unitId,
-                'guest_name'     => $guestName,
-                'guest_phone'    => $guestPhone,
-                'check_in'       => $checkIn,
-                'check_out'      => $checkOut,
-                'total_price'    => $totalPrice,
-                'deposit_amount' => $deposit,
-                'notes'          => $userNotes ?: null,
-                'system_note'    => $returnTo === 'dashboard'
+                'property_id'       => $id,
+                'unit_id'           => $unitId,
+                'guest_name'        => $guestName,
+                'guest_phone'       => $guestPhone,
+                'check_in'          => $checkIn,
+                'check_out'         => $checkOut,
+                'total_price'       => $totalPrice,
+                'deposit_amount'    => $deposit,
+                'notes'             => $userNotes ?: null,
+                'guest_line_user_id'=> $lineUserId,
+                'send_line_confirm' => $sendLineConfirm,
+                'system_note'       => $returnTo === 'dashboard'
                     ? 'บันทึกจากหน้าแรก (ปฏิทิน)'
                     : 'บันทึกจากปฏิทินที่พัก',
-                'source'         => 'manual_phone',
+                'source'            => 'manual_phone',
             ]);
             $code = Database::fetch('SELECT code FROM bookings WHERE id = :i', ['i' => $bookingId])['code'] ?? '';
             Session::flash('success', 'บันทึกการจอง #' . $code . ' เรียบร้อย');

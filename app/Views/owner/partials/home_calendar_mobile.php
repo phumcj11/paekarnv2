@@ -275,6 +275,30 @@ $csrfToken    = \App\Core\Csrf::token();
               <textarea x-model="notes" rows="2" maxlength="1000" placeholder="เช่น ตกลงราคาพิเศษ, โอนมัดจำแล้ว..."
                         class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y"></textarea>
             </div>
+            <!-- LINE section -->
+            <div class="rounded-xl border border-[#06C755]/30 bg-[#06C755]/5 p-3 space-y-2">
+              <p class="text-xs font-semibold text-[#067a2f] flex items-center gap-1.5">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
+                LINE (ไม่จำเป็น — ใช้ส่งใบยืนยัน)
+              </p>
+              <div class="flex gap-2">
+                <input type="text" x-model="lineUserId" maxlength="64" placeholder="Uxxxxxxxxxxxxxxxxxx"
+                       class="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:border-[#06C755] outline-none">
+                <template x-if="lineContacts.length > 0">
+                  <select @change="lineUserId = $event.target.value; $event.target.value = ''"
+                          class="px-2 py-2 rounded-lg border border-slate-200 text-xs text-slate-600 focus:outline-none max-w-[120px]">
+                    <option value="">เลือกจาก OA</option>
+                    <template x-for="c in lineContacts" :key="c.line_user_id">
+                      <option :value="c.line_user_id" x-text="c.display_name || c.line_user_id"></option>
+                    </template>
+                  </select>
+                </template>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer" :class="lineUserId.trim() ? '' : 'opacity-50 pointer-events-none'">
+                <input type="checkbox" x-model="sendLine" class="rounded accent-[#06C755]">
+                <span class="text-xs text-[#067a2f] font-medium">ส่งใบยืนยันการจองทาง LINE ทันที</span>
+              </label>
+            </div>
             <button type="button" @click="confirmBook()" :disabled="!canBook()"
                     class="ow-btn-primary w-full disabled:opacity-40">บันทึกการจอง</button>
           </div>
@@ -374,6 +398,10 @@ function homeCalManage() {
     priceLoading: false,
     deposit: '',
     notes: '',
+    lineUserId: '',
+    sendLine: false,
+    lineContacts: [],
+    lineContactsLoaded: false,
     init() {
       this.$watch('open', v => { if (v) this.$nextTick(() => lucide.createIcons()); });
       this.$watch('step', v => {
@@ -384,8 +412,18 @@ function homeCalManage() {
           this.notes = '';
           this.totalPrice = '';
           this.$nextTick(() => this.fetchQuote());
+          if (!this.lineContactsLoaded) this.fetchLineContacts();
         }
       });
+    },
+    async fetchLineContacts() {
+      const pid = <?= $pid ?>;
+      if (!pid) return;
+      try {
+        const r = await fetch(`<?= url('/owner/api/line-contacts') ?>?property_id=${pid}`);
+        this.lineContacts = await r.json();
+      } catch(e) {}
+      this.lineContactsLoaded = true;
     },
     openDay(date, label, key) {
       this.selectedDate = date;
@@ -396,6 +434,8 @@ function homeCalManage() {
       this.guestPhone = '';
       this.nights = 1;
       this.checkOut = addDays(date, 1);
+      this.lineUserId = '';
+      this.sendLine = false;
       this.step = 'choose';
       this.open = true;
     },
@@ -459,9 +499,13 @@ function homeCalManage() {
     async confirmBook() {
       if (!this.canBook()) return;
       this.syncCheckOut();
-      const unitName = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
-      const price    = parseFloat(this.totalPrice) || 0;
-      const dep      = parseFloat(this.deposit) || 0;
+      const unitName  = (this.units.find(u => String(u.id) === this.formUnitId) || {}).name || '';
+      const price     = parseFloat(this.totalPrice) || 0;
+      const dep       = parseFloat(this.deposit) || 0;
+      const lineUid   = this.lineUserId.trim();
+      const lineLabel = lineUid
+        ? ((this.lineContacts.find(c => c.line_user_id === lineUid) || {}).display_name || lineUid)
+        : '';
       const html = `<div class="text-left text-sm space-y-1">
         <p><strong>ยูนิต:</strong> ${unitName}</p>
         <p><strong>ผู้จอง:</strong> ${this.guestName}</p>
@@ -470,19 +514,23 @@ function homeCalManage() {
         <p><strong>ราคา:</strong> ${this.formatMoney(price)}</p>
         ${dep > 0 ? `<p><strong>มัดจำ:</strong> ${this.formatMoney(dep)} · <strong>คงเหลือ:</strong> ${this.formatMoney(this.balance)}</p>` : ''}
         ${this.notes.trim() ? `<p><strong>หมายเหตุ:</strong> ${this.notes.trim()}</p>` : ''}
+        ${lineLabel ? `<p><strong>LINE:</strong> ${lineLabel}${this.sendLine ? ' · ส่งใบยืนยันทันที' : ''}</p>` : ''}
       </div>`;
       const ok = await this.swalConfirm('ยืนยันเพิ่มการจอง?', html, 'question');
       if (!ok) return;
-      this.fillForm('homeCalBookForm', {
-        unit_id:        this.formUnitId,
-        check_in:       this.selectedDate,
-        check_out:      this.checkOut,
-        guest_name:     this.guestName.trim(),
-        guest_phone:    this.guestPhone.trim(),
-        total_price:    this.totalPrice,
-        deposit_amount: this.deposit,
-        notes:          this.notes.trim(),
-      });
+      const fields = {
+        unit_id:             this.formUnitId,
+        check_in:            this.selectedDate,
+        check_out:           this.checkOut,
+        guest_name:          this.guestName.trim(),
+        guest_phone:         this.guestPhone.trim(),
+        total_price:         this.totalPrice,
+        deposit_amount:      this.deposit,
+        notes:               this.notes.trim(),
+        guest_line_user_id:  lineUid,
+      };
+      if (lineUid && this.sendLine) fields['send_line_confirm'] = '1';
+      this.fillForm('homeCalBookForm', fields);
       document.getElementById('homeCalBookForm').submit();
     },
     async confirmClose() {
