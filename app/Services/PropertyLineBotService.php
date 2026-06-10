@@ -179,6 +179,7 @@ class PropertyLineBotService
              . "เราเป็น{$typeLbl}ใน" . ($p['zone'] ?? $p['district'] ?? 'กาญจนบุรี') . "ค่ะ\n\n"
              . "สอบถามได้เลยนะคะ เช่น\n"
              . "• \"ราคาเท่าไหร่\" — ดูราคาห้อง\n"
+             . "• \"เดือนนี้ เสาร์ไหน ว่างบ้าง\" — ดูวันเสาร์ว่างทั้งเดือน\n"
              . "• \"15-16 มิ.ย. ว่างไหม 4 คน\" — เช็กวันว่าง\n"
              . "• \"เช็คอินกี่โมง\" — เวลาเข้าพัก\n"
              . "• \"ที่อยู่\" — แผนที่ / เส้นทาง\n"
@@ -338,6 +339,7 @@ class PropertyLineBotService
         return "ขอบคุณที่ติดต่อ {$p['name']} ค่ะ 😊\n\n"
              . "สอบถามได้เลยนะคะ เช่น\n"
              . "• \"ราคาเท่าไหร่\"\n"
+             . "• \"เดือนนี้ เสาร์ไหน ว่างบ้าง\"\n"
              . "• \"15-16 มิ.ย. ว่างไหม 4 คน\"\n"
              . "• \"เช็คอินกี่โมง\"\n"
              . "• \"ที่อยู่อยู่ที่ไหน\"\n"
@@ -353,6 +355,12 @@ class PropertyLineBotService
     /** @return array<int,array> LINE messages array */
     private static function buildAvailabilityMsgs(int $propertyId, array $property, array $units, string $text): array
     {
+        // "เดือนนี้ เสาร์ไหน ว่างบ้าง" → สแกนทุกวันเสาร์ในเดือน
+        $listQuery = self::parseMonthWeekdayListQuery($text);
+        if ($listQuery !== null) {
+            return self::buildMonthWeekdayListMsgs($propertyId, $property, $text, $listQuery);
+        }
+
         $dates  = self::parseDates($text);
         $guests = self::parseGuests($text);
 
@@ -409,6 +417,138 @@ class PropertyLineBotService
 
         $lines[] = "\n" . str_repeat('─', 28);
         $lines[] = "สนใจจองแจ้งชื่อและเบอร์โทรได้เลยค่ะ 😊\n" . self::contactLine($property);
+
+        return [self::txtMsg(implode("\n", $lines))];
+    }
+
+    /**
+     * คำถามแบบ "เดือนนี้ เสาร์ไหน ว่างบ้าง" / "เสาร์ไหนว่างบ้าง"
+     * @return array{weekday:int,weekday_name:string,month_offset:int}|null
+     */
+    private static function parseMonthWeekdayListQuery(string $text): ?array
+    {
+        $t = mb_strtolower($text, 'UTF-8');
+
+        if (!preg_match('/ไหน|บ้าง|ทุก|ทั้งหมด|มี.*ไหม|ได้.*บ้าง/u', $t)) {
+            return null;
+        }
+
+        $weekday     = null;
+        $weekdayName = '';
+        $dayMap      = [
+            'อาทิตย์' => 0, 'จันทร์' => 1, 'อังคาร' => 2, 'พุธ' => 3,
+            'พฤหัส'   => 4, 'ศุกร์'  => 5, 'เสาร์'  => 6,
+        ];
+        foreach ($dayMap as $name => $dow) {
+            if (preg_match('/' . $name . '/u', $t)) {
+                $weekday     = $dow;
+                $weekdayName = $name;
+                break;
+            }
+        }
+        if ($weekday === null) {
+            return null;
+        }
+
+        $monthOffset = preg_match('/เดือนหน้า/u', $t) ? 1 : 0;
+
+        return [
+            'weekday'      => $weekday,
+            'weekday_name' => $weekdayName,
+            'month_offset' => $monthOffset,
+        ];
+    }
+
+    /** @param array{weekday:int,weekday_name:string,month_offset:int} $query */
+    private static function buildMonthWeekdayListMsgs(
+        int $propertyId,
+        array $property,
+        string $text,
+        array $query
+    ): array {
+        $guests = self::parseGuests($text);
+        $offset = (int)$query['month_offset'];
+        $ts     = strtotime("+{$offset} month");
+        $year   = (int)date('Y', $ts);
+        $month  = (int)date('n', $ts);
+        $dow    = (int)$query['weekday'];
+        $dname  = (string)$query['weekday_name'];
+
+        $thaiMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        $monthLabel = $thaiMonths[$month] ?? (string)$month;
+        $scopeLabel = $offset === 1 ? 'เดือนหน้า' : 'เดือนนี้';
+
+        $today    = date('Y-m-d');
+        $firstDay = sprintf('%04d-%02d-01', $year, $month);
+        $lastDay  = date('Y-m-t', strtotime($firstDay));
+
+        $lines = [
+            "วัน{$dname}ที่ว่าง — {$property['name']} 🗓️",
+            "{$scopeLabel} ({$monthLabel} {$year})"
+                . ($guests > 0 ? " · {$guests} คน" : '') . "\n"
+                . str_repeat('─', 28),
+        ];
+
+        $availableDates = [];
+        $fullDates      = [];
+        $cur            = strtotime($firstDay);
+        $end            = strtotime($lastDay);
+
+        while ($cur <= $end) {
+            if ((int)date('w', $cur) !== $dow) {
+                $cur = strtotime('+1 day', $cur);
+                continue;
+            }
+            $ci = date('Y-m-d', $cur);
+            if ($ci < $today) {
+                $cur = strtotime('+1 day', $cur);
+                continue;
+            }
+            $co = date('Y-m-d', strtotime($ci . ' +1 day'));
+            $units = self::queryAvailableUnits($propertyId, $ci, $co, $guests);
+            if (!empty($units)) {
+                $minPrice = PHP_INT_MAX;
+                foreach ($units as $u) {
+                    $p = self::calcPrice($u, $ci, 1);
+                    if ($p < $minPrice) $minPrice = $p;
+                }
+                $availableDates[] = ['date' => $ci, 'price' => $minPrice];
+            } else {
+                $fullDates[] = $ci;
+            }
+            $cur = strtotime('+1 day', $cur);
+        }
+
+        if (empty($availableDates) && empty($fullDates)) {
+            $lines[] = "\nไม่พบวัน{$dname}ที่เหลือใน{$scopeLabel}ค่ะ";
+            $lines[] = "\nลองถาม \"เดือนหน้า {$dname}ไหนว่างบ้าง\" หรือระบุวันที่เฉพาะได้เลย";
+            $lines[] = self::contactLine($property);
+            return [self::txtMsg(implode("\n", $lines))];
+        }
+
+        if (!empty($availableDates)) {
+            $lines[] = "\n✅ ว่าง " . count($availableDates) . " วัน:";
+            foreach ($availableDates as $row) {
+                $dLabel = self::thaiDateShort($row['date']);
+                $price  = $row['price'] < PHP_INT_MAX
+                    ? '฿' . number_format((int)$row['price']) . '/คืน'
+                    : '';
+                $lines[] = "• {$dname} {$dLabel}" . ($price ? " — {$price}" : '');
+            }
+        }
+
+        if (!empty($fullDates) && count($fullDates) <= 4) {
+            $lines[] = "\n❌ เต็มแล้ว:";
+            foreach ($fullDates as $fd) {
+                $lines[] = '• ' . $dname . ' ' . self::thaiDateShort($fd);
+            }
+        } elseif (!empty($fullDates)) {
+            $lines[] = "\n❌ เต็มอีก " . count($fullDates) . ' วัน';
+        }
+
+        $lines[] = "\n" . str_repeat('─', 28);
+        $lines[] = "สนใจวันไหนแจ้งชื่อ+เบอร์ได้เลยค่ะ 😊\n" . self::contactLine($property);
 
         return [self::txtMsg(implode("\n", $lines))];
     }
@@ -535,6 +675,11 @@ class PropertyLineBotService
      */
     private static function parseRelativeDates(string $text): ?array
     {
+        // คำถามแบบ list ("เสาร์ไหนว่างบ้าง") ไม่ใช่วันเดียว
+        if (self::parseMonthWeekdayListQuery($text) !== null) {
+            return null;
+        }
+
         $t = mb_strtolower($text, 'UTF-8');
 
         // พรุ่งนี้
@@ -549,15 +694,34 @@ class PropertyLineBotService
             return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime('+1 day'))];
         }
 
-        // วันในสัปดาห์: เสาร์นี้, ศุกร์นี้, วันอาทิตย์ ฯลฯ
-        $dayMap = [
-            'อาทิตย์' => 0, 'จันทร์' => 1, 'อังคาร' => 2, 'พุธ' => 3,
-            'พฤหัส'   => 4, 'ศุกร์'  => 5, 'เสาร์'  => 6,
+        // วันในสัปดาห์แบบเฉพาะเจาะจง: เสาร์นี้, ศุกร์นี้ (ต้องมี "นี้" — ไม่จับ "เสาร์ไหน")
+        $dayThisPatterns = [
+            '/อาทิตย์นี้/u' => 0,
+            '/จันทร์นี้/u'   => 1,
+            '/อังคารนี้/u'  => 2,
+            '/พุธนี้/u'     => 3,
+            '/พฤหัสนี้/u'   => 4,
+            '/ศุกร์นี้/u'   => 5,
+            '/เสาร์นี้/u'   => 6,
         ];
-        foreach ($dayMap as $thaiDay => $targetDow) {
-            if (!preg_match('/' . $thaiDay . '/u', $t)) continue;
-            $ci = self::nextWeekday($targetDow);
-            return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime($ci . ' +1 day'))];
+        foreach ($dayThisPatterns as $pat => $targetDow) {
+            if (preg_match($pat, $t)) {
+                $ci = self::nextWeekday($targetDow);
+                return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime($ci . ' +1 day'))];
+            }
+        }
+
+        // "วันเสาร์" / "วันศุกร์" โดยไม่มี "ไหน/บ้าง" (เช็กวันเดียว)
+        $dayBarePatterns = [
+            '/วันอาทิตย์/u' => 0, '/วันจันทร์/u' => 1, '/วันอังคาร/u' => 2,
+            '/วันพุธ/u'     => 3, '/วันพฤหัส/u' => 4, '/วันศุกร์/u' => 5,
+            '/วันเสาร์/u'   => 6,
+        ];
+        foreach ($dayBarePatterns as $pat => $targetDow) {
+            if (preg_match($pat, $t)) {
+                $ci = self::nextWeekday($targetDow);
+                return ['check_in' => $ci, 'check_out' => date('Y-m-d', strtotime($ci . ' +1 day'))];
+            }
         }
 
         return null;
