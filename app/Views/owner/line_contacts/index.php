@@ -328,7 +328,7 @@ $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build
 <!-- Per-row send message sheet (mounted globally) -->
 <div x-data="msgSheet()" x-show="show" x-cloak
      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/40"
-     @click.self="open=false">
+     @click.self="show=false">
   <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 space-y-4">
     <div class="flex items-center gap-3">
       <svg class="w-6 h-6 text-[#06C755] shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>

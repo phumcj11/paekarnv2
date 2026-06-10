@@ -13,11 +13,12 @@ class LineContactController extends Controller
     public function index(): void
     {
         $ownerId    = Auth::ownerId();
+        $hasLineCol = Database::tableHasColumn('properties', 'line_messaging_enabled');
         $properties = $ownerId
             ? Database::fetchAll(
-                "SELECT p.id, p.name, p.line_messaging_enabled
+                "SELECT p.id, p.name" . ($hasLineCol ? ', p.line_messaging_enabled' : '') . "
                  FROM properties p
-                 WHERE p.owner_id = :o AND p.deleted_at IS NULL
+                 WHERE p.owner_id = :o
                  ORDER BY p.id ASC",
                 ['o' => $ownerId]
             )
@@ -25,7 +26,8 @@ class LineContactController extends Controller
 
         if (Auth::isAdmin()) {
             $properties = Database::fetchAll(
-                "SELECT id, name, line_messaging_enabled FROM properties WHERE deleted_at IS NULL ORDER BY id ASC"
+                "SELECT id, name" . ($hasLineCol ? ', line_messaging_enabled' : '') . "
+                 FROM properties ORDER BY id ASC"
             );
         }
 
@@ -61,22 +63,35 @@ class LineContactController extends Controller
             $total  = (int)($countRow['cnt'] ?? 0);
             $offset = ($page - 1) * $perPage;
 
-            // ดึง contact + นับจองที่ผูก
-            $contacts = Database::fetchAll(
-                "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
-                        plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol},
-                        COUNT(b.id) AS booking_count,
-                        MAX(b.check_in) AS last_booking_date
-                 FROM property_line_contacts plc
-                 LEFT JOIN bookings b
-                        ON b.guest_line_user_id = plc.line_user_id
-                       AND b.property_id = plc.property_id
-                 WHERE {$where}
-                 GROUP BY plc.id
-                 ORDER BY plc.last_seen_at DESC
-                 LIMIT {$perPage} OFFSET {$offset}",
-                $params
-            );
+            $hasLineUid = Database::tableHasColumn('bookings', 'guest_line_user_id');
+            if ($hasLineUid) {
+                $contacts = Database::fetchAll(
+                    "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
+                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol},
+                            COUNT(b.id) AS booking_count,
+                            MAX(b.check_in) AS last_booking_date
+                     FROM property_line_contacts plc
+                     LEFT JOIN bookings b
+                            ON b.guest_line_user_id = plc.line_user_id
+                           AND b.property_id = plc.property_id
+                     WHERE {$where}
+                     GROUP BY plc.id
+                     ORDER BY plc.last_seen_at DESC
+                     LIMIT {$perPage} OFFSET {$offset}",
+                    $params
+                );
+            } else {
+                $contacts = Database::fetchAll(
+                    "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
+                            plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol},
+                            0 AS booking_count, NULL AS last_booking_date
+                     FROM property_line_contacts plc
+                     WHERE {$where}
+                     ORDER BY plc.last_seen_at DESC
+                     LIMIT {$perPage} OFFSET {$offset}",
+                    $params
+                );
+            }
         }
 
         View::render('owner/line_contacts/index', [
