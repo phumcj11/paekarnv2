@@ -125,14 +125,6 @@ class DashboardController extends Controller
         if (!$validCalUnit && !empty($calUnits)) {
             $calUnitId = (int)$calUnits[0]['id'];
         }
-        $calTotalUnits = 1;
-        foreach ($calUnits as $cu) {
-            if ((int)$cu['id'] === $calUnitId) {
-                $calTotalUnits = max(1, (int)$cu['total_units']);
-                break;
-            }
-        }
-
         $homeCalendar = null;
         $calPropertyName = '';
         foreach ($calProperties as $cp) {
@@ -141,14 +133,14 @@ class DashboardController extends Controller
                 break;
             }
         }
-        if ($calUnitId > 0) {
-            $homeCalendar = OwnerAvailabilityCalendar::buildMonth($calUnitId, $calMonth, $calYear, $calTotalUnits);
+        if ($calPropertyId > 0) {
+            $homeCalendar = OwnerAvailabilityCalendar::buildPropertyMonth($calPropertyId, $calMonth, $calYear);
             $homeCalendar['property_id']   = $calPropertyId;
             $homeCalendar['property_name'] = $calPropertyName;
-            $homeCalendar['unit_id']         = $calUnitId;
-            $homeCalendar['month']           = $calMonth;
-            $homeCalendar['year']            = $calYear;
-            $homeCalendar['units']           = $calUnits;
+            $homeCalendar['unit_id']       = $calUnitId;
+            $homeCalendar['month']         = $calMonth;
+            $homeCalendar['year']          = $calYear;
+            $homeCalendar['units']         = $calUnits;
         }
 
         View::render('owner/dashboard', [

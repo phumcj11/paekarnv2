@@ -105,7 +105,7 @@ $csrfToken = \App\Core\Csrf::token();
     <?php endfor; ?>
   </div>
 
-  <p class="text-[10px] text-slate-500 mt-3 text-center">แตะวันที่เพื่อจัดการ — ปิดการจอง หรือ เพิ่มการจอง</p>
+  <p class="text-[10px] text-slate-500 mt-3 text-center">แสดงสถานะรวมทุกยูนิต · แตะวันที่เพื่อจัดการ</p>
 
   <!-- Modal จัดการวัน -->
   <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50" @keydown.escape.window="closeModal()">
@@ -130,7 +130,7 @@ $csrfToken = \App\Core\Csrf::token();
                   <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
                       <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="text-sm font-semibold text-core-700 truncate block" x-text="b.guest_name"></a>
-                      <p class="text-[10px] text-slate-500 font-mono mt-0.5" x-text="b.code"></p>
+                      <p class="text-[10px] text-slate-500 font-mono mt-0.5" x-text="b.code + (b.unit_name ? ' · ' + b.unit_name : '')"></p>
                     </div>
                     <a x-show="b.guest_phone" :href="'tel:' + b.guest_phone"
                        class="shrink-0 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white grid place-items-center"
