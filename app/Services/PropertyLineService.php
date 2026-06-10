@@ -263,19 +263,31 @@ class PropertyLineService
 
     /**
      * ตั้ง Rich Menu เป็น default ของ OA
+     * LINE API: POST https://api.line.me/v2/bot/richmenu/{richMenuId}/default
      */
     public static function setDefaultRichMenu(int $propertyId, string $richMenuId): bool
     {
         $token = self::token($propertyId);
         if (!$token) return false;
-        $res = self::post(
-            "https://api.line.me/v2/bot/user/all/richmenu/{$richMenuId}",
-            $token, ''
-        );
-        if ($res['code'] === 200) {
+
+        $ch = curl_init("https://api.line.me/v2/bot/richmenu/{$richMenuId}/default");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_POSTFIELDS     => '',
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        ]);
+        $body = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 200) {
+            error_log("[Paekarn] setDefaultRichMenu FAIL property={$propertyId} HTTP {$code}: {$body}");
+        } else {
             Database::update('properties', ['line_rich_menu_id' => $richMenuId], 'id = :i', ['i' => $propertyId]);
         }
-        return $res['code'] === 200;
+        return $code === 200;
     }
 
     /**
@@ -293,8 +305,9 @@ class PropertyLineService
         $menuId = $prop['line_rich_menu_id'] ?? '';
         if (!$menuId) return false;
 
-        // unlink default
-        $ch = curl_init("https://api.line.me/v2/bot/user/all/richmenu");
+        // unlink default rich menu ของ channel
+        // LINE API: DELETE https://api.line.me/v2/bot/user/all/richmenu
+        $ch = curl_init("https://api.line.me/v2/bot/richmenu/default");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST  => 'DELETE',
