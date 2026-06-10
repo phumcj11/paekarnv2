@@ -6,6 +6,7 @@ use App\Core\Auth;
 use App\Core\Database;
 use App\Core\View;
 use App\Services\OwnerMembership;
+use App\Services\OwnerAvailabilityCalendar;
 
 class DashboardController extends Controller
 {
@@ -88,6 +89,68 @@ class DashboardController extends Controller
             }
         }
 
+        // ปฏิทินสำหรับหน้าแรกมือถือ
+        $calProperties = Database::fetchAll(
+            "SELECT p.id, p.name FROM properties p WHERE 1=1 $whereOwner ORDER BY p.created_at DESC",
+            $params
+        );
+        $calPropertyId = isset($_GET['cal_p']) ? (int)$_GET['cal_p'] : (int)($calProperties[0]['id'] ?? 0);
+        $validCalProperty = false;
+        foreach ($calProperties as $cp) {
+            if ((int)$cp['id'] === $calPropertyId) {
+                $validCalProperty = true;
+                break;
+            }
+        }
+        if (!$validCalProperty && !empty($calProperties)) {
+            $calPropertyId = (int)$calProperties[0]['id'];
+        }
+        $calMonth = isset($_GET['cal_m']) ? max(1, min(12, (int)$_GET['cal_m'])) : (int)date('n');
+        $calYear  = isset($_GET['cal_y']) ? (int)$_GET['cal_y'] : (int)date('Y');
+
+        $calUnits = $calPropertyId
+            ? Database::fetchAll(
+                "SELECT id, name, total_units FROM property_units WHERE property_id = :p AND is_active=1 ORDER BY sort_order, id",
+                ['p' => $calPropertyId]
+            )
+            : [];
+        $calUnitId = isset($_GET['cal_u']) ? (int)$_GET['cal_u'] : (int)($calUnits[0]['id'] ?? 0);
+        $validCalUnit = false;
+        foreach ($calUnits as $cu) {
+            if ((int)$cu['id'] === $calUnitId) {
+                $validCalUnit = true;
+                break;
+            }
+        }
+        if (!$validCalUnit && !empty($calUnits)) {
+            $calUnitId = (int)$calUnits[0]['id'];
+        }
+        $calTotalUnits = 1;
+        foreach ($calUnits as $cu) {
+            if ((int)$cu['id'] === $calUnitId) {
+                $calTotalUnits = max(1, (int)$cu['total_units']);
+                break;
+            }
+        }
+
+        $homeCalendar = null;
+        $calPropertyName = '';
+        foreach ($calProperties as $cp) {
+            if ((int)$cp['id'] === $calPropertyId) {
+                $calPropertyName = $cp['name'];
+                break;
+            }
+        }
+        if ($calUnitId > 0) {
+            $homeCalendar = OwnerAvailabilityCalendar::buildMonth($calUnitId, $calMonth, $calYear, $calTotalUnits);
+            $homeCalendar['property_id']   = $calPropertyId;
+            $homeCalendar['property_name'] = $calPropertyName;
+            $homeCalendar['unit_id']         = $calUnitId;
+            $homeCalendar['month']           = $calMonth;
+            $homeCalendar['year']            = $calYear;
+            $homeCalendar['units']           = $calUnits;
+        }
+
         View::render('owner/dashboard', [
             'page_title'               => 'ภาพรวม',
             'stats'                    => $stats,
@@ -98,6 +161,8 @@ class DashboardController extends Controller
             'membership_benefits_active' => $membershipBenefitsActive,
             'membership_line_linked'   => $membershipLineLinked,
             'membership_is_vip'        => $membershipIsVip,
+            'homeCalendar'             => $homeCalendar,
+            'calProperties'            => $calProperties,
         ], 'layouts/owner');
     }
 }

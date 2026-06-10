@@ -9,6 +9,7 @@ use App\Core\View;
 use App\Models\Property;
 use App\Models\PropertyUnit;
 use App\Services\BookingService;
+use App\Services\OwnerAvailabilityCalendar;
 
 class AvailabilityController extends Controller
 {
@@ -41,61 +42,12 @@ class AvailabilityController extends Controller
         }
         $totalUnits = max(1, (int)($selectedUnit['total_units'] ?? 1));
 
-        $start = sprintf('%04d-%02d-01', $year, $month);
-        $end   = date('Y-m-t', strtotime($start));
-
-        // Load availability rows + bookings on calendar
-        $availMap = [];
-        $bookingsByDate = [];
-        if ($unitId) {
-            $rows = Database::fetchAll(
-                "SELECT date, status, available_units, note FROM availability WHERE unit_id = :u AND date BETWEEN :s AND :e",
-                ['u' => $unitId, 's' => $start, 'e' => $end]
-            );
-            foreach ($rows as $r) $availMap[$r['date']] = $r;
-
-            $bookings = Database::fetchAll(
-                "SELECT b.id, b.code, b.guest_name, b.guest_phone, b.check_in, b.check_out,
-                        b.status, b.total_price, b.nights, u.name AS unit_name
-                 FROM bookings b
-                 LEFT JOIN property_units u ON u.id = b.unit_id
-                 WHERE b.unit_id = :u AND b.status IN ('pending','confirmed','completed')
-                 AND b.check_in <= :e AND b.check_out > :s
-                 ORDER BY b.check_in ASC",
-                ['u' => $unitId, 's' => $start, 'e' => $end]
-            );
-            foreach ($bookings as $b) {
-                $summary = [
-                    'id'          => (int)$b['id'],
-                    'code'        => $b['code'],
-                    'guest_name'  => $b['guest_name'],
-                    'guest_phone' => $b['guest_phone'],
-                    'check_in'    => $b['check_in'],
-                    'check_out'   => $b['check_out'],
-                    'status'      => $b['status'],
-                    'total_price' => (float)$b['total_price'],
-                    'nights'      => (int)$b['nights'],
-                    'unit_name'   => $b['unit_name'] ?? '',
-                ];
-                $cur = $b['check_in'];
-                $stop = $b['check_out'];
-                while ($cur < $stop) {
-                    if ($cur >= $start && $cur <= $end) {
-                        $availMap[$cur]['booked'] = ($availMap[$cur]['booked'] ?? 0) + 1;
-                        $bookingsByDate[$cur][] = $summary;
-                    }
-                    $cur = date('Y-m-d', strtotime($cur . ' +1 day'));
-                }
-            }
-        }
-
-        $dayMeta = [];
-        if ($unitId) {
-            for ($d = 1; $d <= (int)date('t', strtotime($start)); $d++) {
-                $date = sprintf('%04d-%02d-%02d', $year, $month, $d);
-                $dayMeta[$date] = self::dayMeta($date, $availMap[$date] ?? null, $totalUnits);
-            }
-        }
+        $cal = $unitId
+            ? OwnerAvailabilityCalendar::buildMonth($unitId, $month, $year, $totalUnits)
+            : ['dayMeta' => [], 'bookingsByDate' => [], 'availMap' => [], 'daysInMonth' => (int)date('t'), 'startWeekday' => 0];
+        $dayMeta        = $cal['dayMeta'];
+        $bookingsByDate = $cal['bookingsByDate'];
+        $availMap       = $cal['availMap'];
 
         View::render('owner/availability/index', [
             'page_title' => 'ปฏิทินวันว่าง: ' . $property['name'],
@@ -104,26 +56,6 @@ class AvailabilityController extends Controller
             'dayMeta' => $dayMeta, 'totalUnits' => $totalUnits,
             'bookingsByDate' => $bookingsByDate,
         ], 'layouts/owner');
-    }
-
-    /** สถานะวันสำหรับแสดงในปฏิทิน (ตรงกับที่ LINE bot ใช้เป็นหลัก) */
-    private static function dayMeta(string $date, ?array $row, int $totalUnits): array
-    {
-        if ($date < date('Y-m-d')) {
-            return ['key' => 'past', 'label' => '', 'cls' => 'bg-slate-50 border-slate-200 text-slate-400'];
-        }
-        $status = $row['status'] ?? null;
-        if (in_array($status, ['closed', 'blocked', 'fully_booked'], true)) {
-            return ['key' => 'closed', 'label' => 'ปิด', 'cls' => 'bg-slate-300 border-slate-400 text-slate-700'];
-        }
-        $booked = (int)($row['booked'] ?? 0);
-        if ($booked >= $totalUnits) {
-            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800', 'booked' => $booked];
-        }
-        if ($booked > 0) {
-            return ['key' => 'booked', 'label' => 'จอง', 'cls' => 'bg-amber-100 border-amber-300 text-amber-900', 'booked' => $booked];
-        }
-        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800', 'booked' => 0];
     }
 
     public function save(int $id): void
