@@ -90,20 +90,7 @@ class BookingController extends Controller
         }
 
         Session::flash('success', 'อัปเดตสถานะเป็น ' . $status . ' เรียบร้อย');
-        if (($_POST['return_to'] ?? '') === 'dashboard') {
-            $q = array_filter([
-                'cal_p' => (int)($_POST['cal_p'] ?? 0),
-                'cal_u' => (int)($_POST['cal_u'] ?? 0),
-                'cal_m' => (int)($_POST['cal_m'] ?? 0),
-                'cal_y' => (int)($_POST['cal_y'] ?? 0),
-            ]);
-            $calView = ($_POST['cal_view'] ?? '');
-            if ($calView === 'unit') {
-                $q['cal_view'] = 'unit';
-            }
-            redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
-        }
-        redirect(url('/owner/bookings/' . $id));
+        $this->redirectAfterBookingAction($id, $row);
     }
 
     public function verifyPayment(int $id): void
@@ -309,7 +296,6 @@ class BookingController extends Controller
         if (!$row) { http_response_code(404); View::render('errors/404'); return; }
 
         $input = $this->input();
-        $returnTo = ($_POST['return_to'] ?? '') === 'dashboard' ? 'dashboard' : 'booking';
 
         try {
             $ownerId = Auth::ownerId();
@@ -346,6 +332,13 @@ class BookingController extends Controller
             Session::flash('error', 'แก้ไขไม่สำเร็จ — ' . $e->getMessage());
         }
 
+        $this->redirectAfterBookingAction($id, $row);
+    }
+
+    /** @param array<string,mixed> $row */
+    private function redirectAfterBookingAction(int $bookingId, array $row): void
+    {
+        $returnTo = $_POST['return_to'] ?? '';
         if ($returnTo === 'dashboard') {
             $q = array_filter([
                 'cal_p' => (int)($_POST['cal_p'] ?? 0),
@@ -358,7 +351,14 @@ class BookingController extends Controller
             }
             redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
         }
-        redirect(url('/owner/bookings/' . $id));
+        if ($returnTo === 'availability') {
+            $pid   = (int)($_POST['property_id'] ?? $row['property_id'] ?? 0);
+            $unit  = (int)($_POST['cal_u'] ?? $row['unit_id'] ?? 0);
+            $month = (int)($_POST['cal_m'] ?? date('n'));
+            $year  = (int)($_POST['cal_y'] ?? date('Y'));
+            redirect(url('/owner/properties/' . $pid . '/availability') . '?unit=' . $unit . '&month=' . $month . '&year=' . $year);
+        }
+        redirect(url('/owner/bookings/' . $bookingId));
     }
 
     private function fetchOwnedBooking(int $id): ?array

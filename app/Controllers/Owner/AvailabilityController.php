@@ -45,16 +45,15 @@ class AvailabilityController extends Controller
         $cal = $unitId
             ? OwnerAvailabilityCalendar::buildMonth($unitId, $month, $year, $totalUnits)
             : ['dayMeta' => [], 'bookingsByDate' => [], 'availMap' => [], 'daysInMonth' => (int)date('t'), 'startWeekday' => 0];
-        $dayMeta        = $cal['dayMeta'];
-        $bookingsByDate = $cal['bookingsByDate'];
-        $availMap       = $cal['availMap'];
 
         View::render('owner/availability/index', [
             'page_title' => 'ปฏิทินวันว่าง: ' . $property['name'],
             'property' => $property, 'units' => $units, 'unitId' => $unitId,
-            'month' => $month, 'year' => $year, 'availMap' => $availMap,
-            'dayMeta' => $dayMeta, 'totalUnits' => $totalUnits,
-            'bookingsByDate' => $bookingsByDate,
+            'month' => $month, 'year' => $year,
+            'dayMeta' => $cal['dayMeta'],
+            'bookingsByDate' => $cal['bookingsByDate'],
+            'daysInMonth' => (int)$cal['daysInMonth'],
+            'startWeekday' => (int)$cal['startWeekday'],
         ], 'layouts/owner');
     }
 
