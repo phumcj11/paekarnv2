@@ -52,7 +52,7 @@ $leadStatusColors = [
     'leads'    => ['icon' => 'target',        'label' => 'หา Lead'],
   ];
   foreach ($tabs as $key => $t): ?>
-  <a href="<?= url('/owner/content-plans?tab=' . $key) ?>"
+  <a href="<?= url('/owner/content-plans?tab=' . $key . '&month=' . sprintf('%04d-%02d', $year, $month)) ?>"
      class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition whitespace-nowrap <?= $tab === $key ? 'bg-primary-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100' ?>">
     <i data-lucide="<?= $t['icon'] ?>" class="w-4 h-4"></i>
     <?= $t['label'] ?>
@@ -64,6 +64,12 @@ $leadStatusColors = [
   </a>
   <?php endforeach; ?>
 </div>
+
+<?php if (empty($hasMarketingTables) && in_array($tab, ['groups', 'leads'], true)): ?>
+<div class="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+  ระบบกำลังอัปเดตฐานข้อมูล Marketing — แท็บนี้จะใช้งานได้หลัง deploy เสร็จ (รอประมาณ 2–5 นาที) แท็บปฏิทินโพสต์ใช้ได้ปกติ
+</div>
+<?php endif; ?>
 
 <?php if ($tab === 'calendar'): ?>
 <!-- ═══════════════════════════════════════════════════════
@@ -97,7 +103,9 @@ $leadStatusColors = [
       ];
       foreach ($quickTemplates as $qt): ?>
       <button type="button"
-              @click="openCreateWithTemplate(<?= htmlspecialchars(json_encode($qt['prompt']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($qt['type']), ENT_QUOTES) ?>)"
+              data-prompt="<?= e($qt['prompt']) ?>"
+              data-type="<?= e($qt['type']) ?>"
+              @click="openCreateWithTemplate($el.dataset.prompt, $el.dataset.type)"
               class="px-3 py-2 bg-slate-50 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition">
         <?= e($qt['label']) ?>
       </button>
@@ -214,10 +222,8 @@ $leadStatusColors = [
     <?php endif; ?>
   </div>
 
-</div><!-- end contentPlanApp -->
-
-<!-- ── Content Plan Modal ─────────────────────────────────── -->
-<div x-show="modal" x-cloak x-transition.opacity
+  <!-- ── Content Plan Modal (must stay inside contentPlanApp scope) ── -->
+  <div x-show="modal" x-cloak x-transition.opacity
      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
      @click.self="modal=false">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.stop>
@@ -367,7 +373,9 @@ $leadStatusColors = [
       </div>
     </form>
   </div>
-</div>
+  </div>
+
+</div><!-- end contentPlanApp -->
 
 <?php endif; /* end calendar tab */ ?>
 

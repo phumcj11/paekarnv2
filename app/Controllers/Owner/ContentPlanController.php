@@ -50,13 +50,15 @@ class ContentPlanController extends Controller
             ? Database::fetchAll("SELECT id, name FROM properties WHERE owner_id = :o ORDER BY name", ['o' => $ownerId])
             : [];
 
+        $hasMarketingTables = self::hasMarketingTables();
+
         // ---- Groups (FB) ----
-        $groups = $ownerId
+        $groups = ($ownerId && $hasMarketingTables)
             ? Database::fetchAll("SELECT * FROM marketing_fb_groups WHERE owner_id = :o ORDER BY created_at ASC", ['o' => $ownerId])
             : [];
 
         // ---- Leads ----
-        $leads = $ownerId
+        $leads = ($ownerId && $hasMarketingTables)
             ? Database::fetchAll(
                 "SELECT l.*, p.name AS property_name FROM marketing_leads l
                  LEFT JOIN properties p ON p.id = l.property_id
@@ -68,6 +70,7 @@ class ContentPlanController extends Controller
         View::render('owner/content_plans/index', [
             'page_title'   => 'Marketing Center',
             'tab'          => $tab,
+            'hasMarketingTables' => $hasMarketingTables,
             // calendar
             'year'         => $year,
             'month'        => $month,
@@ -190,11 +193,18 @@ class ContentPlanController extends Controller
     // GROUP MANAGEMENT
     // ─────────────────────────────────────────────────────────────
 
+    private static function hasMarketingTables(): bool
+    {
+        return Database::tableHasColumn('marketing_fb_groups', 'id')
+            && Database::tableHasColumn('marketing_leads', 'id');
+    }
+
     /** POST /owner/content-plans/groups/save — create or update a group */
     public function groupSave(): void
     {
         $ownerId = $this->ownerId();
         if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+        if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
         $id   = (int)($data['id'] ?? 0);
@@ -277,6 +287,7 @@ class ContentPlanController extends Controller
     {
         $ownerId = $this->ownerId();
         if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+        if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
         $id   = (int)($data['id'] ?? 0);
