@@ -47,19 +47,19 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
 ?>
 
 <!-- Tab bar -->
-<div class="flex items-center gap-1 mb-5 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-soft overflow-x-auto">
+<div class="flex items-center gap-1 mb-5 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-soft">
   <?php
-  $tabs = [
+  $mainTabs = [
     'calendar' => ['icon' => 'calendar-days', 'label' => 'ปฏิทินโพสต์'],
     'groups'   => ['icon' => 'users',         'label' => 'กลุ่ม Facebook'],
     'leads'    => ['icon' => 'target',        'label' => 'หา Lead'],
-    'settings' => ['icon' => 'settings-2',   'label' => 'ตั้งค่า Social'],
   ];
-  foreach ($tabs as $key => $t): ?>
+  foreach ($mainTabs as $key => $t): ?>
   <a href="<?= url('/owner/content-plans?tab=' . $key . '&month=' . sprintf('%04d-%02d', $year, $month)) ?>"
-     class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition whitespace-nowrap <?= $tab === $key ? 'bg-primary-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100' ?>">
-    <i data-lucide="<?= $t['icon'] ?>" class="w-4 h-4"></i>
-    <?= $t['label'] ?>
+     class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl transition whitespace-nowrap flex-1 justify-center sm:flex-none sm:px-4 <?= $tab === $key ? 'bg-primary-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100' ?>">
+    <i data-lucide="<?= $t['icon'] ?>" class="w-4 h-4 shrink-0"></i>
+    <span class="hidden sm:inline"><?= $t['label'] ?></span>
+    <span class="sm:hidden text-xs"><?= ['calendar'=>'โพสต์','groups'=>'กลุ่ม','leads'=>'Lead'][$key] ?></span>
     <?php if ($key === 'leads' && !empty($leads)): ?>
     <span class="<?= $tab === $key ? 'bg-white/30 text-white' : 'bg-blue-100 text-blue-700' ?> text-[10px] font-bold px-1.5 py-0.5 rounded-full">
       <?= count(array_filter($leads, fn($l) => $l['status'] === 'new')) ?>
@@ -67,6 +67,13 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
     <?php endif; ?>
   </a>
   <?php endforeach; ?>
+  <!-- Settings: icon-only button, clearly visible on all screen sizes -->
+  <a href="<?= url('/owner/content-plans?tab=settings&month=' . sprintf('%04d-%02d', $year, $month)) ?>"
+     title="ตั้งค่า Social Media"
+     class="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl transition whitespace-nowrap <?= $tab === 'settings' ? 'bg-primary-600 text-white shadow' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700' ?>">
+    <i data-lucide="settings-2" class="w-4 h-4 shrink-0"></i>
+    <span class="hidden sm:inline text-xs">ตั้งค่า</span>
+  </a>
 </div>
 
 <?php if (empty($hasMarketingTables) && in_array($tab, ['groups', 'leads'], true)): ?>
