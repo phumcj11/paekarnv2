@@ -121,6 +121,7 @@ return function (Router $r): void {
         // Social Settings + Image Picker
         $r->get('/content-plans/property-images',                   [ContentPlanController::class, 'propertyImages']);
         $r->post('/content-plans/social-save',                      [ContentPlanController::class, 'socialSave'])->middleware('csrf');
+        $r->post('/content-plans/upload-image',                     [ContentPlanController::class, 'uploadImage'])->middleware('csrf');
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);

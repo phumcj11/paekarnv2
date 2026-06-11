@@ -408,11 +408,25 @@ class ContentPlanController extends Controller
         $hasUnitImg = Database::tableHasColumn('property_images', 'unit_id');
         $images = Database::fetchAll(
             $hasUnitImg
-                ? "SELECT id, image_path FROM property_images WHERE property_id = :id AND unit_id IS NULL ORDER BY sort_order, id LIMIT 30"
-                : "SELECT id, image_path FROM property_images WHERE property_id = :id ORDER BY sort_order, id LIMIT 30",
+                ? "SELECT id, path FROM property_images WHERE property_id = :id AND unit_id IS NULL ORDER BY sort_order, id LIMIT 30"
+                : "SELECT id, path FROM property_images WHERE property_id = :id ORDER BY sort_order, id LIMIT 30",
             ['id' => $propertyId]
         );
         $this->json(['ok' => true, 'images' => $images]);
+    }
+
+    /** POST /owner/content-plans/upload-image — upload image file, return public URL */
+    public function uploadImage(): void
+    {
+        $ownerId = $this->ownerId();
+        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+        try {
+            $path = \App\Core\Upload::image('image', 'marketing');
+            if (!$path) { $this->json(['ok' => false, 'error' => 'ไม่ได้เลือกไฟล์']); return; }
+            $this->json(['ok' => true, 'url' => upload_url($path), 'path' => $path]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     /** POST /owner/content-plans/social-save — update social links for a property */

@@ -357,19 +357,34 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
           <i data-lucide="image" class="w-3.5 h-3.5"></i> รูปภาพประกอบโพสต์
           <span class="font-normal text-slate-400">(ไม่จำเป็น)</span>
         </label>
-        <div class="flex gap-2">
-          <input type="url" x-model="form.image_url" placeholder="วาง URL รูปภาพ หรือเลือกจากที่พัก"
-                 class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+        <!-- Action buttons: Upload from phone + Pick from property -->
+        <div class="flex gap-2 mb-2">
+          <!-- Browse / Camera from phone -->
+          <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-semibold transition cursor-pointer whitespace-nowrap border border-primary-200">
+            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+            <span x-text="imgUploading ? 'กำลังอัปโหลด...' : 'อัปโหลดรูป'"></span>
+            <input type="file" accept="image/*" class="sr-only" :disabled="imgUploading"
+                   @change="uploadFile($event)">
+          </label>
           <?php if (!empty($properties)): ?>
-          <button type="button" @click="openImagePicker()"
-                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-primary-100 hover:text-primary-700 text-slate-600 text-xs font-semibold transition whitespace-nowrap">
-            <i data-lucide="images" class="w-3.5 h-3.5"></i> เลือกรูป
+          <button type="button" @click="openImagePicker()" :disabled="!form.property_id"
+                  :class="form.property_id ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-not-allowed'"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap border border-slate-200">
+            <i data-lucide="images" class="w-3.5 h-3.5"></i>
+            <span x-text="form.property_id ? 'รูปของที่พัก' : 'เลือกที่พักก่อน'"></span>
           </button>
           <?php endif; ?>
         </div>
+        <!-- URL input (manual) -->
+        <input type="url" x-model="form.image_url" placeholder="หรือวาง URL รูปภาพโดยตรง"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+        <!-- Upload progress bar -->
+        <div x-show="imgUploading" x-cloak class="mt-1.5 h-1 bg-primary-200 rounded-full overflow-hidden">
+          <div class="h-full bg-primary-500 rounded-full animate-pulse w-3/4"></div>
+        </div>
         <!-- Image preview -->
-        <template x-if="form.image_url">
-          <div class="mt-2 relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+        <template x-if="form.image_url && !imgUploading">
+          <div class="mt-2 relative w-full h-32 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
             <img :src="form.image_url" class="w-full h-full object-cover" @error="form.image_url = ''">
             <button type="button" @click="form.image_url = ''"
                     class="absolute top-1.5 right-1.5 w-6 h-6 bg-black/50 hover:bg-black/70 text-white rounded-full grid place-items-center transition">
@@ -377,7 +392,7 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
             </button>
           </div>
         </template>
-        <!-- Image Picker Panel -->
+        <!-- Property Image Picker Panel -->
         <div x-show="imgPickerOpen" x-cloak class="mt-2 bg-slate-50 rounded-xl border border-slate-200 p-3">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-semibold text-slate-600">รูปภาพของที่พัก</span>
@@ -389,7 +404,7 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
             <div class="text-xs text-slate-400 text-center py-4">กำลังโหลดรูป...</div>
           </template>
           <template x-if="!imgPickerLoading && imgPickerImages.length === 0">
-            <div class="text-xs text-slate-400 text-center py-4">ไม่มีรูปภาพ — อัปโหลดรูปในหน้าแก้ไขที่พักก่อน</div>
+            <div class="text-xs text-slate-400 text-center py-4">ไม่มีรูปภาพ — <a href="<?= url('/owner/properties') ?>" class="underline text-primary-600">ไปอัปโหลดรูปที่พัก</a></div>
           </template>
           <div class="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto">
             <template x-for="img in imgPickerImages" :key="img.id">
@@ -935,6 +950,8 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
 <?php endif; /* end settings tab */ ?>
 
 <script>
+const __CSRF__        = '<?= \App\Core\Csrf::token() ?>';
+const __UPLOAD_BASE__ = '<?= e(url('uploads/')) ?>';
 const __CP_PLANS__    = <?= json_encode(array_values($plans), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_PROPS__    = <?= json_encode(array_values($properties ?? []), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_GROUPS__   = <?= json_encode(array_values($groups ?? []), JSON_UNESCAPED_UNICODE) ?>;
@@ -952,6 +969,7 @@ const __CP_ENDPOINTS__ = {
   leadAiComment:   '<?= e(url('/owner/content-plans/leads')) ?>/{id}/ai-comment',
   propertyImages:  '<?= e(url('/owner/content-plans/property-images')) ?>',
   socialSave:      '<?= e(url('/owner/content-plans/social-save')) ?>',
+  uploadImage:     '<?= e(url('/owner/content-plans/upload-image')) ?>',
 };
 
 // ── Calendar + AI Content Planner ─────────────────────────
@@ -968,6 +986,7 @@ function contentPlanApp() {
     imgPickerOpen: false,
     imgPickerLoading: false,
     imgPickerImages: [],
+    imgUploading: false,
     form: {
       post_date: '', platform: 'facebook', post_type: 'page', property_id: '',
       title: '', body: '', hashtags: '', image_url: '', status: 'draft',
@@ -983,26 +1002,53 @@ function contentPlanApp() {
         platform: 'facebook', post_type: 'page', property_id: '',
         title: '', body: '', hashtags: '', image_url: '', status: 'draft',
       };
-      this.aiPrompt       = '';
-      this.aiError        = '';
-      this.imgPickerOpen  = false;
+      this.aiPrompt        = '';
+      this.aiError         = '';
+      this.imgPickerOpen   = false;
       this.imgPickerImages = [];
+      this.imgUploading    = false;
+    },
+
+    async uploadFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      this.imgUploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
+        fd.append('image', file);
+        const r = await fetch(__CP_ENDPOINTS__.uploadImage, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json();
+        if (j.ok && j.url) {
+          this.form.image_url = j.url;
+          this.imgPickerOpen  = false;
+        } else {
+          alert(j.error || 'อัปโหลดไม่สำเร็จ');
+        }
+      } catch(e) {
+        alert('เชื่อมต่อไม่สำเร็จ');
+      } finally {
+        this.imgUploading = false;
+        event.target.value = '';
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      }
     },
 
     async openImagePicker() {
-      this.imgPickerOpen   = true;
-      this.imgPickerImages = [];
-      const propId = this.form.property_id;
-      if (!propId) { this.imgPickerLoading = false; return; }
+      if (!this.form.property_id) return;
+      this.imgPickerOpen    = true;
+      this.imgPickerImages  = [];
       this.imgPickerLoading = true;
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
       try {
-        const r = await fetch(__CP_ENDPOINTS__.propertyImages + '?property_id=' + propId, { credentials: 'same-origin' });
+        const r = await fetch(__CP_ENDPOINTS__.propertyImages + '?property_id=' + this.form.property_id, { credentials: 'same-origin' });
         const j = await r.json();
         if (j.ok && j.images) {
           this.imgPickerImages = j.images.map(img => ({
             id: img.id,
-            src: img.image_path.startsWith('http') ? img.image_path : '/' + img.image_path.replace(/^\/+/, ''),
+            src: img.path
+              ? (img.path.startsWith('http') ? img.path : __UPLOAD_BASE__ + img.path.replace(/^\/+/, ''))
+              : '',
           }));
         }
       } catch(e) { /* silent */ }
@@ -1079,6 +1125,7 @@ function contentPlanApp() {
       this.saving = true;
       try {
         const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
         for (const [k, v] of Object.entries(this.form)) { if (v !== '') fd.append(k, v); }
         const url = this.editId
           ? __CP_ENDPOINTS__.update.replace('{id}', this.editId)
@@ -1098,7 +1145,8 @@ function contentPlanApp() {
       if (!this.editId) return;
       if (!confirm('ลบโพสต์นี้?')) return;
       const url = __CP_ENDPOINTS__.destroy.replace('{id}', this.editId);
-      await fetch(url, { method: 'POST', credentials: 'same-origin' });
+      const fd = new FormData(); fd.append('_csrf', __CSRF__);
+      await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
       window.location.reload();
     },
 
@@ -1108,6 +1156,7 @@ function contentPlanApp() {
       this.aiError   = '';
       try {
         const fd = new FormData();
+        fd.append('_csrf',     __CSRF__);
         fd.append('platform',  this.form.platform);
         fd.append('post_type', this.form.post_type);
         fd.append('prompt',    this.aiPrompt);
@@ -1171,6 +1220,7 @@ function groupPostingApp() {
       this.adaptLoading = true;
       try {
         const fd = new FormData();
+        fd.append('_csrf',      __CSRF__);
         fd.append('platform',   'facebook');
         fd.append('post_type',  'group');
         fd.append('prompt',     this.adaptedBody);
@@ -1192,6 +1242,7 @@ function groupPostingApp() {
     async logPosted() {
       if (!this.selectedPlan || !this.selectedGroup) return;
       const fd = new FormData();
+      fd.append('_csrf', __CSRF__);
       fd.append('group_id', this.selectedGroup.id);
       fd.append('note', '');
       const url = __CP_ENDPOINTS__.logPost.replace('{id}', this.selectedPlan.id);
@@ -1243,6 +1294,7 @@ function groupModalApp() {
       this.saving = true;
       try {
         const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
         if (this.editId) fd.append('id', this.editId);
         fd.append('name', this.form.name);
         fd.append('url',  this.form.url);
@@ -1258,7 +1310,8 @@ function groupModalApp() {
     async deleteGroup() {
       if (!this.editId || !confirm('ลบกลุ่มนี้?')) return;
       const url = __CP_ENDPOINTS__.groupDelete.replace('{id}', this.editId);
-      await fetch(url, { method: 'POST', credentials: 'same-origin' });
+      const fd = new FormData(); fd.append('_csrf', __CSRF__);
+      await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
       window.location.reload();
     },
   };
@@ -1328,6 +1381,7 @@ function leadWatchlistApp() {
       this.saving = true;
       try {
         const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
         if (this.editId) fd.append('id', this.editId);
         for (const [k, v] of Object.entries(this.form)) { if (v !== '') fd.append(k, String(v)); }
         const r = await fetch(__CP_ENDPOINTS__.leadSave, { method: 'POST', body: fd, credentials: 'same-origin' });
@@ -1351,7 +1405,8 @@ function leadWatchlistApp() {
     async deleteLead() {
       if (!this.editId || !confirm('ลบ lead นี้?')) return;
       const url = __CP_ENDPOINTS__.leadDelete.replace('{id}', this.editId);
-      await fetch(url, { method: 'POST', credentials: 'same-origin' });
+      const fd = new FormData(); fd.append('_csrf', __CSRF__);
+      await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
       this.leads = this.leads.filter(l => l.id !== this.editId);
       this.modal = false;
     },
@@ -1409,6 +1464,7 @@ function propertySettingsCard(prop) {
       this.saved    = false;
       try {
         const fd = new FormData();
+        fd.append('_csrf',         __CSRF__);
         fd.append('property_id',   this.propertyId);
         fd.append('facebook_url',  this.form.facebook_url  || '');
         fd.append('line_id',       this.form.line_id       || '');
