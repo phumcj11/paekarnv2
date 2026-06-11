@@ -17,6 +17,7 @@ use App\Controllers\Owner\LineHubController;
 use App\Controllers\Owner\LineContactController;
 use App\Controllers\Owner\AnalyticsController as OwnerAnalytics;
 use App\Controllers\Owner\AutomationController as OwnerAutomation;
+use App\Controllers\Owner\FacebookController;
 
 return function (Router $r): void {
     // Auth (no middleware)
@@ -122,6 +123,13 @@ return function (Router $r): void {
         $r->get('/content-plans/property-images',                   [ContentPlanController::class, 'propertyImages']);
         $r->post('/content-plans/social-save',                      [ContentPlanController::class, 'socialSave'])->middleware('csrf');
         $r->post('/content-plans/upload-image',                     [ContentPlanController::class, 'uploadImage'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/post-facebook',        [ContentPlanController::class, 'postToFacebook'])->middleware('csrf');
+        // Facebook OAuth
+        $r->get('/facebook/connect/{id:[0-9]+}',  [FacebookController::class, 'connect']);
+        $r->get('/facebook/callback',             [FacebookController::class, 'callback']);
+        $r->get('/facebook/pick-page',            [FacebookController::class, 'pickPage']);
+        $r->get('/facebook/save-page',            [FacebookController::class, 'savePage']);
+        $r->get('/facebook/disconnect/{id:[0-9]+}', [FacebookController::class, 'disconnect']);
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);

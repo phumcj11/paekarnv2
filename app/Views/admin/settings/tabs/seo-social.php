@@ -81,6 +81,31 @@ foreach ($socialFields as $k => [$label, $hint]):
 endforeach;
 ?>
 </div>
+
+<!-- Facebook Page API for Owner Marketing Center -->
+<div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-4">
+  <h3 class="font-bold text-blue-800 flex items-center gap-2">📘 Facebook Page API — Owner Auto-Post</h3>
+  <p class="text-xs text-blue-700">ให้ Owner เชื่อมต่อ Facebook Page แล้วโพสต์จาก Marketing Center ได้โดยตรง</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <?php ob_start(); ?>
+    <input type="text" name="fb_app_id" value="<?= e($values['fb_app_id'] ?? '') ?>" class="<?= $ic ?> font-mono text-sm" placeholder="1234567890...">
+    <?php settings_field('Facebook App ID', ob_get_clean(), 'จาก developers.facebook.com → App Dashboard'); ?>
+    <?php ob_start(); ?>
+    <input type="password" name="fb_app_secret" value="<?= e($values['fb_app_secret'] ?? '') ?>" class="<?= $ic ?> font-mono text-sm" placeholder="••••••••••••">
+    <?php settings_field('Facebook App Secret', ob_get_clean(), 'เก็บเป็นความลับ — ดูได้จาก App Dashboard'); ?>
+  </div>
+  <details class="text-xs text-blue-700">
+    <summary class="cursor-pointer font-semibold">วิธีตั้งค่า Facebook App (คลิกเปิด)</summary>
+    <ol class="mt-2 space-y-1 list-decimal list-inside text-blue-600">
+      <li>ไปที่ <a href="https://developers.facebook.com" target="_blank" class="underline">developers.facebook.com</a> → Create App</li>
+      <li>เพิ่ม Product: <strong>Facebook Login for Business</strong></li>
+      <li>Facebook Login Settings → Valid OAuth Redirect URIs ใส่: <code class="bg-white/60 px-1 rounded"><?= e(url('/owner/facebook/callback')) ?></code></li>
+      <li>Copy App ID + App Secret มาใส่ด้านบน แล้วบันทึก</li>
+      <li>Owner ไปที่ Marketing Center → ตั้งค่า → กด "เชื่อมต่อ Facebook Page"</li>
+    </ol>
+    <p class="mt-2 text-amber-700 bg-amber-50 rounded p-2">⚠️ Development Mode: เฉพาะ App Admin ใช้ได้ — Production ต้อง Submit App Review</p>
+  </details>
+</div>
 <?php
 $socialContent = ob_get_clean();
 settings_section(

@@ -8,6 +8,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Models\ContentPlan;
 use App\Services\AIService;
+use App\Services\FacebookService;
 
 class ContentPlanController extends Controller
 {
@@ -47,9 +48,10 @@ class ContentPlanController extends Controller
 
         // ---- Properties (with social links for settings tab) ----
         $hasSocial = Database::tableHasColumn('properties', 'instagram_url');
-        $socialSel = $hasSocial
-            ? 'id, name, facebook_url, line_id, instagram_url, tiktok_url'
-            : 'id, name, facebook_url, line_id, NULL AS instagram_url, NULL AS tiktok_url';
+        $hasFbPage = Database::tableHasColumn('properties', 'facebook_page_id');
+        $socialSel = 'id, name, facebook_url, line_id'
+            . ($hasSocial ? ', instagram_url, tiktok_url' : ', NULL AS instagram_url, NULL AS tiktok_url')
+            . ($hasFbPage ? ', facebook_page_id, facebook_page_name, facebook_page_token' : ', NULL AS facebook_page_id, NULL AS facebook_page_name, NULL AS facebook_page_token');
         $properties = $ownerId
             ? Database::fetchAll("SELECT {$socialSel} FROM properties WHERE owner_id = :o ORDER BY name", ['o' => $ownerId])
             : [];
@@ -463,6 +465,72 @@ class ContentPlanController extends Controller
             FROM properties WHERE id = :id", ['id' => $propertyId]);
 
         $this->json(['ok' => true, 'property' => $row]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // FACEBOOK PAGE POST
+    // ─────────────────────────────────────────────────────────────
+
+    /** POST /owner/content-plans/{id}/post-facebook */
+    public function postToFacebook(int $id): void
+    {
+        $ownerId = $this->ownerId();
+        $plan    = ContentPlan::findForOwner($id, $ownerId);
+        if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
+
+        if (!FacebookService::isConfigured()) {
+            $this->json(['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า Facebook App — ไปที่ Admin → ตั้งค่า']);
+            return;
+        }
+
+        $propId   = (int)($plan['property_id'] ?? 0);
+        $hasFbCols = Database::tableHasColumn('properties', 'facebook_page_token');
+        if (!$propId || !$hasFbCols) {
+            $this->json(['ok' => false, 'error' => 'ต้องเลือกที่พักและเชื่อมต่อ Facebook Page ก่อน']);
+            return;
+        }
+
+        $prop = Database::fetch(
+            "SELECT facebook_page_id, facebook_page_token, facebook_page_name FROM properties WHERE id = :id AND owner_id = :o",
+            ['id' => $propId, 'o' => $ownerId]
+        );
+        if (!$prop || !$prop['facebook_page_token']) {
+            $this->json(['ok' => false, 'error' => 'ยังไม่ได้เชื่อมต่อ Facebook Page — ไปที่ ตั้งค่า Social']);
+            return;
+        }
+
+        // Build message
+        $body     = trim((string)($plan['body'] ?? ''));
+        $hashtags = trim((string)($plan['hashtags'] ?? ''));
+        $message  = $body . ($hashtags ? "\n\n" . $hashtags : '');
+
+        // Parse images
+        $imageUrls = ContentPlan::parseImages($plan['image_url'] ?? null);
+
+        $result = FacebookService::postToPage(
+            $prop['facebook_page_id'],
+            $prop['facebook_page_token'],
+            $message,
+            $imageUrls
+        );
+
+        if (!$result) {
+            $this->json(['ok' => false, 'error' => 'ไม่สามารถโพสต์ได้ — ลองอีกครั้ง']);
+            return;
+        }
+        if (isset($result['error'])) {
+            $this->json(['ok' => false, 'error' => 'Facebook: ' . $result['error']]);
+            return;
+        }
+
+        // Mark as published
+        ContentPlan::update($id, ['status' => 'published', 'owner_id' => $plan['owner_id']]);
+
+        $this->json([
+            'ok'       => true,
+            'post_url' => $result['url'] ?? '',
+            'post_id'  => $result['post_id'] ?? '',
+        ]);
     }
 
     // ─────────────────────────────────────────────────────────────

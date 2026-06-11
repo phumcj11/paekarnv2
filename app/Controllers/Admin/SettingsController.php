@@ -30,6 +30,7 @@ class SettingsController extends Controller
         'payment_gateway_enabled','payment_gateway_provider','payment_gateway_public_key','payment_gateway_secret_key',
         'activity_checkout_gateway_enabled',
         'facebook_url','line_oa','line_friend_url','facebook_plugins_app_id',
+        'fb_app_id','fb_app_secret',
         'instagram_url','youtube_url','tiktok_url','wechat_url','xiaohongshu_url','social_whatsapp',
         'lead_seek_line_notify_token','lead_broadcast_max','membership_grace_days',
         'membership_boost_priority_standard','membership_boost_priority_vip','membership_vip_auto_featured',

@@ -508,6 +508,30 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
         </div>
       </div>
 
+      <!-- Facebook Post Button (only for existing posts with FB-connected property) -->
+      <template x-if="editId && fbPageConnected()">
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 fill-[#1877F2] shrink-0" viewBox="0 0 24 24"><path d="M24 12.073C24 5.406 18.627 0 12 0S0 5.406 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.885v2.27h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+            <span class="text-sm font-semibold text-blue-800">โพสต์ไปยัง Facebook Page ทันที</span>
+            <span class="text-xs text-blue-500 ml-auto" x-text="fbPageName()"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" @click="postToFacebook()" :disabled="fbPosting"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-semibold transition disabled:opacity-50">
+              <i data-lucide="send" class="w-3.5 h-3.5" x-show="!fbPosting"></i>
+              <i data-lucide="loader-circle" class="w-3.5 h-3.5 animate-spin" x-show="fbPosting" x-cloak></i>
+              <span x-text="fbPosting ? 'กำลังโพสต์...' : 'โพสต์เลย'"></span>
+            </button>
+            <span x-show="fbResult" x-cloak class="text-xs font-semibold"
+                  :class="fbResult?.ok ? 'text-emerald-700' : 'text-red-600'"
+                  x-text="fbResult?.ok ? '✓ โพสต์แล้ว' : ('⚠ ' + fbResult?.error)"></span>
+            <a x-show="fbResult?.url" x-cloak :href="fbResult?.url" target="_blank" rel="noopener"
+               class="text-xs text-blue-600 underline">ดูโพสต์</a>
+          </div>
+        </div>
+      </template>
+
       <!-- Actions -->
       <div class="flex items-center justify-between gap-3 pt-2">
         <template x-if="editId">
@@ -1009,13 +1033,45 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
                 class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow transition disabled:opacity-50">
           <i data-lucide="save" class="w-4 h-4" x-show="!saving"></i>
           <i data-lucide="loader-circle" class="w-4 h-4 animate-spin" x-show="saving" x-cloak></i>
-          <span x-text="saving ? 'กำลังบันทึก...' : 'บันทึก'"></span>
+          <span x-text="saving ? 'กำลังบันทึก...' : 'บันทึก Social'"></span>
         </button>
         <a href="<?= url('/owner/properties/' . (int)$prop['id'] . '/edit') ?>"
            class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-600 transition px-3 py-2 rounded-xl hover:bg-primary-50">
           <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่าที่พักอื่นๆ
         </a>
         <p x-show="errorMsg" x-cloak x-text="errorMsg" class="text-xs text-red-600"></p>
+      </div>
+
+      <!-- Facebook Page Connection -->
+      <div class="pt-3 border-t border-slate-100">
+        <p class="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
+          <span class="text-base">📘</span> เชื่อมต่อ Facebook Page (Auto-Post)
+        </p>
+        <?php if (!empty($prop['facebook_page_id'])): ?>
+        <div class="flex items-center gap-3 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span class="text-emerald-600 text-lg">✅</span>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-emerald-800"><?= e($prop['facebook_page_name'] ?? $prop['facebook_page_id']) ?></p>
+            <p class="text-xs text-emerald-600">เชื่อมต่อแล้ว — สามารถโพสต์ได้จาก Marketing Center</p>
+          </div>
+          <a href="<?= url('/owner/facebook/disconnect/' . (int)$prop['id']) ?>"
+             onclick="return confirm('ยืนยันตัดการเชื่อมต่อ Facebook Page?')"
+             class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition">ตัดเชื่อมต่อ</a>
+        </div>
+        <?php else: ?>
+        <?php if (\App\Services\FacebookService::isConfigured()): ?>
+        <a href="<?= url('/owner/facebook/connect/' . (int)$prop['id']) ?>"
+           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-semibold transition">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M24 12.073C24 5.406 18.627 0 12 0S0 5.406 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.885v2.27h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+          เชื่อมต่อ Facebook Page
+        </a>
+        <p class="text-xs text-slate-400 mt-1.5">จะ redirect ไป Facebook Login เพื่อขอ permission</p>
+        <?php else: ?>
+        <div class="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+          ⚠️ ยังไม่ได้ตั้งค่า Facebook App ID — Admin ต้องไปที่ <a href="<?= url('/admin/settings?tab=seo') ?>" class="underline font-semibold">Admin → ตั้งค่า → SEO/Social</a> ก่อน
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -1047,6 +1103,7 @@ const __CP_ENDPOINTS__ = {
   propertyImages:  '<?= e(url('/owner/content-plans/property-images')) ?>',
   socialSave:      '<?= e(url('/owner/content-plans/social-save')) ?>',
   uploadImage:     '<?= e(url('/owner/content-plans/upload-image')) ?>',
+  postFacebook:    '<?= e(url('/owner/content-plans')) ?>/{id}/post-facebook',
 };
 
 // ── Calendar + AI Content Planner ─────────────────────────
@@ -1059,6 +1116,9 @@ function contentPlanApp() {
     aiPrompt: '',
     aiError: '',
     copied: false,
+    // Facebook posting
+    fbPosting: false,
+    fbResult: null,
     // multi-image
     imgPickerOpen: false,
     imgPickerLoading: false,
@@ -1102,6 +1162,46 @@ function contentPlanApp() {
       this.imgUploadingCount = 0;
       this.imgLibraryOpen    = false;
       this.manualUrl         = '';
+      this.fbPosting         = false;
+      this.fbResult          = null;
+    },
+
+    fbPageConnected() {
+      const propId = this.form.property_id;
+      if (!propId) return false;
+      const p = this.props.find(x => x.id == propId);
+      return !!(p?.facebook_page_id && p?.facebook_page_token);
+    },
+
+    fbPageName() {
+      const propId = this.form.property_id;
+      if (!propId) return '';
+      const p = this.props.find(x => x.id == propId);
+      return p?.facebook_page_name || '';
+    },
+
+    async postToFacebook() {
+      if (!this.editId || this.fbPosting) return;
+      this.fbPosting = true;
+      this.fbResult  = null;
+      try {
+        const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
+        const url = __CP_ENDPOINTS__.postFacebook.replace('{id}', this.editId);
+        const r   = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j   = await r.json();
+        this.fbResult = j;
+        if (j.ok) {
+          // Update plan status locally
+          const idx = this.plans.findIndex(p => p.id == this.editId);
+          if (idx >= 0) this.plans[idx].status = 'published';
+        }
+      } catch(e) {
+        this.fbResult = { ok: false, error: 'เชื่อมต่อไม่สำเร็จ' };
+      } finally {
+        this.fbPosting = false;
+        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      }
     },
 
     _parseImages(raw) {

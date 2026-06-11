@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS `marketing_leads` (
 SQL
 echo "  marketing_leads OK"
 
+echo "=== properties Facebook Page columns ==="
+$MYSQL <<'SQL'
+ALTER TABLE `properties`
+  ADD COLUMN IF NOT EXISTS `facebook_page_id`      VARCHAR(64)  NULL AFTER `tiktok_url`,
+  ADD COLUMN IF NOT EXISTS `facebook_page_name`    VARCHAR(200) NULL AFTER `facebook_page_id`,
+  ADD COLUMN IF NOT EXISTS `facebook_page_token`   TEXT         NULL AFTER `facebook_page_name`,
+  ADD COLUMN IF NOT EXISTS `facebook_token_expiry` DATETIME     NULL AFTER `facebook_page_token`;
+SQL
+echo "  Facebook Page columns OK"
+
 echo "=== content_plans image_url to TEXT ==="
 $MYSQL <<'SQL'
 ALTER TABLE `content_plans` MODIFY COLUMN `image_url` TEXT NULL;
