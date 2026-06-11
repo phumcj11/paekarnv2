@@ -7,6 +7,7 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Models\AuditLog;
 use App\Models\PropertyUnit;
 use App\Services\BookingService;
 use App\Services\OwnerBookingService;
@@ -70,7 +71,53 @@ class BookingController extends Controller
         View::render('owner/bookings/show', [
             'page_title' => 'การจอง #' . $row['code'],
             'b' => $row, 'payments' => $payments,
+            'canHardDelete' => BookingService::canHardDelete($row),
         ], 'layouts/owner');
+    }
+
+    /** POST /owner/bookings/{id}/delete — ลบถาวร (เก็บ audit log ให้แอดมินติดตาม) */
+    public function destroy(int $id): void
+    {
+        $row = $this->fetchOwnedBooking($id);
+        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+
+        if (!BookingService::canHardDelete($row)) {
+            Session::flash('error', 'ไม่สามารถลบการจองนี้ได้ — อนุญาตเฉพาะสถานะรอยืนยัน/ปฏิเสธ/ยกเลิก และไม่มีคูปองที่ใช้แล้ว');
+            $this->redirectAfterBookingDelete($row, false);
+        }
+
+        if (!BookingService::cancel($id, true, Auth::id())) {
+            Session::flash('error', 'ลบการจองไม่สำเร็จ');
+            $this->redirectAfterBookingDelete($row, false);
+        }
+
+        $ownerId = Auth::ownerId();
+        if (!$ownerId) {
+            $prop = Database::fetch('SELECT owner_id FROM properties WHERE id = :i LIMIT 1', ['i' => $row['property_id']]);
+            $ownerId = $prop ? (int)$prop['owner_id'] : null;
+        }
+
+        AuditLog::record('owner_booking_deleted', [
+            'booking_id'    => $id,
+            'code'          => $row['code'],
+            'guest_name'    => $row['guest_name'],
+            'guest_phone'   => $row['guest_phone'],
+            'property_id'   => (int)$row['property_id'],
+            'property_name' => $row['property_name'],
+            'unit_id'       => $row['unit_id'] ? (int)$row['unit_id'] : null,
+            'unit_name'     => $row['unit_name'] ?? null,
+            'check_in'      => $row['check_in'],
+            'check_out'     => $row['check_out'],
+            'nights'        => (int)($row['nights'] ?? 0),
+            'status'        => $row['status'],
+            'total_price'   => (float)($row['total_price'] ?? 0),
+            'source'        => $row['source'] ?? null,
+            'owner_id'      => $ownerId,
+            'portal'        => 'owner',
+        ], 'booking', $id);
+
+        Session::flash('success', 'ลบการจอง #' . $row['code'] . ' ถาวรแล้ว');
+        $this->redirectAfterBookingDelete($row);
     }
 
     public function updateStatus(int $id): void
@@ -375,6 +422,35 @@ class BookingController extends Controller
         }
 
         $this->redirectAfterBookingAction($id, $row);
+    }
+
+    /** @param array<string,mixed> $row */
+    private function redirectAfterBookingDelete(array $row, bool $deleted = true): void
+    {
+        $returnTo = $_POST['return_to'] ?? '';
+        if ($returnTo === 'dashboard') {
+            $q = array_filter([
+                'cal_p' => (int)($_POST['cal_p'] ?? 0),
+                'cal_u' => (int)($_POST['cal_u'] ?? 0),
+                'cal_m' => (int)($_POST['cal_m'] ?? 0),
+                'cal_y' => (int)($_POST['cal_y'] ?? 0),
+            ]);
+            if (($_POST['cal_view'] ?? '') === 'unit') {
+                $q['cal_view'] = 'unit';
+            }
+            redirect(url('/owner/dashboard') . ($q ? '?' . http_build_query($q) : ''));
+        }
+        if ($returnTo === 'availability') {
+            $pid   = (int)($_POST['property_id'] ?? $row['property_id'] ?? 0);
+            $unit  = (int)($_POST['cal_u'] ?? $row['unit_id'] ?? 0);
+            $month = (int)($_POST['cal_m'] ?? date('n'));
+            $year  = (int)($_POST['cal_y'] ?? date('Y'));
+            redirect(url('/owner/properties/' . $pid . '/availability') . '?unit=' . $unit . '&month=' . $month . '&year=' . $year);
+        }
+        if ($deleted) {
+            redirect(url('/owner/bookings'));
+        }
+        redirect(url('/owner/bookings/' . (int)$row['id']));
     }
 
     /** @param array<string,mixed> $row */

@@ -143,7 +143,13 @@ $csrfToken    = \App\Core\Csrf::token();
                     <template x-if="canCancelBooking(b)">
                       <button type="button" @click="confirmCancel(b)"
                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100">
-                        <i data-lucide="trash-2" class="w-3 h-3"></i> ยกเลิก
+                        <i data-lucide="ban" class="w-3 h-3"></i> ยกเลิก
+                      </button>
+                    </template>
+                    <template x-if="canDeleteBooking(b)">
+                      <button type="button" @click="confirmDelete(b)"
+                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-white bg-rose-600 border border-rose-700 hover:bg-rose-700">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> ลบถาวร
                       </button>
                     </template>
                   </div>
@@ -406,6 +412,14 @@ $csrfToken    = \App\Core\Csrf::token();
     <input type="hidden" name="cal_m" value="<?= $month ?>">
     <input type="hidden" name="cal_y" value="<?= $year ?>">
   </form>
+  <form id="avCalDeleteForm" method="post" action="" class="hidden">
+    <input type="hidden" name="_csrf" value="<?= e($csrfToken) ?>">
+    <input type="hidden" name="return_to" value="availability">
+    <input type="hidden" name="property_id" value="<?= $pid ?>">
+    <input type="hidden" name="cal_u" value="<?= $unitId ?>">
+    <input type="hidden" name="cal_m" value="<?= $month ?>">
+    <input type="hidden" name="cal_y" value="<?= $year ?>">
+  </form>
 </section>
 
 <script>
@@ -581,6 +595,9 @@ function avCalManage() {
     },
     canCancelBooking(b) {
       return ['pending', 'confirmed'].includes(b.status);
+    },
+    canDeleteBooking(b) {
+      return !!b.can_hard_delete;
     },
     loadBookingForEdit(b) {
       this.editBookingId = b.id;
@@ -788,6 +805,14 @@ function avCalManage() {
       if (!ok) return;
       const f = document.getElementById('avCalCancelForm');
       f.action = '<?= url('/owner/bookings') ?>/' + b.id + '/status';
+      f.submit();
+    },
+    async confirmDelete(b) {
+      const html = `<div class="text-left text-sm"><p>ลบถาวรการจองของ <strong>${b.guest_name}</strong> (${b.code})?<br><span class="text-slate-500 text-xs">ไม่สามารถกู้คืนได้</span></p></div>`;
+      const ok = await this.swalConfirm('ยืนยันลบถาวร?', html, 'error');
+      if (!ok) return;
+      const f = document.getElementById('avCalDeleteForm');
+      f.action = '<?= url('/owner/bookings') ?>/' + b.id + '/delete';
       f.submit();
     },
     async swalConfirm(title, html, icon) {

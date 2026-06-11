@@ -196,7 +196,8 @@ class OwnerAvailabilityCalendar
             'nights'      => (int)$b['nights'],
             'unit_id'     => (int)($b['unit_id'] ?? 0),
             'unit_name'   => $b['unit_name'] ?? '',
-            'notes'       => $b['notes'] ?? '',
+            'notes'           => $b['notes'] ?? '',
+            'can_hard_delete' => BookingService::canHardDelete($b),
         ];
     }
 

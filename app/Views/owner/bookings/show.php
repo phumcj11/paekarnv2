@@ -1,4 +1,4 @@
-<?php /** @var array $b @var array $payments */
+<?php /** @var array $b @var array $payments @var bool $canHardDelete */
 $colors = ['pending'=>'amber','confirmed'=>'emerald','rejected'=>'rose','cancelled'=>'slate','completed'=>'blue','no_show'=>'slate'];
 $c = $colors[$b['status']] ?? 'slate';
 $bookingHdrIcons = ['pending'=>'clock','confirmed'=>'check-circle','rejected'=>'x-circle','cancelled'=>'ban','completed'=>'flag','no_show'=>'user-x'];
@@ -148,6 +148,16 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
          class="mt-3 w-full py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2 transition">
         <i data-lucide="file-text" class="w-4 h-4"></i> ดูใบยืนยันการจอง
       </a>
+      <?php endif; ?>
+      <?php if (!empty($canHardDelete)): ?>
+      <form method="post" action="<?= url('/owner/bookings/' . $b['id'] . '/delete') ?>"
+            onsubmit="return confirm('ลบการจองนี้ถาวร? ไม่สามารถกู้คืนได้ แต่แอดมินเว็บไซต์จะเห็นบันทึกใน Audit log')"
+            class="mt-3">
+        <?= csrf() ?>
+        <button type="submit" class="w-full py-2 bg-rose-600 text-white rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-2">
+          <i data-lucide="trash-2" class="w-4 h-4"></i> ลบถาวร
+        </button>
+      </form>
       <?php endif; ?>
     </div>
 
