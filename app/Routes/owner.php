@@ -86,6 +86,7 @@ return function (Router $r): void {
         $r->post('/line-contacts/{id:[0-9]+}/message',         [LineContactController::class, 'sendMessage']);
         $r->post('/line-contacts/{id:[0-9]+}/tags',            [LineContactController::class, 'updateTags']);
         $r->post('/line-contacts/{id:[0-9]+}/notes',           [LineContactController::class, 'updateNotes']);
+        $r->get('/line-contacts/{id:[0-9]+}/ai-reply',         [LineContactController::class, 'aiReply']);
         $r->post('/line-contacts/broadcast',                   [LineContactController::class, 'broadcast']);
         $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');

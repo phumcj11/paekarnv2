@@ -8,7 +8,9 @@ use App\Services\PropertyLineService;
 /**
  * Owner automation: อ่าน property_message_templates, render placeholders, ส่งผ่าน LINE OA
  * ใช้โดย BookingService (booking_confirmed, deposit_received)
- * และ CronService (checkin_reminder_1d, checkout_followup, review_request)
+ * และ CronService (checkin_reminder_1d, checkout_followup, review_request, reengagement)
+ *
+ * send_delay_hours > 0 จะ queue ลง message_queue แทนการส่งทันที
  */
 class MessageTemplateService
 {
@@ -27,6 +29,31 @@ class MessageTemplateService
             ['p' => $propertyId, 'e' => $eventType]
         );
         return $row ?: null;
+    }
+
+    /**
+     * Render template text using only property context (no booking).
+     * ใช้สำหรับ reengagement หรือ broadcast ที่ไม่มี booking context
+     *
+     * @param array<string,mixed> $property
+     */
+    public static function renderForProperty(string $text, array $property): string
+    {
+        $map = [
+            '{{property_name}}'  => (string)($property['name'] ?? ''),
+            '{{property_phone}}' => (string)($property['phone'] ?? ''),
+            // booking-specific placeholders — strip เพื่อไม่ให้โชว์ raw tag
+            '{{booking_code}}'   => '',
+            '{{unit_name}}'      => '',
+            '{{guest_name}}'     => '',
+            '{{check_in_date}}'  => '',
+            '{{check_out_date}}' => '',
+            '{{nights}}'         => '',
+            '{{total_price}}'    => '',
+            '{{review_url}}'     => '',
+            '{{confirm_url}}'    => '',
+        ];
+        return trim(str_replace(array_keys($map), array_values($map), $text));
     }
 
     /**
@@ -70,7 +97,8 @@ class MessageTemplateService
 
     /**
      * Fetch booking, render template, push via property LINE OA.
-     * Returns true if sent OK, false if no template / no LINE ID / not enabled.
+     * If send_delay_hours > 0 and message_queue table exists, queues for later delivery.
+     * Returns true if sent/queued OK, false if no template / no LINE ID / not enabled.
      */
     public static function sendToGuest(int $bookingId, string $eventType): bool
     {
@@ -90,12 +118,66 @@ class MessageTemplateService
         $text = self::render((string)$tpl['message_text'], $b);
         if (!$text) return false;
 
+        $delayHours = (int)($tpl['send_delay_hours'] ?? 0);
+
+        // Queue for delayed delivery
+        if ($delayHours > 0 && Database::tableHasColumn('message_queue', 'id')) {
+            $sendAfter = date('Y-m-d H:i:s', strtotime("+{$delayHours} hours"));
+            Database::insert('message_queue', [
+                'booking_id'         => $bookingId,
+                'property_id'        => (int)$b['property_id'],
+                'event_type'         => $eventType,
+                'message_text'       => $text,
+                'guest_line_user_id' => (string)$b['guest_line_user_id'],
+                'send_after'         => $sendAfter,
+                'status'             => 'pending',
+            ]);
+            return true; // queued successfully
+        }
+
+        // Send immediately
         try {
             return PropertyLineService::push(
                 (int)$b['property_id'],
                 (string)$b['guest_line_user_id'],
                 [['type' => 'text', 'text' => $text]]
             );
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Queue a raw message for a LINE contact (no booking context) with optional delay.
+     * Used by reengagement and Saturday-vacancy notifications.
+     *
+     * @return bool true if queued/sent
+     */
+    public static function sendDirectToContact(
+        int $propertyId,
+        string $lineUserId,
+        string $text,
+        string $eventType = 'direct',
+        int $delayHours = 0
+    ): bool {
+        if (!$text || !$lineUserId) return false;
+
+        if ($delayHours > 0 && Database::tableHasColumn('message_queue', 'id')) {
+            $sendAfter = date('Y-m-d H:i:s', strtotime("+{$delayHours} hours"));
+            Database::insert('message_queue', [
+                'booking_id'         => null,
+                'property_id'        => $propertyId,
+                'event_type'         => $eventType,
+                'message_text'       => $text,
+                'guest_line_user_id' => $lineUserId,
+                'send_after'         => $sendAfter,
+                'status'             => 'pending',
+            ]);
+            return true;
+        }
+
+        try {
+            return PropertyLineService::push($propertyId, $lineUserId, [['type' => 'text', 'text' => $text]]);
         } catch (\Throwable) {
             return false;
         }

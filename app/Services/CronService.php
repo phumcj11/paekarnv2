@@ -5,6 +5,7 @@ use App\Core\Database;
 use App\Models\Setting;
 use App\Services\LineService;
 use App\Services\MessageTemplateService;
+use App\Services\PropertyLineService;
 
 /**
  * Job runner for scheduled automation tasks.
@@ -27,6 +28,9 @@ class CronService
             'send_checkin_reminders'   => [self::class, 'sendCheckinReminders'],
             'send_checkout_followup'   => [self::class, 'sendCheckoutFollowup'],
             'send_review_requests'     => [self::class, 'sendReviewRequests'],
+            'process_message_queue'    => [self::class, 'processMessageQueue'],
+            'send_reengagement'        => [self::class, 'sendReengagement'],
+            'notify_saturday_vacancy'  => [self::class, 'notifySaturdayVacancy'],
             'owner_weekly_report'      => [self::class, 'ownerWeeklyReport'],
             'cleanup_drafts'           => [self::class, 'cleanupDrafts'],
             'membership_apply_grace'        => [self::class, 'membershipApplyGrace'],
@@ -235,6 +239,170 @@ class CronService
         }
         $prefix = self::$dryRun ? '[DRY-RUN] Would send' : 'Sent';
         return ['affected' => $n, 'output' => "$prefix $n review request messages for checkouts on $target"];
+    }
+
+    /** ส่งข้อความจาก message_queue ที่ถึงเวลาแล้ว (send_after <= NOW()) */
+    public static function processMessageQueue(): array
+    {
+        if (!Database::tableHasColumn('message_queue', 'id')) {
+            return ['affected' => 0, 'output' => 'Skipped (message_queue table missing)'];
+        }
+        $rows = Database::fetchAll(
+            "SELECT * FROM message_queue
+              WHERE status = 'pending' AND send_after <= NOW()
+              ORDER BY send_after ASC LIMIT 200"
+        );
+        $sent = 0; $failed = 0;
+        foreach ($rows as $row) {
+            if (self::$dryRun) { $sent++; continue; }
+            try {
+                $ok = PropertyLineService::push(
+                    (int)$row['property_id'],
+                    (string)$row['guest_line_user_id'],
+                    [['type' => 'text', 'text' => (string)$row['message_text']]]
+                );
+                Database::update('message_queue',
+                    ['status' => $ok ? 'sent' : 'failed', 'sent_at' => date('Y-m-d H:i:s')],
+                    'id = :i', ['i' => $row['id']]
+                );
+                $ok ? $sent++ : $failed++;
+            } catch (\Throwable $e) {
+                Database::update('message_queue',
+                    ['status' => 'failed', 'sent_at' => date('Y-m-d H:i:s')],
+                    'id = :i', ['i' => $row['id']]
+                );
+                $failed++;
+            }
+        }
+        $prefix = self::$dryRun ? '[DRY-RUN] Would process' : 'Processed';
+        return ['affected' => $sent, 'output' => "$prefix message_queue: sent=$sent failed=$failed"];
+    }
+
+    /**
+     * ส่ง reengagement_30d template ให้ผู้ติดตาม LINE ที่ไม่จองใน 60-90 วัน
+     * รันทุกวันจันทร์
+     */
+    public static function sendReengagement(): array
+    {
+        if ((int)date('w') !== 1) {
+            return ['affected' => 0, 'output' => 'Skipped (only run on Monday)'];
+        }
+
+        $ago60  = date('Y-m-d', strtotime('-60 days'));
+        $ago90  = date('Y-m-d', strtotime('-90 days'));
+
+        // contacts ที่ booking ล่าสุดอยู่ในช่วง 60-90 วันก่อน (หรือไม่เคยจองเลยแต่ทักมา 90+ วัน)
+        $contacts = Database::fetchAll(
+            "SELECT plc.id, plc.line_user_id, plc.property_id,
+                    MAX(b.check_out) AS last_checkout
+             FROM property_line_contacts plc
+             LEFT JOIN bookings b
+                    ON b.guest_line_user_id = plc.line_user_id
+                   AND b.property_id = plc.property_id
+                   AND b.status IN ('confirmed','completed')
+             WHERE plc.unfollowed_at IS NULL
+             GROUP BY plc.id, plc.line_user_id, plc.property_id
+             HAVING (last_checkout IS NOT NULL AND last_checkout BETWEEN :ago90 AND :ago60)
+                 OR (last_checkout IS NULL AND plc.last_seen_at < :ago90s)
+             LIMIT 500",
+            ['ago60' => $ago60, 'ago90' => $ago90, 'ago90s' => $ago90 . ' 00:00:00']
+        );
+
+        $n = 0;
+        foreach ($contacts as $c) {
+            if (self::$dryRun) { $n++; continue; }
+            $tpl = \App\Services\MessageTemplateService::getTemplate((int)$c['property_id'], 'reengagement_30d');
+            if (!$tpl) continue;
+            $property = Database::fetch("SELECT name, phone FROM properties WHERE id = :i LIMIT 1", ['i' => $c['property_id']]);
+            if (!$property) continue;
+            $text = \App\Services\MessageTemplateService::renderForProperty((string)$tpl['message_text'], $property);
+            if (!$text) continue;
+            try {
+                $ok = PropertyLineService::push(
+                    (int)$c['property_id'],
+                    (string)$c['line_user_id'],
+                    [['type' => 'text', 'text' => $text]]
+                );
+                if ($ok) $n++;
+            } catch (\Throwable) {}
+        }
+        $prefix = self::$dryRun ? '[DRY-RUN] Would send' : 'Sent';
+        return ['affected' => $n, 'output' => "$prefix $n reengagement messages (window $ago90 – $ago60)"];
+    }
+
+    /**
+     * แจ้งเตือนเจ้าของทุกวันพฤหัส–ศุกร์ ถ้าเสาร์นี้ยังมีห้องว่าง
+     * ส่งผ่าน LINE OA ของที่พัก (multicast ไม่ได้ ส่งให้เจ้าของด้วย LineService ส่วนตัว)
+     */
+    public static function notifySaturdayVacancy(): array
+    {
+        $dow = (int)date('w'); // 0=Sun, 4=Thu, 5=Fri
+        if (!in_array($dow, [4, 5], true)) {
+            return ['affected' => 0, 'output' => 'Skipped (only run Thu–Fri)'];
+        }
+
+        $sat = date('w') === '5'
+            ? date('Y-m-d', strtotime('+1 day'))
+            : date('Y-m-d', strtotime('+2 days')); // Thursday → Saturday
+
+        $n = 0;
+        $properties = Database::fetchAll(
+            "SELECT p.id, p.name, p.owner_id,
+                    u.id AS unit_id, u.name AS unit_name
+             FROM properties p
+             JOIN property_units u ON u.property_id = p.id AND u.is_active = 1
+             WHERE p.status = 'published'
+             ORDER BY p.id"
+        );
+
+        $notified = [];
+        foreach ($properties as $prop) {
+            $pid = (int)$prop['id'];
+            $oid = (int)$prop['owner_id'];
+
+            if (isset($notified[$pid])) continue;
+
+            $blocked = Database::fetch(
+                "SELECT 1 FROM availability av
+                  WHERE av.unit_id = :uid AND av.date = :d
+                    AND av.status IN ('closed','blocked','fully_booked') LIMIT 1",
+                ['uid' => $prop['unit_id'], 'd' => $sat]
+            );
+            $booked = Database::fetch(
+                "SELECT COUNT(*) AS cnt FROM bookings b
+                  WHERE b.unit_id = :uid AND b.status IN ('pending','confirmed')
+                    AND b.check_in <= :co AND b.check_out > :ci",
+                ['uid' => $prop['unit_id'], 'ci' => $sat, 'co' => date('Y-m-d', strtotime($sat . ' +1 day'))]
+            );
+
+            if ($blocked || (int)($booked['cnt'] ?? 0) >= 1) continue;
+
+            // มีห้องว่าง → แจ้งเจ้าของ
+            $notified[$pid] = true;
+            if (self::$dryRun) { $n++; continue; }
+
+            $ownerUser = Database::fetch(
+                "SELECT u.line_user_id FROM owners o JOIN users u ON u.id = o.user_id WHERE o.id = :oid LIMIT 1",
+                ['oid' => $oid]
+            );
+            if (empty($ownerUser['line_user_id'])) continue;
+
+            $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+            $satThai = (int)date('j', strtotime($sat)) . ' ' . $thaiMonths[(int)date('n', strtotime($sat))] . ' ' . ((int)date('Y', strtotime($sat)) + 543);
+
+            $msg = "📢 แจ้งเตือน: {$prop['name']} ยังว่างวันเสาร์นี้!\n\n"
+                 . "📅 {$satThai} ยังมีห้องว่าง\n"
+                 . "🔔 อย่าลืม Broadcast ให้ลูกค้า LINE หรืออัปเดตโซเชียลมีเดีย\n\n"
+                 . "👉 จัดการได้ที่ paekarn.com/owner/line-contacts";
+
+            try {
+                if (LineService::push((string)$ownerUser['line_user_id'], $msg)) {
+                    $n++;
+                }
+            } catch (\Throwable) {}
+        }
+        $prefix = self::$dryRun ? '[DRY-RUN] Would notify' : 'Notified';
+        return ['affected' => $n, 'output' => "$prefix $n owners of Saturday vacancy on $sat"];
     }
 
     public static function ownerWeeklyReport(): array

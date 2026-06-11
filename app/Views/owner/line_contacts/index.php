@@ -343,9 +343,25 @@ $presetTags = [
                   </span>
                 </template>
                 <!-- add tag input -->
-                <div x-show="!addingTag" class="opacity-0 group-hover:opacity-100 transition">
+                <div x-show="!addingTag" class="opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
                   <button type="button" @click="addingTag=true; $nextTick(()=>$el.closest('td').querySelector('input.tag-input')?.focus())"
                           class="w-5 h-5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-violet-400 hover:text-violet-600 text-xs grid place-items-center transition">+</button>
+                  <!-- preset quick-add -->
+                  <div class="relative">
+                    <button type="button" @click="showPresets = !showPresets"
+                            class="w-5 h-5 rounded-full border border-dashed border-teal-300 text-teal-400 hover:border-teal-500 hover:text-teal-600 text-[10px] grid place-items-center transition"
+                            title="Tag สำเร็จรูป">⚡</button>
+                    <div x-show="showPresets" x-cloak @click.outside="showPresets=false"
+                         class="absolute left-0 top-6 z-20 bg-white rounded-xl border border-slate-200 shadow-lg p-2 w-44 flex flex-wrap gap-1">
+                      <?php foreach ($presetTags as $pLabel => $pCls): ?>
+                      <button type="button"
+                              @click="addPresetTag(<?= json_encode($pLabel) ?>)"
+                              class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold <?= $pCls ?> hover:opacity-70 transition">
+                        <?= e($pLabel) ?>
+                      </button>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
                 </div>
                 <div x-show="addingTag" class="flex items-center gap-1">
                   <input type="text" x-model="newTagVal" maxlength="30" placeholder="tag..."
@@ -387,10 +403,19 @@ $presetTags = [
               <?php endif; ?>
             </td>
             <td class="px-4 py-3 text-right">
-              <button type="button" @click="openMsg()"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755]/10 hover:bg-[#06C755]/20 text-[#067a2f] text-xs font-semibold rounded-lg transition">
-                <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> ส่งข้อความ
-              </button>
+              <div class="flex items-center justify-end gap-1.5">
+                <button type="button" @click="fetchAiReply()" :disabled="aiLoading"
+                        title="AI ช่วยร่างข้อความ"
+                        class="inline-flex items-center gap-1 px-2 py-1.5 bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs font-semibold rounded-lg transition disabled:opacity-60">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                  <span x-show="!aiLoading" class="hidden sm:inline">AI</span>
+                  <span x-show="aiLoading">…</span>
+                </button>
+                <button type="button" @click="openMsg()"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755]/10 hover:bg-[#06C755]/20 text-[#067a2f] text-xs font-semibold rounded-lg transition">
+                  <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> ส่งข้อความ
+                </button>
+              </div>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -453,11 +478,18 @@ $presetTags = [
             <button type="button" @click="editPhone=false" class="text-slate-400"><i data-lucide="x" class="w-4 h-4"></i></button>
           </div>
         </div>
-        <!-- send msg -->
-        <button type="button" @click="openMsg()"
-                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#06C755]/10 hover:bg-[#06C755]/15 text-[#067a2f] text-sm font-semibold rounded-xl transition">
-          <i data-lucide="message-circle" class="w-4 h-4"></i> ส่งข้อความ LINE
-        </button>
+        <!-- send msg + AI -->
+        <div class="flex gap-2">
+          <button type="button" @click="fetchAiReply()" :disabled="aiLoading"
+                  class="flex-none flex items-center gap-1.5 px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs font-semibold rounded-xl transition disabled:opacity-60">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span x-show="!aiLoading">AI</span><span x-show="aiLoading">…</span>
+          </button>
+          <button type="button" @click="openMsg()"
+                  class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#06C755]/10 hover:bg-[#06C755]/15 text-[#067a2f] text-sm font-semibold rounded-xl transition">
+            <i data-lucide="message-circle" class="w-4 h-4"></i> ส่งข้อความ LINE
+          </button>
+        </div>
       </div>
       <?php endforeach; ?>
     </div>
@@ -622,6 +654,9 @@ function contactRow(id, initialPhone, initialTags) {
     tags: Array.isArray(initialTags) ? [...initialTags] : [],
     addingTag: false,
     newTagVal: '',
+    showPresets: false,
+    aiLoading: false,
+    aiText: '',
 
     async savePhone() {
       try {
@@ -647,7 +682,28 @@ function contactRow(id, initialPhone, initialTags) {
 
     async addPresetTag(tag) {
       if (!tag || this.tags.includes(tag)) return;
+      this.showPresets = false;
       await this._saveTags([...this.tags, tag]);
+    },
+
+    async fetchAiReply() {
+      if (this.aiLoading) return;
+      this.aiLoading = true;
+      this.aiText = '';
+      try {
+        const r = await fetch(`<?= url('/owner/line-contacts') ?>/${this.id}/ai-reply`);
+        const d = await r.json();
+        if (d.ok && d.text) {
+          this.aiText = d.text;
+          // pre-populate the send message modal if available
+          window._msgSheet?.openSheet(this.id,
+            this.$el.querySelector('.font-semibold.text-slate-800')?.textContent?.trim() || 'ลูกค้า',
+            this.aiText);
+        } else {
+          alert(d.error || 'AI ไม่พร้อมใช้งาน');
+        }
+      } catch(e) { alert('เกิดข้อผิดพลาด'); }
+      this.aiLoading = false;
     },
 
     async removeTag(tag) {

@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
+use App\Services\AIService;
 use App\Services\OwnerTier;
 use App\Services\PropertyLineService;
 
@@ -245,6 +246,66 @@ class LineContactController extends Controller
             Database::update('property_line_contacts', ['notes' => $notes ?: null], 'id = :i', ['i' => $id]);
         }
         $this->json(['ok' => true]);
+    }
+
+    /**
+     * GET /owner/line-contacts/{id}/ai-reply
+     * AI ช่วยร่างข้อความตอบลูกค้าตาม context ของ contact นั้น (ชื่อ, segment, ประวัติจอง)
+     */
+    public function aiReply(): void
+    {
+        $id      = (int)($this->params['id'] ?? 0);
+        $context = mb_substr(trim((string)($_GET['context'] ?? '')), 0, 300);
+
+        $contact = $this->ownedContact($id);
+        if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
+
+        $ownerId = Auth::ownerId();
+        if ($ownerId && !OwnerTier::can($ownerId, OwnerTier::FEATURE_AI_DRAFT)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Starter ขึ้นไป']); return;
+        }
+
+        $property = Database::fetch(
+            "SELECT name, type, zone FROM properties WHERE id = :i LIMIT 1",
+            ['i' => $contact['property_id']]
+        );
+        if (!$property) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
+
+        // ดึง booking history
+        $bookings = Database::fetchAll(
+            "SELECT check_in, check_out, status, total_price FROM bookings
+              WHERE guest_line_user_id = :uid AND property_id = :pid
+              ORDER BY created_at DESC LIMIT 5",
+            ['uid' => $contact['line_user_id'], 'pid' => $contact['property_id']]
+        );
+        $historyParts = [];
+        foreach ($bookings as $b) {
+            $historyParts[] = "{$b['check_in']} – {$b['check_out']} ({$b['status']}, ฿" . number_format((float)$b['total_price']) . ')';
+        }
+        $historyStr = $historyParts ? implode('; ', $historyParts) : 'ไม่มีประวัติการจอง';
+
+        // Auto segment
+        $segment = '';
+        if (!empty($contact['auto_segment'])) $segment = $contact['auto_segment'];
+
+        $guestName = $contact['display_name'] ?: 'ลูกค้า LINE';
+
+        $instruction = <<<PROMPT
+คุณคือพนักงานต้อนรับของ "{$property['name']}" ที่พักในกาญจนบุรี
+กำลังจะส่งข้อความตอบลูกค้าชื่อ "{$guestName}" ผ่าน LINE
+ประวัติการจอง: {$historyStr}
+กลุ่ม: {$segment}
+{$context}
+
+เขียนข้อความตอบกลับ LINE สั้นๆ (ไม่เกิน 200 ตัวอักษร) เป็นกันเอง ภาษาไทย
+กฎ: ตอบเฉพาะเนื้อหาข้อความ — ห้ามใส่คำอธิบายนอกเนื้อหา
+PROMPT;
+
+        $text = AIService::generate($instruction, '', 0.75, 200);
+        if ($text === null) {
+            $this->json(['ok' => false, 'error' => 'AI ไม่พร้อมใช้งาน']); return;
+        }
+        $this->json(['ok' => true, 'text' => trim($text)]);
     }
 
     /** POST /owner/line-contacts/broadcast?property_id=N — push ให้ทุกคน (หรือ filtered) */
