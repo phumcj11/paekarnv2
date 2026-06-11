@@ -101,6 +101,34 @@ class ContentPlan
         return $map;
     }
 
+    /** Store single URL or JSON array of URLs; strip empties */
+    public static function sanitizeImages(mixed $raw): ?string
+    {
+        if (empty($raw)) return null;
+        // Already JSON array string
+        if (is_string($raw) && str_starts_with(ltrim($raw), '[')) {
+            $arr = json_decode($raw, true);
+            if (is_array($arr)) {
+                $clean = array_values(array_filter(array_map('trim', $arr)));
+                return $clean ? json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+            }
+        }
+        // Single URL string
+        $s = trim((string)$raw);
+        return $s !== '' ? json_encode([$s], JSON_UNESCAPED_SLASHES) : null;
+    }
+
+    /** Parse image_url field → array of URL strings */
+    public static function parseImages(?string $raw): array
+    {
+        if (!$raw) return [];
+        if (str_starts_with(ltrim($raw), '[')) {
+            $arr = json_decode($raw, true);
+            return is_array($arr) ? array_values(array_filter($arr)) : [];
+        }
+        return $raw !== '' ? [$raw] : [];
+    }
+
     private static function sanitize(array $d): array
     {
         $platform = in_array($d['platform'] ?? '', self::PLATFORMS) ? $d['platform'] : 'facebook';
@@ -114,7 +142,7 @@ class ContentPlan
             'title'        => mb_substr(trim((string)($d['title'] ?? '')), 0, 200),
             'body'         => trim((string)($d['body'] ?? '')),
             'hashtags'     => trim((string)($d['hashtags'] ?? '')) ?: null,
-            'image_url'    => trim((string)($d['image_url'] ?? '')) ?: null,
+            'image_url'    => self::sanitizeImages($d['image_url'] ?? null),
             'ai_generated' => !empty($d['ai_generated']) ? 1 : 0,
         ];
     }

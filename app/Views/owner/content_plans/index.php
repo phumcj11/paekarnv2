@@ -351,49 +351,113 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
       </div>
 
-      <!-- Image URL + Picker -->
+      <!-- Multi-Image Section -->
       <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
-          <i data-lucide="image" class="w-3.5 h-3.5"></i> รูปภาพประกอบโพสต์
-          <span class="font-normal text-slate-400">(ไม่จำเป็น)</span>
+        <label class="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+          <i data-lucide="images" class="w-3.5 h-3.5"></i> รูปภาพประกอบโพสต์
+          <span class="font-normal text-slate-400">(ไม่จำเป็น · เลือกได้หลายรูป)</span>
         </label>
-        <!-- Action buttons: Upload from phone + Pick from property -->
-        <div class="flex gap-2 mb-2">
-          <!-- Browse / Camera from phone -->
-          <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-semibold transition cursor-pointer whitespace-nowrap border border-primary-200">
-            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-            <span x-text="imgUploading ? 'กำลังอัปโหลด...' : 'อัปโหลดรูป'"></span>
-            <input type="file" accept="image/*" class="sr-only" :disabled="imgUploading"
-                   @change="uploadFile($event)">
-          </label>
-          <?php if (!empty($properties)): ?>
-          <button type="button" @click="openImagePicker()" :disabled="!form.property_id"
-                  :class="form.property_id ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-not-allowed'"
-                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap border border-slate-200">
-            <i data-lucide="images" class="w-3.5 h-3.5"></i>
-            <span x-text="form.property_id ? 'รูปของที่พัก' : 'เลือกที่พักก่อน'"></span>
-          </button>
-          <?php endif; ?>
-        </div>
-        <!-- URL input (manual) -->
-        <input type="url" x-model="form.image_url" placeholder="หรือวาง URL รูปภาพโดยตรง"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
-        <!-- Upload progress bar -->
-        <div x-show="imgUploading" x-cloak class="mt-1.5 h-1 bg-primary-200 rounded-full overflow-hidden">
-          <div class="h-full bg-primary-500 rounded-full animate-pulse w-3/4"></div>
-        </div>
-        <!-- Image preview -->
-        <template x-if="form.image_url && !imgUploading">
-          <div class="mt-2 relative w-full h-32 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-            <img :src="form.image_url" class="w-full h-full object-cover" @error="form.image_url = ''">
-            <button type="button" @click="form.image_url = ''"
-                    class="absolute top-1.5 right-1.5 w-6 h-6 bg-black/50 hover:bg-black/70 text-white rounded-full grid place-items-center transition">
-              <i data-lucide="x" class="w-3 h-3"></i>
-            </button>
+
+        <!-- Selected images grid -->
+        <template x-if="form.images.length > 0">
+          <div class="grid grid-cols-3 gap-2 mb-2">
+            <template x-for="(img, idx) in form.images" :key="img.url">
+              <div class="relative aspect-square rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 group">
+                <img :src="img.url" :alt="img.name" class="w-full h-full object-cover">
+                <!-- Filename overlay -->
+                <div class="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1 text-white text-[9px] truncate">
+                  <span x-text="img.name"></span>
+                </div>
+                <!-- Remove button -->
+                <button type="button" @click="removeImage(idx)"
+                        class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full grid place-items-center opacity-0 group-hover:opacity-100 transition">
+                  <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+                <!-- Check badge -->
+                <div class="absolute top-1 left-1 w-4 h-4 bg-emerald-500 rounded-full grid place-items-center">
+                  <i data-lucide="check" class="w-2.5 h-2.5 text-white"></i>
+                </div>
+              </div>
+            </template>
+            <!-- Upload more slot -->
+            <label class="aspect-square rounded-xl border-2 border-dashed border-primary-300 bg-primary-50 hover:bg-primary-100 flex flex-col items-center justify-center cursor-pointer transition"
+                   :class="imgUploading ? 'opacity-50 pointer-events-none' : ''">
+              <i data-lucide="plus" class="w-5 h-5 text-primary-400 mb-0.5"></i>
+              <span class="text-[9px] text-primary-500 font-semibold">เพิ่มรูป</span>
+              <input type="file" accept="image/*" multiple class="sr-only" :disabled="imgUploading" @change="uploadFiles($event)">
+            </label>
           </div>
         </template>
+
+        <!-- Upload progress -->
+        <template x-if="imgUploading">
+          <div class="mb-2 flex items-center gap-2 px-3 py-2 bg-primary-50 rounded-lg border border-primary-200">
+            <i data-lucide="loader-circle" class="w-4 h-4 text-primary-500 animate-spin shrink-0"></i>
+            <span class="text-xs text-primary-700 font-semibold" x-text="'กำลังอัปโหลด ' + imgUploadingCount + ' รูป...'"></span>
+          </div>
+        </template>
+
+        <!-- Empty state: action buttons -->
+        <template x-if="form.images.length === 0 && !imgUploading">
+          <div class="flex flex-wrap gap-2 mb-2">
+            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-semibold transition cursor-pointer whitespace-nowrap border border-primary-200">
+              <i data-lucide="camera" class="w-3.5 h-3.5"></i> อัปโหลดรูป
+              <input type="file" accept="image/*" multiple class="sr-only" @change="uploadFiles($event)">
+            </label>
+            <button type="button" @click="openLibrary()"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold transition whitespace-nowrap border border-violet-200">
+              <i data-lucide="library-big" class="w-3.5 h-3.5"></i>
+              คลังรูป <span class="text-[10px] opacity-70" x-text="'(' + imgLibrary.length + ')'"></span>
+            </button>
+            <?php if (!empty($properties)): ?>
+            <button type="button" @click="openImagePicker()" :disabled="!form.property_id"
+                    :class="form.property_id ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-not-allowed'"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap border border-slate-200">
+              <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+              <span x-text="form.property_id ? 'รูปที่พัก' : 'เลือกที่พักก่อน'"></span>
+            </button>
+            <?php endif; ?>
+          </div>
+        </template>
+
+        <!-- Library panel -->
+        <div x-show="imgLibraryOpen" x-cloak class="mb-2 bg-violet-50 rounded-xl border border-violet-200 p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-violet-700 flex items-center gap-1.5">
+              <i data-lucide="library-big" class="w-3.5 h-3.5"></i> คลังรูปของฉัน
+            </span>
+            <div class="flex gap-2">
+              <button type="button" @click="clearLibrary()" x-show="imgLibrary.length > 0"
+                      class="text-[10px] text-red-400 hover:text-red-600">ล้างทั้งหมด</button>
+              <button type="button" @click="imgLibraryOpen=false" class="text-slate-400 hover:text-slate-700">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+          <template x-if="imgLibrary.length === 0">
+            <div class="text-xs text-violet-400 text-center py-3">ยังไม่มีรูปในคลัง — อัปโหลดรูปเพื่อบันทึกไว้ใช้ซ้ำ</div>
+          </template>
+          <div class="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+            <template x-for="lib in imgLibrary" :key="lib.url">
+              <button type="button" @click="addFromLibrary(lib)"
+                      :class="form.images.some(i=>i.url===lib.url) ? 'border-primary-500 ring-1 ring-primary-400' : 'border-transparent hover:border-violet-300'"
+                      class="relative aspect-square rounded-lg overflow-hidden border-2 transition group">
+                <img :src="lib.url" :alt="lib.name" class="w-full h-full object-cover">
+                <div x-show="form.images.some(i=>i.url===lib.url)"
+                     class="absolute inset-0 bg-primary-600/30 flex items-center justify-center">
+                  <i data-lucide="check-circle" class="w-5 h-5 text-white"></i>
+                </div>
+                <div class="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-white text-[8px] truncate opacity-0 group-hover:opacity-100 transition">
+                  <span x-text="lib.name"></span>
+                </div>
+              </button>
+            </template>
+          </div>
+          <p class="text-[10px] text-violet-400 mt-2">คลังรูปเก็บไว้ในเครื่อง สูงสุด 20 รูป</p>
+        </div>
+
         <!-- Property Image Picker Panel -->
-        <div x-show="imgPickerOpen" x-cloak class="mt-2 bg-slate-50 rounded-xl border border-slate-200 p-3">
+        <div x-show="imgPickerOpen" x-cloak class="mb-2 bg-slate-50 rounded-xl border border-slate-200 p-3">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-semibold text-slate-600">รูปภาพของที่พัก</span>
             <button type="button" @click="imgPickerOpen=false" class="text-slate-400 hover:text-slate-700">
@@ -408,13 +472,26 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
           </template>
           <div class="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto">
             <template x-for="img in imgPickerImages" :key="img.id">
-              <button type="button" @click="selectImage(img)"
-                      class="aspect-square rounded-lg overflow-hidden border-2 transition"
-                      :class="form.image_url === img.src ? 'border-primary-500' : 'border-transparent hover:border-primary-300'">
+              <button type="button" @click="addFromPicker(img)"
+                      :class="form.images.some(i=>i.url===img.src) ? 'border-primary-500' : 'border-transparent hover:border-primary-300'"
+                      class="relative aspect-square rounded-lg overflow-hidden border-2 transition">
                 <img :src="img.src" class="w-full h-full object-cover">
+                <div x-show="form.images.some(i=>i.url===img.src)"
+                     class="absolute inset-0 bg-primary-600/30 flex items-center justify-center">
+                  <i data-lucide="check-circle" class="w-5 h-5 text-white"></i>
+                </div>
               </button>
             </template>
           </div>
+        </div>
+
+        <!-- URL input (manual paste) -->
+        <div class="flex gap-2">
+          <input type="url" x-model="manualUrl" placeholder="วาง URL รูปภาพ แล้วกด +"
+                 @keydown.enter.prevent="addManualUrl()"
+                 class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+          <button type="button" @click="addManualUrl()"
+                  class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold transition">+</button>
         </div>
       </div>
 
@@ -982,55 +1059,151 @@ function contentPlanApp() {
     aiPrompt: '',
     aiError: '',
     copied: false,
-    // image picker
+    // multi-image
     imgPickerOpen: false,
     imgPickerLoading: false,
     imgPickerImages: [],
     imgUploading: false,
+    imgUploadingCount: 0,
+    imgLibraryOpen: false,
+    imgLibrary: [],   // loaded from localStorage
+    manualUrl: '',
     form: {
       post_date: '', platform: 'facebook', post_type: 'page', property_id: '',
-      title: '', body: '', hashtags: '', image_url: '', status: 'draft',
+      title: '', body: '', hashtags: '',
+      images: [],   // [{url, name}]
+      status: 'draft',
     },
     plans: __CP_PLANS__,
     props: __CP_PROPS__,
 
-    init() { if (window.lucide) lucide.createIcons(); },
+    init() {
+      if (window.lucide) lucide.createIcons();
+      // Load image library from localStorage
+      try {
+        const saved = localStorage.getItem('mkImgLib');
+        if (saved) this.imgLibrary = JSON.parse(saved);
+      } catch(e) { this.imgLibrary = []; }
+    },
 
     _resetForm(date) {
       this.form = {
         post_date: date || new Date().toISOString().slice(0, 10),
         platform: 'facebook', post_type: 'page', property_id: '',
-        title: '', body: '', hashtags: '', image_url: '', status: 'draft',
+        title: '', body: '', hashtags: '',
+        images: [],
+        status: 'draft',
       };
-      this.aiPrompt        = '';
-      this.aiError         = '';
-      this.imgPickerOpen   = false;
-      this.imgPickerImages = [];
-      this.imgUploading    = false;
+      this.aiPrompt          = '';
+      this.aiError           = '';
+      this.imgPickerOpen     = false;
+      this.imgPickerImages   = [];
+      this.imgUploading      = false;
+      this.imgUploadingCount = 0;
+      this.imgLibraryOpen    = false;
+      this.manualUrl         = '';
     },
 
-    async uploadFile(event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
+    _parseImages(raw) {
+      if (!raw) return [];
+      if (typeof raw === 'string' && raw.trimStart().startsWith('[')) {
+        try {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) return arr.map(u => ({ url: u, name: u.split('/').pop() }));
+        } catch(e) {}
+      }
+      // single URL fallback
+      return raw.trim() ? [{ url: raw.trim(), name: raw.trim().split('/').pop() }] : [];
+    },
+
+    _saveLibrary() {
+      try { localStorage.setItem('mkImgLib', JSON.stringify(this.imgLibrary.slice(0, 20))); } catch(e) {}
+    },
+
+    _addToLibrary(img) {
+      if (!img.url) return;
+      if (!this.imgLibrary.some(i => i.url === img.url)) {
+        this.imgLibrary.unshift(img);
+        if (this.imgLibrary.length > 20) this.imgLibrary.pop();
+        this._saveLibrary();
+      }
+    },
+
+    async uploadFiles(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
       this.imgUploading = true;
-      try {
-        const fd = new FormData();
-        fd.append('_csrf', __CSRF__);
-        fd.append('image', file);
-        const r = await fetch(__CP_ENDPOINTS__.uploadImage, { method: 'POST', body: fd, credentials: 'same-origin' });
-        const j = await r.json();
-        if (j.ok && j.url) {
-          this.form.image_url = j.url;
-          this.imgPickerOpen  = false;
-        } else {
-          alert(j.error || 'อัปโหลดไม่สำเร็จ');
+      this.imgUploadingCount = files.length;
+      const results = [];
+      for (const file of files) {
+        try {
+          const fd = new FormData();
+          fd.append('_csrf', __CSRF__);
+          fd.append('image', file);
+          const r = await fetch(__CP_ENDPOINTS__.uploadImage, { method: 'POST', body: fd, credentials: 'same-origin' });
+          const j = await r.json();
+          if (j.ok && j.url) {
+            const img = { url: j.url, name: file.name };
+            results.push(img);
+            this._addToLibrary(img);
+          } else {
+            alert(file.name + ': ' + (j.error || 'อัปโหลดไม่สำเร็จ'));
+          }
+        } catch(e) {
+          alert(file.name + ': เชื่อมต่อไม่สำเร็จ');
         }
-      } catch(e) {
-        alert('เชื่อมต่อไม่สำเร็จ');
-      } finally {
-        this.imgUploading = false;
-        event.target.value = '';
-        this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+        this.imgUploadingCount--;
+      }
+      this.form.images.push(...results);
+      this.imgUploading = false;
+      this.imgPickerOpen = false;
+      event.target.value = '';
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    removeImage(idx) {
+      this.form.images.splice(idx, 1);
+    },
+
+    addManualUrl() {
+      const u = this.manualUrl.trim();
+      if (!u) return;
+      if (!this.form.images.some(i => i.url === u)) {
+        const img = { url: u, name: u.split('/').pop() || u };
+        this.form.images.push(img);
+        this._addToLibrary(img);
+      }
+      this.manualUrl = '';
+    },
+
+    openLibrary() {
+      this.imgLibraryOpen = !this.imgLibraryOpen;
+      this.imgPickerOpen  = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    clearLibrary() {
+      if (!confirm('ล้างคลังรูปทั้งหมด?')) return;
+      this.imgLibrary = [];
+      this._saveLibrary();
+    },
+
+    addFromLibrary(lib) {
+      if (this.form.images.some(i => i.url === lib.url)) {
+        // Toggle off
+        this.form.images = this.form.images.filter(i => i.url !== lib.url);
+      } else {
+        this.form.images.push({ url: lib.url, name: lib.name });
+      }
+    },
+
+    addFromPicker(img) {
+      if (this.form.images.some(i => i.url === img.src)) {
+        this.form.images = this.form.images.filter(i => i.url !== img.src);
+      } else {
+        const item = { url: img.src, name: img.src.split('/').pop() };
+        this.form.images.push(item);
+        this._addToLibrary(item);
       }
     },
 
@@ -1056,11 +1229,6 @@ function contentPlanApp() {
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
-    selectImage(img) {
-      this.form.image_url = img.src;
-      this.imgPickerOpen  = false;
-      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-    },
 
     openCreate(date) {
       this.editId = null;
@@ -1094,13 +1262,14 @@ function contentPlanApp() {
         title:       p.title || '',
         body:        p.body || '',
         hashtags:    p.hashtags || '',
-        image_url:   p.image_url || '',
+        images:      this._parseImages(p.image_url),
         status:      p.status,
       };
-      this.aiPrompt        = '';
-      this.aiError         = '';
-      this.imgPickerOpen   = false;
-      this.imgPickerImages = [];
+      this.aiPrompt          = '';
+      this.aiError           = '';
+      this.imgPickerOpen     = false;
+      this.imgPickerImages   = [];
+      this.manualUrl         = '';
       this.modal = true;
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
@@ -1126,7 +1295,11 @@ function contentPlanApp() {
       try {
         const fd = new FormData();
         fd.append('_csrf', __CSRF__);
-        for (const [k, v] of Object.entries(this.form)) { if (v !== '') fd.append(k, v); }
+        // Serialize images array → image_url JSON string
+        const { images, ...rest } = this.form;
+        for (const [k, v] of Object.entries(rest)) { if (v !== '') fd.append(k, v); }
+        const urls = images.map(i => i.url).filter(Boolean);
+        if (urls.length) fd.append('image_url', JSON.stringify(urls));
         const url = this.editId
           ? __CP_ENDPOINTS__.update.replace('{id}', this.editId)
           : __CP_ENDPOINTS__.store;

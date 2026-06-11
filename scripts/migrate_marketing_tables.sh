@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS `marketing_leads` (
 SQL
 echo "  marketing_leads OK"
 
+echo "=== content_plans image_url to TEXT ==="
+$MYSQL <<'SQL'
+ALTER TABLE `content_plans` MODIFY COLUMN `image_url` TEXT NULL;
+SQL
+echo "  image_url TEXT OK"
+
 echo "=== properties social columns ==="
 $MYSQL <<'SQL'
 ALTER TABLE `properties`
