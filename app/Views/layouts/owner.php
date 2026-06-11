@@ -89,7 +89,7 @@ $calendarUrl = $firstPropertyId
       ['/owner/analytics',   'bar-chart-2',      'Analytics', null],
       ['/owner/line-contacts', 'message-circle', 'แชท LINE', null],
       ['/owner/automation',  'zap',              'Automation', null],
-      ['/owner/content-plans', 'calendar-days',  'ปฏิทินโพสต์', null],
+      ['/owner/content-plans', 'megaphone',      'การตลาด', null],
       ['/owner/coupons/verify','ticket',         'ตรวจคูปอง', null],
       ['/owner/coupons/scan', 'camera',          'สแกนคูปอง', null],
       ['/owner/membership',  'award',            'สมาชิกเจ้าของแพ', null],

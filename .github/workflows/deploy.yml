@@ -97,6 +97,9 @@ jobs:
             if [ -f "$APP/scripts/migrate_message_queue.sh" ]; then
               bash "$APP/scripts/migrate_message_queue.sh" || echo "WARN: migrate_message_queue failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_marketing_tables.sh" ]; then
+              bash "$APP/scripts/migrate_marketing_tables.sh" || echo "WARN: migrate_marketing_tables failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"

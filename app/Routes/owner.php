@@ -103,12 +103,21 @@ return function (Router $r): void {
         $r->post('/coupons/verify',          [OwnerCoupon::class, 'check'])->middleware('csrf');
         $r->post('/coupons/use',             [OwnerCoupon::class, 'markUsed'])->middleware('csrf');
 
-        // Content Planner
-        $r->get('/content-plans',                             [ContentPlanController::class, 'index']);
-        $r->post('/content-plans',                            [ContentPlanController::class, 'store'])->middleware('csrf');
-        $r->post('/content-plans/ai-generate',                [ContentPlanController::class, 'aiGenerate'])->middleware('csrf');
-        $r->post('/content-plans/{id:[0-9]+}/update',         [ContentPlanController::class, 'update'])->middleware('csrf');
-        $r->post('/content-plans/{id:[0-9]+}/delete',         [ContentPlanController::class, 'destroy'])->middleware('csrf');
+        // Content Planner / Marketing Center
+        $r->get('/content-plans',                                   [ContentPlanController::class, 'index']);
+        $r->post('/content-plans',                                  [ContentPlanController::class, 'store'])->middleware('csrf');
+        $r->post('/content-plans/ai-generate',                      [ContentPlanController::class, 'aiGenerate'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/update',               [ContentPlanController::class, 'update'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/delete',               [ContentPlanController::class, 'destroy'])->middleware('csrf');
+        // Group Posting Helper
+        $r->post('/content-plans/groups/save',                      [ContentPlanController::class, 'groupSave'])->middleware('csrf');
+        $r->post('/content-plans/groups/{id:[0-9]+}/delete',        [ContentPlanController::class, 'groupDelete'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/log-post',             [ContentPlanController::class, 'logPost'])->middleware('csrf');
+        $r->get('/content-plans/{id:[0-9]+}/post-logs',             [ContentPlanController::class, 'postLogs']);
+        // Lead Watchlist
+        $r->post('/content-plans/leads/save',                       [ContentPlanController::class, 'leadSave'])->middleware('csrf');
+        $r->post('/content-plans/leads/{id:[0-9]+}/delete',         [ContentPlanController::class, 'leadDelete'])->middleware('csrf');
+        $r->get('/content-plans/leads/{id:[0-9]+}/ai-comment',      [ContentPlanController::class, 'leadAiComment']);
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);
