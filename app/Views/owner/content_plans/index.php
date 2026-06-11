@@ -41,6 +41,9 @@ $leadStatusColors = [
     'closed'   => 'bg-violet-100 text-violet-700',
     'lost'     => 'bg-slate-100 text-slate-500',
 ];
+
+// Social columns available
+$hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $properties[0]);
 ?>
 
 <!-- Tab bar -->
@@ -50,6 +53,7 @@ $leadStatusColors = [
     'calendar' => ['icon' => 'calendar-days', 'label' => 'ปฏิทินโพสต์'],
     'groups'   => ['icon' => 'users',         'label' => 'กลุ่ม Facebook'],
     'leads'    => ['icon' => 'target',        'label' => 'หา Lead'],
+    'settings' => ['icon' => 'settings-2',   'label' => 'ตั้งค่า Social'],
   ];
   foreach ($tabs as $key => $t): ?>
   <a href="<?= url('/owner/content-plans?tab=' . $key . '&month=' . sprintf('%04d-%02d', $year, $month)) ?>"
@@ -338,6 +342,58 @@ $leadStatusColors = [
         <label class="block text-xs font-semibold text-slate-600 mb-1">Hashtags</label>
         <input type="text" x-model="form.hashtags" placeholder="#แพกาญ #กาญจนบุรี #ที่พัก"
                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+      </div>
+
+      <!-- Image URL + Picker -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+          <i data-lucide="image" class="w-3.5 h-3.5"></i> รูปภาพประกอบโพสต์
+          <span class="font-normal text-slate-400">(ไม่จำเป็น)</span>
+        </label>
+        <div class="flex gap-2">
+          <input type="url" x-model="form.image_url" placeholder="วาง URL รูปภาพ หรือเลือกจากที่พัก"
+                 class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100">
+          <?php if (!empty($properties)): ?>
+          <button type="button" @click="openImagePicker()"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-primary-100 hover:text-primary-700 text-slate-600 text-xs font-semibold transition whitespace-nowrap">
+            <i data-lucide="images" class="w-3.5 h-3.5"></i> เลือกรูป
+          </button>
+          <?php endif; ?>
+        </div>
+        <!-- Image preview -->
+        <template x-if="form.image_url">
+          <div class="mt-2 relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+            <img :src="form.image_url" class="w-full h-full object-cover" @error="form.image_url = ''">
+            <button type="button" @click="form.image_url = ''"
+                    class="absolute top-1.5 right-1.5 w-6 h-6 bg-black/50 hover:bg-black/70 text-white rounded-full grid place-items-center transition">
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </template>
+        <!-- Image Picker Panel -->
+        <div x-show="imgPickerOpen" x-cloak class="mt-2 bg-slate-50 rounded-xl border border-slate-200 p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-600">รูปภาพของที่พัก</span>
+            <button type="button" @click="imgPickerOpen=false" class="text-slate-400 hover:text-slate-700">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <template x-if="imgPickerLoading">
+            <div class="text-xs text-slate-400 text-center py-4">กำลังโหลดรูป...</div>
+          </template>
+          <template x-if="!imgPickerLoading && imgPickerImages.length === 0">
+            <div class="text-xs text-slate-400 text-center py-4">ไม่มีรูปภาพ — อัปโหลดรูปในหน้าแก้ไขที่พักก่อน</div>
+          </template>
+          <div class="grid grid-cols-4 gap-2 max-h-44 overflow-y-auto">
+            <template x-for="img in imgPickerImages" :key="img.id">
+              <button type="button" @click="selectImage(img)"
+                      class="aspect-square rounded-lg overflow-hidden border-2 transition"
+                      :class="form.image_url === img.src ? 'border-primary-500' : 'border-transparent hover:border-primary-300'">
+                <img :src="img.src" class="w-full h-full object-cover">
+              </button>
+            </template>
+          </div>
+        </div>
       </div>
 
       <!-- Status -->
@@ -751,22 +807,144 @@ $leadStatusColors = [
 </div><!-- end leadWatchlistApp -->
 <?php endif; /* end leads tab */ ?>
 
+<?php if ($tab === 'settings'): ?>
+<!-- ═══════════════════════════════════════════════════════
+     TAB 4: Social Channel Settings
+═══════════════════════════════════════════════════════ -->
+<div x-data="socialSettingsApp()" x-init="init()" class="space-y-5">
+
+  <div>
+    <h1 class="text-xl font-bold text-slate-800">ตั้งค่า Social Media</h1>
+    <p class="text-sm text-slate-500 mt-0.5">กรอก URL ช่องทาง Social ของที่พัก — ระบบจะใช้ลิงก์เหล่านี้ตอนสร้างโพสต์และเปิด Facebook</p>
+  </div>
+
+  <!-- Tip banner -->
+  <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+    <i data-lucide="lightbulb" class="w-5 h-5 text-blue-500 shrink-0 mt-0.5"></i>
+    <div class="text-sm text-blue-800">
+      <p class="font-semibold mb-1">ทำไมต้องตั้งค่า?</p>
+      <ul class="text-xs space-y-1 text-blue-700 list-disc list-inside">
+        <li>ปุ่ม "เปิด FB Page" ในโพสต์ใช้ Facebook URL จากที่นี่</li>
+        <li>AI ใช้ข้อมูลที่พักเพื่อเขียนโพสต์ได้แม่นขึ้น</li>
+        <li>LINE ID ใช้เป็น CTA ใน Caption</li>
+      </ul>
+    </div>
+  </div>
+
+  <?php if (empty($properties)): ?>
+  <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+    <i data-lucide="building-2" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
+    <p class="text-slate-400 text-sm">ยังไม่มีที่พัก — <a href="<?= url('/owner/properties/create') ?>" class="text-primary-600 hover:underline">สร้างที่พักก่อน</a></p>
+  </div>
+  <?php else: ?>
+
+  <!-- Property cards -->
+  <?php foreach ($properties as $prop): ?>
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden"
+       x-data="propertySettingsCard(<?= htmlspecialchars(json_encode($prop), ENT_QUOTES) ?>)">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-primary-100 grid place-items-center">
+          <i data-lucide="building-2" class="w-5 h-5 text-primary-600"></i>
+        </div>
+        <h2 class="font-bold text-slate-800"><?= e($prop['name']) ?></h2>
+      </div>
+      <span x-show="saved" x-cloak class="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+        ✓ บันทึกแล้ว
+      </span>
+    </div>
+    <div class="p-5 space-y-3">
+      <div class="grid sm:grid-cols-2 gap-3">
+
+        <!-- Facebook -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+            <span class="text-base">📘</span> Facebook Page URL
+          </label>
+          <input type="url" x-model="form.facebook_url"
+                 placeholder="https://facebook.com/YourPage"
+                 class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+          <template x-if="form.facebook_url">
+            <a :href="form.facebook_url" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline">
+              <i data-lucide="external-link" class="w-3 h-3"></i> เปิดดู
+            </a>
+          </template>
+        </div>
+
+        <!-- LINE -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+            <span class="text-base">💚</span> LINE ID / LINE OA
+          </label>
+          <input type="text" x-model="form.line_id"
+                 placeholder="@username หรือ line.me/ti/p/..."
+                 class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100 transition">
+        </div>
+
+        <!-- Instagram -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+            <span class="text-base">📸</span> Instagram URL
+          </label>
+          <input type="url" x-model="form.instagram_url"
+                 placeholder="https://instagram.com/yourpage"
+                 class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-100 transition">
+        </div>
+
+        <!-- TikTok -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
+            <span class="text-base">🎵</span> TikTok URL
+          </label>
+          <input type="url" x-model="form.tiktok_url"
+                 placeholder="https://tiktok.com/@yourpage"
+                 class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition">
+        </div>
+
+      </div>
+
+      <!-- Save button + error -->
+      <div class="flex items-center gap-3 pt-1">
+        <button type="button" @click="save()" :disabled="saving"
+                class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow transition disabled:opacity-50">
+          <i data-lucide="save" class="w-4 h-4" x-show="!saving"></i>
+          <i data-lucide="loader-circle" class="w-4 h-4 animate-spin" x-show="saving" x-cloak></i>
+          <span x-text="saving ? 'กำลังบันทึก...' : 'บันทึก'"></span>
+        </button>
+        <a href="<?= url('/owner/properties/' . (int)$prop['id'] . '/edit') ?>"
+           class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-600 transition px-3 py-2 rounded-xl hover:bg-primary-50">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i> ตั้งค่าที่พักอื่นๆ
+        </a>
+        <p x-show="errorMsg" x-cloak x-text="errorMsg" class="text-xs text-red-600"></p>
+      </div>
+    </div>
+  </div>
+  <?php endforeach; ?>
+
+  <?php endif; ?>
+
+</div><!-- end socialSettingsApp -->
+<?php endif; /* end settings tab */ ?>
+
 <script>
 const __CP_PLANS__    = <?= json_encode(array_values($plans), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_PROPS__    = <?= json_encode(array_values($properties ?? []), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_GROUPS__   = <?= json_encode(array_values($groups ?? []), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_LEADS__    = <?= json_encode(array_values($leads ?? []), JSON_UNESCAPED_UNICODE) ?>;
 const __CP_ENDPOINTS__ = {
-  store:          '<?= e(url('/owner/content-plans')) ?>',
-  update:         '<?= e(url('/owner/content-plans')) ?>/{id}/update',
-  destroy:        '<?= e(url('/owner/content-plans')) ?>/{id}/delete',
-  aiGenerate:     '<?= e(url('/owner/content-plans/ai-generate')) ?>',
-  groupSave:      '<?= e(url('/owner/content-plans/groups/save')) ?>',
-  groupDelete:    '<?= e(url('/owner/content-plans/groups')) ?>/{id}/delete',
-  logPost:        '<?= e(url('/owner/content-plans')) ?>/{id}/log-post',
-  leadSave:       '<?= e(url('/owner/content-plans/leads/save')) ?>',
-  leadDelete:     '<?= e(url('/owner/content-plans/leads')) ?>/{id}/delete',
-  leadAiComment:  '<?= e(url('/owner/content-plans/leads')) ?>/{id}/ai-comment',
+  store:           '<?= e(url('/owner/content-plans')) ?>',
+  update:          '<?= e(url('/owner/content-plans')) ?>/{id}/update',
+  destroy:         '<?= e(url('/owner/content-plans')) ?>/{id}/delete',
+  aiGenerate:      '<?= e(url('/owner/content-plans/ai-generate')) ?>',
+  groupSave:       '<?= e(url('/owner/content-plans/groups/save')) ?>',
+  groupDelete:     '<?= e(url('/owner/content-plans/groups')) ?>/{id}/delete',
+  logPost:         '<?= e(url('/owner/content-plans')) ?>/{id}/log-post',
+  leadSave:        '<?= e(url('/owner/content-plans/leads/save')) ?>',
+  leadDelete:      '<?= e(url('/owner/content-plans/leads')) ?>/{id}/delete',
+  leadAiComment:   '<?= e(url('/owner/content-plans/leads')) ?>/{id}/ai-comment',
+  propertyImages:  '<?= e(url('/owner/content-plans/property-images')) ?>',
+  socialSave:      '<?= e(url('/owner/content-plans/social-save')) ?>',
 };
 
 // ── Calendar + AI Content Planner ─────────────────────────
@@ -779,9 +957,13 @@ function contentPlanApp() {
     aiPrompt: '',
     aiError: '',
     copied: false,
+    // image picker
+    imgPickerOpen: false,
+    imgPickerLoading: false,
+    imgPickerImages: [],
     form: {
       post_date: '', platform: 'facebook', post_type: 'page', property_id: '',
-      title: '', body: '', hashtags: '', status: 'draft',
+      title: '', body: '', hashtags: '', image_url: '', status: 'draft',
     },
     plans: __CP_PLANS__,
     props: __CP_PROPS__,
@@ -792,10 +974,39 @@ function contentPlanApp() {
       this.form = {
         post_date: date || new Date().toISOString().slice(0, 10),
         platform: 'facebook', post_type: 'page', property_id: '',
-        title: '', body: '', hashtags: '', status: 'draft',
+        title: '', body: '', hashtags: '', image_url: '', status: 'draft',
       };
-      this.aiPrompt = '';
-      this.aiError  = '';
+      this.aiPrompt       = '';
+      this.aiError        = '';
+      this.imgPickerOpen  = false;
+      this.imgPickerImages = [];
+    },
+
+    async openImagePicker() {
+      this.imgPickerOpen   = true;
+      this.imgPickerImages = [];
+      const propId = this.form.property_id;
+      if (!propId) { this.imgPickerLoading = false; return; }
+      this.imgPickerLoading = true;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+      try {
+        const r = await fetch(__CP_ENDPOINTS__.propertyImages + '?property_id=' + propId, { credentials: 'same-origin' });
+        const j = await r.json();
+        if (j.ok && j.images) {
+          this.imgPickerImages = j.images.map(img => ({
+            id: img.id,
+            src: img.image_path.startsWith('http') ? img.image_path : '/' + img.image_path.replace(/^\/+/, ''),
+          }));
+        }
+      } catch(e) { /* silent */ }
+      this.imgPickerLoading = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    selectImage(img) {
+      this.form.image_url = img.src;
+      this.imgPickerOpen  = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     openCreate(date) {
@@ -830,10 +1041,13 @@ function contentPlanApp() {
         title:       p.title || '',
         body:        p.body || '',
         hashtags:    p.hashtags || '',
+        image_url:   p.image_url || '',
         status:      p.status,
       };
-      this.aiPrompt = '';
-      this.aiError  = '';
+      this.aiPrompt        = '';
+      this.aiError         = '';
+      this.imgPickerOpen   = false;
+      this.imgPickerImages = [];
       this.modal = true;
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
@@ -1157,6 +1371,55 @@ function leadWatchlistApp() {
       navigator.clipboard?.writeText(lead.ai_comment);
       this.copiedLead = lead.id;
       setTimeout(() => this.copiedLead = null, 2500);
+    },
+  };
+}
+
+// ── Social Settings ────────────────────────────────────────
+function socialSettingsApp() {
+  return {
+    init() { if (window.lucide) lucide.createIcons(); },
+  };
+}
+
+function propertySettingsCard(prop) {
+  return {
+    saving:   false,
+    saved:    false,
+    errorMsg: '',
+    form: {
+      facebook_url:  prop.facebook_url  || '',
+      line_id:       prop.line_id       || '',
+      instagram_url: prop.instagram_url || '',
+      tiktok_url:    prop.tiktok_url    || '',
+    },
+    propertyId: prop.id,
+
+    async save() {
+      if (this.saving) return;
+      this.saving   = true;
+      this.errorMsg = '';
+      this.saved    = false;
+      try {
+        const fd = new FormData();
+        fd.append('property_id',   this.propertyId);
+        fd.append('facebook_url',  this.form.facebook_url  || '');
+        fd.append('line_id',       this.form.line_id       || '');
+        fd.append('instagram_url', this.form.instagram_url || '');
+        fd.append('tiktok_url',    this.form.tiktok_url    || '');
+        const r = await fetch(__CP_ENDPOINTS__.socialSave, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json();
+        if (j.ok) {
+          this.saved = true;
+          setTimeout(() => this.saved = false, 3000);
+        } else {
+          this.errorMsg = j.error || 'เกิดข้อผิดพลาด';
+        }
+      } catch(e) {
+        this.errorMsg = 'เชื่อมต่อไม่สำเร็จ';
+      } finally {
+        this.saving = false;
+      }
     },
   };
 }

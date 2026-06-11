@@ -91,6 +91,8 @@ class PropertyController extends Controller
             'website_url'     => trim((string)($_POST['website_url'] ?? '')) ?: null,
             'raft_variant'    => Property::normalizeRaftVariant($data['type'], $_POST['raft_variant'] ?? ''),
             'owner_intake'    => Property::encodeOwnerIntakeFromPost($_POST),
+            ...(Database::tableHasColumn('properties', 'instagram_url') ? ['instagram_url' => trim((string)($_POST['instagram_url'] ?? '')) ?: null] : []),
+            ...(Database::tableHasColumn('properties', 'tiktok_url')    ? ['tiktok_url'    => trim((string)($_POST['tiktok_url'] ?? '')) ?: null]    : []),
             // โหมดการจองและคูปอง — แอดมินเป็นผู้กำหนดหลังอนุมัติ (ไม่รับค่าจากฟอร์มเจ้าของ)
             'booking_mode'    => 'info_only',
             'allow_contact'   => 1,
@@ -183,6 +185,8 @@ class PropertyController extends Controller
             'website_url'     => trim((string)($_POST['website_url'] ?? '')) ?: null,
             'raft_variant'    => Property::normalizeRaftVariant($data['type'], $_POST['raft_variant'] ?? ''),
             'owner_intake'    => Property::encodeOwnerIntakeFromPost($_POST),
+            ...(Database::tableHasColumn('properties', 'instagram_url') ? ['instagram_url' => trim((string)($_POST['instagram_url'] ?? '')) ?: null] : []),
+            ...(Database::tableHasColumn('properties', 'tiktok_url')    ? ['tiktok_url'    => trim((string)($_POST['tiktok_url'] ?? '')) ?: null]    : []),
             'meta_title'      => $_POST['meta_title'] ?? null,
             'meta_description'=> $_POST['meta_description'] ?? null,
         ];

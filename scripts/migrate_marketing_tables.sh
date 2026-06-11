@@ -58,4 +58,12 @@ CREATE TABLE IF NOT EXISTS `marketing_leads` (
 SQL
 echo "  marketing_leads OK"
 
+echo "=== properties social columns ==="
+$MYSQL <<'SQL'
+ALTER TABLE `properties`
+  ADD COLUMN IF NOT EXISTS `instagram_url` VARCHAR(500) NULL AFTER `facebook_url`,
+  ADD COLUMN IF NOT EXISTS `tiktok_url`    VARCHAR(500) NULL AFTER `instagram_url`;
+SQL
+echo "  instagram_url / tiktok_url OK"
+
 echo "=== Done ==="

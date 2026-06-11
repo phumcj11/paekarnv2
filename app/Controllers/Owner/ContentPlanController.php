@@ -24,7 +24,7 @@ class ContentPlanController extends Controller
     public function index(): void
     {
         $ownerId = $this->ownerId();
-        $tab     = in_array($_GET['tab'] ?? '', ['calendar', 'groups', 'leads']) ? $_GET['tab'] : 'calendar';
+        $tab     = in_array($_GET['tab'] ?? '', ['calendar', 'groups', 'leads', 'settings']) ? $_GET['tab'] : 'calendar';
 
         // ---- Calendar data ----
         $monthParam = $_GET['month'] ?? date('Y-m');
@@ -45,9 +45,13 @@ class ContentPlanController extends Controller
         $prevMonth   = $month === 1 ? ['year' => $year - 1, 'month' => 12] : ['year' => $year, 'month' => $month - 1];
         $nextMonth   = $month === 12 ? ['year' => $year + 1, 'month' => 1]  : ['year' => $year, 'month' => $month + 1];
 
-        // ---- Properties ----
+        // ---- Properties (with social links for settings tab) ----
+        $hasSocial = Database::tableHasColumn('properties', 'instagram_url');
+        $socialSel = $hasSocial
+            ? 'id, name, facebook_url, line_id, instagram_url, tiktok_url'
+            : 'id, name, facebook_url, line_id, NULL AS instagram_url, NULL AS tiktok_url';
         $properties = $ownerId
-            ? Database::fetchAll("SELECT id, name FROM properties WHERE owner_id = :o ORDER BY name", ['o' => $ownerId])
+            ? Database::fetchAll("SELECT {$socialSel} FROM properties WHERE owner_id = :o ORDER BY name", ['o' => $ownerId])
             : [];
 
         $hasMarketingTables = self::hasMarketingTables();
@@ -386,6 +390,68 @@ class ContentPlanController extends Controller
         Database::update('marketing_leads', ['ai_comment' => $resp], 'id = :i', ['i' => $id]);
         $this->json(['ok' => true, 'comment' => $resp]);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // SOCIAL SETTINGS (quick-save per property)
+    // ─────────────────────────────────────────────────────────────
+
+    /** GET /owner/content-plans/property-images?property_id=N — returns images for picker */
+    public function propertyImages(): void
+    {
+        $ownerId    = $this->ownerId();
+        $propertyId = (int)($_GET['property_id'] ?? 0);
+        if (!$ownerId || !$propertyId) { $this->json(['ok' => false, 'images' => []]); return; }
+
+        $prop = Database::fetch("SELECT id FROM properties WHERE id = :id AND owner_id = :o", ['id' => $propertyId, 'o' => $ownerId]);
+        if (!$prop) { $this->json(['ok' => false, 'images' => []]); return; }
+
+        $hasUnitImg = Database::tableHasColumn('property_images', 'unit_id');
+        $images = Database::fetchAll(
+            $hasUnitImg
+                ? "SELECT id, image_path FROM property_images WHERE property_id = :id AND unit_id IS NULL ORDER BY sort_order, id LIMIT 30"
+                : "SELECT id, image_path FROM property_images WHERE property_id = :id ORDER BY sort_order, id LIMIT 30",
+            ['id' => $propertyId]
+        );
+        $this->json(['ok' => true, 'images' => $images]);
+    }
+
+    /** POST /owner/content-plans/social-save — update social links for a property */
+    public function socialSave(): void
+    {
+        $ownerId = $this->ownerId();
+        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+
+        $data       = $this->input();
+        $propertyId = (int)($data['property_id'] ?? 0);
+        if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ระบุที่พัก']); return; }
+
+        $prop = Database::fetch("SELECT id FROM properties WHERE id = :id AND owner_id = :o", ['id' => $propertyId, 'o' => $ownerId]);
+        if (!$prop) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
+
+        $update = [
+            'facebook_url' => mb_substr(trim((string)($data['facebook_url'] ?? '')), 0, 500) ?: null,
+            'line_id'      => mb_substr(trim((string)($data['line_id'] ?? '')), 0, 200) ?: null,
+        ];
+
+        // Optional columns — only update if they exist
+        if (Database::tableHasColumn('properties', 'instagram_url')) {
+            $update['instagram_url'] = mb_substr(trim((string)($data['instagram_url'] ?? '')), 0, 500) ?: null;
+        }
+        if (Database::tableHasColumn('properties', 'tiktok_url')) {
+            $update['tiktok_url'] = mb_substr(trim((string)($data['tiktok_url'] ?? '')), 0, 500) ?: null;
+        }
+
+        Database::update('properties', $update, 'id = :id', ['id' => $propertyId]);
+
+        $row = Database::fetch("SELECT id, name, facebook_url, line_id,
+            " . (Database::tableHasColumn('properties', 'instagram_url') ? 'instagram_url,' : "'NULL' AS instagram_url,") . "
+            " . (Database::tableHasColumn('properties', 'tiktok_url') ? 'tiktok_url' : "'NULL' AS tiktok_url") . "
+            FROM properties WHERE id = :id", ['id' => $propertyId]);
+
+        $this->json(['ok' => true, 'property' => $row]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
 
     private static function thMonthName(int $m): string
     {

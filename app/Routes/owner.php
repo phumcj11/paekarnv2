@@ -118,6 +118,9 @@ return function (Router $r): void {
         $r->post('/content-plans/leads/save',                       [ContentPlanController::class, 'leadSave'])->middleware('csrf');
         $r->post('/content-plans/leads/{id:[0-9]+}/delete',         [ContentPlanController::class, 'leadDelete'])->middleware('csrf');
         $r->get('/content-plans/leads/{id:[0-9]+}/ai-comment',      [ContentPlanController::class, 'leadAiComment']);
+        // Social Settings + Image Picker
+        $r->get('/content-plans/property-images',                   [ContentPlanController::class, 'propertyImages']);
+        $r->post('/content-plans/social-save',                      [ContentPlanController::class, 'socialSave'])->middleware('csrf');
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);
