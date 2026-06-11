@@ -7,8 +7,9 @@
  * @var int     $page
  * @var int     $perPage
  * @var string  $q
- * @var array   $allTags    ['tagName' => count]
+ * @var array   $allTags       ['tagName' => count]
  * @var string  $filterTag
+ * @var string  $filterSegment
  */
 $pages    = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 $property = null;
@@ -30,7 +31,7 @@ function lineThaiDate(?string $ymd): string {
 }
 
 $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build_query(array_filter(
-    array_merge(['property_id' => $propertyId, 'q' => $q, 'page' => $page, 'tag' => $filterTag], $extra),
+    array_merge(['property_id' => $propertyId, 'q' => $q, 'page' => $page, 'tag' => $filterTag, 'segment' => $filterSegment], $extra),
     fn($v) => $v !== '' && $v !== null && $v !== 0
 )));
 
@@ -97,6 +98,23 @@ $tagColorFn = function(string $tag) use ($tagColors): string {
   <?php endforeach; ?>
 </div>
 <?php endif; ?>
+
+<!-- Auto-segment filter strip -->
+<div class="flex flex-wrap items-center gap-2 mb-4">
+  <span class="text-xs text-slate-500 font-semibold shrink-0">Segment:</span>
+  <a href="<?= $buildUrl(['segment' => '', 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterSegment === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
+    ทั้งหมด
+  </a>
+  <a href="<?= $buildUrl(['segment' => 'ทักแต่ไม่จอง', 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterSegment === 'ทักแต่ไม่จอง' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800 hover:opacity-80' ?>">
+    ทักแต่ไม่จอง
+  </a>
+  <a href="<?= $buildUrl(['segment' => 'ลูกค้าเก่า 90+ วัน', 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterSegment === 'ลูกค้าเก่า 90+ วัน' ? 'bg-violet-700 text-white' : 'bg-violet-100 text-violet-800 hover:opacity-80' ?>">
+    ลูกค้าเก่า 90+ วัน
+  </a>
+</div>
 
 <!-- Main content -->
 <div x-data="lineContactsPage()" x-init="init()">
@@ -306,8 +324,19 @@ $tagColorFn = function(string $tag) use ($tagColors): string {
                   <i data-lucide="calendar-check" class="w-3.5 h-3.5"></i>
                   <?= (int)$c['booking_count'] ?> จอง
                 </a>
+                <?php if ($c['last_booking_date']): ?>
+                  <div class="text-[10px] text-slate-400 mt-0.5"><?= lineThaiDate($c['last_booking_date']) ?></div>
+                <?php endif; ?>
               <?php else: ?>
                 <span class="text-slate-400 text-xs">—</span>
+              <?php endif; ?>
+              <?php if ($c['auto_segment'] ?? ''): ?>
+                <div class="mt-1">
+                  <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold
+                    <?= $c['auto_segment'] === 'ทักแต่ไม่จอง' ? 'bg-amber-100 text-amber-800' : 'bg-violet-100 text-violet-800' ?>">
+                    <?= e($c['auto_segment']) ?>
+                  </span>
+                </div>
               <?php endif; ?>
             </td>
             <td class="px-4 py-3">
@@ -351,13 +380,21 @@ $tagColorFn = function(string $tag) use ($tagColors): string {
               <span class="text-[10px] text-slate-400"><?= lineThaiDate($c['last_seen_at']) ?></span>
             </div>
           </div>
-          <?php if ((int)$c['booking_count'] > 0): ?>
-          <a href="<?= url('/owner/bookings?' . http_build_query(['line_uid' => $c['line_user_id']])) ?>"
-             class="shrink-0 text-center">
-            <div class="text-base font-bold text-accent-700"><?= (int)$c['booking_count'] ?></div>
-            <div class="text-[10px] text-slate-500">จอง</div>
-          </a>
-          <?php endif; ?>
+          <div class="shrink-0 flex flex-col items-end gap-1">
+            <?php if ((int)$c['booking_count'] > 0): ?>
+            <a href="<?= url('/owner/bookings?' . http_build_query(['line_uid' => $c['line_user_id']])) ?>"
+               class="text-center">
+              <div class="text-base font-bold text-accent-700"><?= (int)$c['booking_count'] ?></div>
+              <div class="text-[10px] text-slate-500">จอง</div>
+            </a>
+            <?php endif; ?>
+            <?php if ($c['auto_segment'] ?? ''): ?>
+            <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold
+              <?= $c['auto_segment'] === 'ทักแต่ไม่จอง' ? 'bg-amber-100 text-amber-800' : 'bg-violet-100 text-violet-800' ?>">
+              <?= e($c['auto_segment']) ?>
+            </span>
+            <?php endif; ?>
+          </div>
         </div>
         <!-- phone -->
         <div class="flex items-center gap-2 mb-3">

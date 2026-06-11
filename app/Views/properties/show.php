@@ -777,7 +777,7 @@ $hasMobileCta = !empty($propertyCtaUrls['buy_coupon']) || !empty($propertyCtaUrl
         ?>
         <iframe class="w-full h-full" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=<?= $bbox ?>&layer=mapnik&marker=<?= $lat ?>,<?= $lng ?>"></iframe>
       </div>
-      <a target="_blank" href="https://www.google.com/maps/search/?api=1&query=<?= $lat ?>,<?= $lng ?>"
+      <a href="<?= url('/property/lead/' . $property['id'] . '?type=map&unit=' . ($listingUid ?? 0)) ?>"
          class="mt-2 inline-flex items-center gap-1.5 text-sm text-primary-700 hover:text-accent-600">
         <i data-lucide="external-link" class="w-4 h-4"></i> เปิดใน Google Maps
       </a>

@@ -16,6 +16,7 @@ class PropertyLeadClick extends Model
         'line'   => 'Add LINE',
         'coupon' => 'ซื้อคูปอง',
         'book'   => 'จองออนไลน์',
+        'map'    => 'ดูแผนที่',
     ];
 
     public static function tableReady(): bool

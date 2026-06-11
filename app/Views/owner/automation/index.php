@@ -68,6 +68,37 @@ $saveUrl = url('/owner/automation/save');
   </p>
 </div>
 
+<!-- AI Campaign from availability -->
+<?php if ($propertyId): ?>
+<div class="bg-white rounded-2xl border border-teal-200 shadow-soft p-5 mb-5"
+     x-data="{ loading: false, text: '', error: '' }">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+      <i data-lucide="calendar-plus" class="w-4 h-4 text-teal-600"></i>
+      AI สร้าง Campaign จากวันว่าง
+    </h3>
+    <button type="button"
+            @click="loading=true; text=''; error='';
+                    fetch('<?= url('/owner/automation/ai-campaign?property_id=' . $propertyId) ?>').then(r=>r.json()).then(d=>{ loading=false; if(d.ok) text=d.text; else error=d.error||'ผิดพลาด'; }).catch(()=>{ loading=false; error='ไม่สามารถเชื่อมต่อ'; })"
+            class="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+            :disabled="loading">
+      <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+      <span x-text="loading ? 'กำลังสร้าง...' : 'สร้างข้อความ'"></span>
+    </button>
+  </div>
+  <p class="text-xs text-slate-500 mb-3">AI จะดูวันว่างใน 30 วันข้างหน้า แล้วร่างข้อความโปรโมทให้ใช้กับ LINE broadcast</p>
+  <div x-show="text" class="space-y-2">
+    <textarea class="w-full px-3 py-2 rounded-xl border border-teal-300 text-sm resize-none bg-teal-50" rows="4" x-model="text"></textarea>
+    <a :href="'<?= url('/owner/line-contacts?property_id=' . $propertyId) ?>'"
+       class="inline-flex items-center gap-1.5 text-xs text-teal-700 font-semibold hover:underline">
+      <i data-lucide="send" class="w-3.5 h-3.5"></i>
+      ไปที่ LINE Contacts เพื่อ Broadcast
+    </a>
+  </div>
+  <div x-show="error" class="text-sm text-rose-600 bg-rose-50 rounded-xl p-3 border border-rose-100" x-text="error"></div>
+</div>
+<?php endif; ?>
+
 <!-- Template cards -->
 <div class="space-y-4">
   <?php foreach ($eventTypes as $eventType => $meta):

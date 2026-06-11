@@ -10,6 +10,7 @@ use App\Core\View;
 use App\Models\AuditLog;
 use App\Models\PropertyUnit;
 use App\Services\BookingService;
+use App\Services\MessageTemplateService;
 use App\Services\OwnerBookingService;
 
 class BookingController extends Controller
@@ -158,6 +159,8 @@ class BookingController extends Controller
 
             if ($newStatus === 'verified') {
                 Database::update('bookings', ['payment_status' => 'paid', 'status' => 'confirmed'], 'id = :i', ['i' => $id]);
+                // ส่ง deposit_received template ถ้า Owner ตั้งค่าไว้
+                try { MessageTemplateService::sendToGuest($id, 'deposit_received'); } catch (\Throwable) {}
                 Session::flash('success', 'ยืนยันการชำระเงินเรียบร้อย และอัปเดตสถานะเป็น confirmed');
             } else {
                 Session::flash('success', 'ปฏิเสธสลิปเรียบร้อย');

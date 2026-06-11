@@ -6,9 +6,91 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
+use App\Services\AIService;
+use App\Services\OwnerTier;
 
 class AnalyticsController extends Controller
 {
+    /** GET /owner/analytics/ai-summary?property_id=N&range=7 — JSON: {ok, summary} */
+    public function aiSummary(): void
+    {
+        $ownerId    = Auth::ownerId();
+        $propertyId = (int)($_GET['property_id'] ?? 0);
+        $range      = in_array((int)($_GET['range'] ?? 7), [7, 14, 30, 90]) ? (int)$_GET['range'] : 7;
+
+        if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ไม่ระบุที่พัก']); return; }
+
+        if ($ownerId) {
+            $owns = Database::fetch("SELECT id FROM properties WHERE id = :p AND owner_id = :o LIMIT 1", ['p' => $propertyId, 'o' => $ownerId]);
+            if (!$owns) { $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return; }
+            if (!OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP)) {
+                $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Standard ขึ้นไป']); return;
+            }
+        }
+
+        $property = Database::fetch("SELECT name, type, zone FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
+        if (!$property) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
+
+        $hasLeads = Database::tableHasColumn('property_lead_clicks', 'id');
+        $hasViews = Database::tableHasColumn('analytics_page_views', 'id');
+
+        $stats = [];
+        if ($hasViews) {
+            $v = Database::fetch("SELECT COUNT(*) AS cnt FROM analytics_page_views WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)", ['p' => $propertyId, 'r' => $range]);
+            $stats['views'] = (int)($v['cnt'] ?? 0);
+        }
+        if ($hasLeads) {
+            $lRow = Database::fetch(
+                "SELECT SUM(CASE WHEN click_type='phone' THEN 1 ELSE 0 END) AS phone,
+                        SUM(CASE WHEN click_type='line'  THEN 1 ELSE 0 END) AS line,
+                        SUM(CASE WHEN click_type='book'  THEN 1 ELSE 0 END) AS book,
+                        SUM(CASE WHEN click_type='map'   THEN 1 ELSE 0 END) AS map
+                 FROM property_lead_clicks WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                ['p' => $propertyId, 'r' => $range]
+            );
+            $stats['phone']  = (int)($lRow['phone'] ?? 0);
+            $stats['line']   = (int)($lRow['line']  ?? 0);
+            $stats['book']   = (int)($lRow['book']  ?? 0);
+            $stats['map']    = (int)($lRow['map']   ?? 0);
+        }
+
+        $bookingsRow = Database::fetch(
+            "SELECT COUNT(*) AS total, SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed
+             FROM bookings b JOIN properties p ON p.id=b.property_id
+             WHERE p.id = :pid AND b.created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+            ['pid' => $propertyId, 'r' => $range]
+        );
+
+        $instruction = sprintf(
+            "คุณคือที่ปรึกษาการตลาดสำหรับที่พัก \"%s\" (%s) ในกาญจนบุรี\n\n" .
+            "ข้อมูลสถิติ %d วันที่ผ่านมา:\n" .
+            "- ยอดเข้าชมหน้าที่พัก: %s ครั้ง\n" .
+            "- กดโทร: %s ครั้ง\n" .
+            "- กด LINE: %s ครั้ง\n" .
+            "- กดจอง: %s ครั้ง\n" .
+            "- เปิดแผนที่: %s ครั้ง\n" .
+            "- การจองทั้งหมด: %s รายการ (ยืนยัน: %s)\n\n" .
+            "วิเคราะห์สถิตินี้เป็นภาษาไทยสั้นๆ 2-3 ประโยค บอกว่าน่าสนใจอย่างไร และแนะนำ 1 action ที่เจ้าของควรทำต่อ " .
+            "ใช้ภาษาเป็นกันเอง ไม่ต้องใส่หัวข้อหรือ bullet",
+            $property['name'],
+            $property['type'],
+            $range,
+            number_format($stats['views'] ?? 0),
+            number_format($stats['phone'] ?? 0),
+            number_format($stats['line']  ?? 0),
+            number_format($stats['book']  ?? 0),
+            number_format($stats['map']   ?? 0),
+            number_format((int)($bookingsRow['total'] ?? 0)),
+            number_format((int)($bookingsRow['confirmed'] ?? 0))
+        );
+
+        $summary = AIService::generate($instruction, '', 0.65, 200);
+        if ($summary === null) {
+            $this->json(['ok' => false, 'error' => 'AI ไม่พร้อมใช้งาน']); return;
+        }
+        $this->json(['ok' => true, 'summary' => trim($summary)]);
+    }
+
     /** GET /owner/analytics?property_id=N&range=30 */
     public function index(): void
     {
@@ -35,13 +117,14 @@ class AnalyticsController extends Controller
         $hasLeadTable = Database::tableHasColumn('property_lead_clicks', 'id');
         $hasViewTable = Database::tableHasColumn('analytics_page_views', 'id');
 
-        $clicks      = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0];
-        $clicksMonth = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0];
+        $clicks      = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0, 'map' => 0];
+        $clicksMonth = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0, 'map' => 0];
         $views       = 0;
         $viewsMonth  = 0;
         $dailyClicks = [];
         $dailyViews  = [];
         $topDays     = [];
+        $topReferrers = [];
 
         if ($propertyId) {
             if ($hasLeadTable) {
@@ -51,7 +134,8 @@ class AnalyticsController extends Controller
                        SUM(CASE WHEN click_type='phone'  THEN 1 ELSE 0 END) AS phone,
                        SUM(CASE WHEN click_type='line'   THEN 1 ELSE 0 END) AS line,
                        SUM(CASE WHEN click_type='coupon' THEN 1 ELSE 0 END) AS coupon,
-                       SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book
+                       SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book,
+                       SUM(CASE WHEN click_type='map'    THEN 1 ELSE 0 END) AS map
                      FROM property_lead_clicks
                      WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
                     ['p' => $propertyId, 'r' => $range]
@@ -62,6 +146,7 @@ class AnalyticsController extends Controller
                         'line'   => (int)$row['line'],
                         'coupon' => (int)$row['coupon'],
                         'book'   => (int)$row['book'],
+                        'map'    => (int)$row['map'],
                     ];
                 }
 
@@ -96,7 +181,8 @@ class AnalyticsController extends Controller
                        SUM(CASE WHEN click_type='phone'  THEN 1 ELSE 0 END) AS phone,
                        SUM(CASE WHEN click_type='line'   THEN 1 ELSE 0 END) AS line,
                        SUM(CASE WHEN click_type='coupon' THEN 1 ELSE 0 END) AS coupon,
-                       SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book
+                       SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book,
+                       SUM(CASE WHEN click_type='map'    THEN 1 ELSE 0 END) AS map
                      FROM property_lead_clicks
                      WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m')",
                     ['p' => $propertyId]
@@ -107,6 +193,7 @@ class AnalyticsController extends Controller
                         'line'   => (int)$rowM['line'],
                         'coupon' => (int)$rowM['coupon'],
                         'book'   => (int)$rowM['book'],
+                        'map'    => (int)$rowM['map'],
                     ];
                 }
             }
@@ -143,6 +230,17 @@ class AnalyticsController extends Controller
                         'cnt'  => $dailyVMap[$d] ?? 0,
                     ];
                 }
+
+                // Top referrers — แหล่งที่มาของผู้เข้าชม
+                $topReferrers = Database::fetchAll(
+                    "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
+                     FROM analytics_page_views
+                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                     GROUP BY referrer_host
+                     ORDER BY cnt DESC
+                     LIMIT 10",
+                    ['p' => $propertyId, 'r' => $range]
+                );
             }
         }
 
@@ -150,6 +248,7 @@ class AnalyticsController extends Controller
         $clickRate = $views > 0 ? round(($clicks['phone'] + $clicks['line'] + $clicks['book']) / $views * 100, 1) : 0;
 
         View::render('owner/analytics/index', [
+            'aiSummaryUrl' => $propertyId ? url('/owner/analytics/ai-summary?property_id=' . $propertyId . '&range=' . $range) : null,
             'page_title'   => 'Analytics — สถิติที่พัก',
             'properties'   => $properties,
             'propertyId'   => $propertyId,
@@ -161,6 +260,7 @@ class AnalyticsController extends Controller
             'dailyClicks'  => $dailyClicks,
             'dailyViews'   => $dailyViews,
             'clickRate'    => $clickRate,
+            'topReferrers' => $topReferrers,
             'hasLeadTable' => $hasLeadTable,
             'hasViewTable' => $hasViewTable,
         ], 'layouts/owner');

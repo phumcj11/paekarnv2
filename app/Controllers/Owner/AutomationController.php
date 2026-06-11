@@ -6,6 +6,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
+use App\Services\OwnerTier;
 
 class AutomationController extends Controller
 {
@@ -115,6 +116,10 @@ class AutomationController extends Controller
         if (!$this->canAccess($propertyId)) {
             $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
         }
+        $oid = Auth::ownerId();
+        if ($oid && !OwnerTier::can($oid, OwnerTier::FEATURE_AUTOMATION)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Starter ขึ้นไป']); return;
+        }
         if (!Database::tableHasColumn('property_message_templates', 'id')) {
             $this->json(['ok' => false, 'error' => 'ยังไม่ได้รัน migration']); return;
         }
@@ -151,6 +156,10 @@ class AutomationController extends Controller
         }
         if (!$this->canAccess($propertyId)) {
             $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
+        }
+        $oidDraft = Auth::ownerId();
+        if ($oidDraft && !OwnerTier::can($oidDraft, OwnerTier::FEATURE_AI_DRAFT)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Starter ขึ้นไป']); return;
         }
 
         $property = \App\Core\Database::fetch(
@@ -196,6 +205,65 @@ PROMPT;
         }
 
         $this->json(['ok' => true, 'text' => trim($draft)]);
+    }
+
+    /**
+     * GET /owner/automation/ai-campaign?property_id=N — JSON: {ok, text}
+     * สร้างข้อความโปรโมทจากวันว่างที่ใกล้ที่สุด (ช่วย Owner ทำ broadcast campaign)
+     */
+    public function aiCampaign(): void
+    {
+        $propertyId = (int)($_GET['property_id'] ?? 0);
+        if (!$propertyId || !$this->canAccess($propertyId)) {
+            $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
+        }
+
+        $property = Database::fetch("SELECT name, type, zone FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
+        if (!$property) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
+
+        // หาช่วงวันที่ว่างในอีก 30 วันข้างหน้า
+        $today = date('Y-m-d');
+        $end   = date('Y-m-d', strtotime('+30 days'));
+        $booked = Database::fetchAll(
+            "SELECT DISTINCT DATE(b.check_in) AS d FROM bookings b
+             JOIN property_units u ON u.id = b.unit_id
+             WHERE u.property_id = :p AND b.status IN ('confirmed','pending')
+             AND b.check_in BETWEEN :s AND :e",
+            ['p' => $propertyId, 's' => $today, 'e' => $end]
+        );
+        $bookedDays = array_column($booked, 'd');
+
+        $freeDays = [];
+        for ($i = 0; $i < 30 && count($freeDays) < 5; $i++) {
+            $d = date('Y-m-d', strtotime("+{$i} days"));
+            if (!in_array($d, $bookedDays, true)) {
+                $freeDays[] = date('j/n', strtotime($d));
+            }
+        }
+
+        $freeSummary = empty($freeDays) ? 'มีห้องว่างในช่วงนี้' : implode(', ', $freeDays);
+        $propType = ['raft' => 'แพพัก', 'resort' => 'รีสอร์ท', 'homestay' => 'โฮมสเตย์',
+                     'house' => 'บ้านพัก', 'pool_villa' => 'บ้านพูลวิลล่า',
+                     'hotel' => 'โรงแรม', 'camping' => 'แคมป์ปิ้ง'][$property['type']] ?? $property['type'];
+
+        $instruction = <<<PROMPT
+คุณคือผู้ช่วยเขียน LINE message โปรโมทที่พักสำหรับธุรกิจในกาญจนบุรี
+ที่พัก: {$property['name']} ({$propType}) ใน {$property['zone']}
+วันว่างที่ใกล้ที่สุด: {$freeSummary}
+
+สร้างข้อความ LINE broadcast สั้นๆ ไม่เกิน 250 ตัวอักษร เพื่อโปรโมทวันว่างเหล่านี้ให้ลูกค้า
+กฎ:
+- ภาษาไทย เป็นกันเอง กระตุ้นอยากจอง
+- ใส่วันว่างที่ระบุ
+- ลงท้ายด้วยคำกระตุ้นให้ทัก/จอง
+- ห้ามใส่คำอธิบายนอกเนื้อหา — ตอบเฉพาะเนื้อหาข้อความ LINE
+PROMPT;
+
+        $text = \App\Services\AIService::generate($instruction, '', 0.8, 250);
+        if ($text === null) {
+            $this->json(['ok' => false, 'error' => 'AI ไม่พร้อมใช้งาน']); return;
+        }
+        $this->json(['ok' => true, 'text' => trim($text)]);
     }
 
     private function canAccess(int $propertyId): bool

@@ -26,11 +26,16 @@ $ariaListing = $listingUid > 0 ? $cardTitle . ' — ' . $property['name'] : $pro
 $showFeatured = UnitPricing::listingShowsFeatured($property);
 $couponOn = (int)($property['coupon_enabled'] ?? 0) === 1;
 
-// membership badge
-$ownerTier = (string)($property['owner_membership_tier'] ?? 'none');
-$ownerMembershipExpires = $property['owner_membership_expires_at'] ?? null;
+// membership badge — ใช้ logic เดียวกับ OwnerMembership::hasActiveBenefits() รวม grace period
+$ownerTier    = (string)($property['owner_membership_tier'] ?? 'none');
+$ownerExpires = $property['owner_membership_expires_at'] ?? null;
+$ownerGrace   = $property['owner_membership_grace_until'] ?? null;
 $ownerMembershipActive = ($ownerTier === 'standard' || $ownerTier === 'vip')
-    && ($ownerMembershipExpires === null || strtotime((string)$ownerMembershipExpires) > time());
+    && (
+        $ownerExpires === null
+        || strtotime((string)$ownerExpires) > time()
+        || ($ownerGrace !== null && strtotime((string)$ownerGrace) > time())
+    );
 $showMemberBadge = $ownerMembershipActive && !$showFeatured; // VIP already shows featured badge
 $rc = (int)($property['rating_count'] ?? 0);
 $ra = (float)($property['rating_avg'] ?? 0);

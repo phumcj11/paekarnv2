@@ -4,6 +4,7 @@ namespace App\Services;
 use App\Core\Database;
 use App\Models\Setting;
 use App\Services\LineService;
+use App\Services\MessageTemplateService;
 
 /**
  * Job runner for scheduled automation tasks.
@@ -18,14 +19,16 @@ class CronService
     public static function jobs(): array
     {
         return [
-            'expire_coupons'      => [self::class, 'expireCoupons'],
-            'mark_no_show'        => [self::class, 'markNoShow'],
-            'send_checkin_reminders' => [self::class, 'sendCheckinReminders'],
-            'owner_weekly_report' => [self::class, 'ownerWeeklyReport'],
-            'cleanup_drafts'      => [self::class, 'cleanupDrafts'],
-            'membership_apply_grace'   => [self::class, 'membershipApplyGrace'],
-            'membership_downgrade'      => [self::class, 'membershipDowngradeExpired'],
-            'membership_warn_expiring' => [self::class, 'membershipWarnExpiring'],
+            'expire_coupons'           => [self::class, 'expireCoupons'],
+            'mark_no_show'             => [self::class, 'markNoShow'],
+            'send_checkin_reminders'   => [self::class, 'sendCheckinReminders'],
+            'send_checkout_followup'   => [self::class, 'sendCheckoutFollowup'],
+            'send_review_requests'     => [self::class, 'sendReviewRequests'],
+            'owner_weekly_report'      => [self::class, 'ownerWeeklyReport'],
+            'cleanup_drafts'           => [self::class, 'cleanupDrafts'],
+            'membership_apply_grace'        => [self::class, 'membershipApplyGrace'],
+            'membership_downgrade'          => [self::class, 'membershipDowngradeExpired'],
+            'membership_warn_expiring'      => [self::class, 'membershipWarnExpiring'],
             'membership_sync_listing_boost' => [self::class, 'membershipSyncListingBoost'],
             'activity_featured_expire'      => [self::class, 'activityFeaturedExpire'],
         ];
@@ -136,22 +139,26 @@ class CronService
             // LINE push สำหรับจองที่ผูก guest_line_user_id ไว้
             if (!empty($b['guest_line_user_id'])) {
                 try {
-                    $checkInThai = self::thaiDate($b['check_in']);
-                    $checkOutThai = self::thaiDate($b['check_out']);
-                    $daysWord = $days === 1 ? 'พรุ่งนี้' : "อีก $days วัน";
-                    $msg = "แจ้งเตือน: เช็คอิน{$daysWord} 🏕️\n\n"
-                         . "📋 การจอง #{$b['code']}\n"
-                         . "🏡 {$b['pname']}\n"
-                         . "📅 เช็คอิน: {$checkInThai}\n"
-                         . "📅 เช็คเอาท์: {$checkOutThai}\n";
-                    if ($b['pci']) $msg .= "🕐 เวลาเช็คอิน: {$b['pci']} น.\n";
-                    if ($b['pphone']) $msg .= "📞 ติดต่อที่พัก: {$b['pphone']}";
+                    // ใช้ owner template ถ้ามี, ไม่งั้น fallback เป็น hardcode
+                    $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'checkin_reminder_1d');
+                    if (!$sent) {
+                        $checkInThai  = self::thaiDate($b['check_in']);
+                        $checkOutThai = self::thaiDate($b['check_out']);
+                        $daysWord = $days === 1 ? 'พรุ่งนี้' : "อีก $days วัน";
+                        $msg = "แจ้งเตือน: เช็คอิน{$daysWord} 🏕️\n\n"
+                             . "📋 การจอง #{$b['code']}\n"
+                             . "🏡 {$b['pname']}\n"
+                             . "📅 เช็คอิน: {$checkInThai}\n"
+                             . "📅 เช็คเอาท์: {$checkOutThai}\n";
+                        if ($b['pci']) $msg .= "🕐 เวลาเช็คอิน: {$b['pci']} น.\n";
+                        if ($b['pphone']) $msg .= "📞 ติดต่อที่พัก: {$b['pphone']}";
 
-                    $sent = PropertyLineService::push(
-                        (int)$b['property_id'],
-                        (string)$b['guest_line_user_id'],
-                        [['type' => 'text', 'text' => $msg]]
-                    );
+                        $sent = PropertyLineService::push(
+                            (int)$b['property_id'],
+                            (string)$b['guest_line_user_id'],
+                            [['type' => 'text', 'text' => $msg]]
+                        );
+                    }
                     if ($sent) $lineN++;
                 } catch (\Throwable) { /* never block */ }
             }
@@ -168,6 +175,50 @@ class CronService
         $ts = strtotime($ymd);
         $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
         return (int)date('j', $ts) . ' ' . $thaiMonths[(int)date('n', $ts)] . ' ' . ((int)date('Y', $ts) + 543);
+    }
+
+    /** ส่ง checkout_followup template ให้การจองที่ check_out = วันนี้ */
+    public static function sendCheckoutFollowup(): array
+    {
+        $target = date('Y-m-d');
+        $rows = Database::fetchAll(
+            "SELECT b.id, b.guest_line_user_id, b.property_id
+             FROM bookings b
+             WHERE b.status IN ('confirmed','completed')
+               AND DATE(b.check_out) = :d
+               AND b.guest_line_user_id IS NOT NULL
+               AND b.guest_line_user_id != ''
+             LIMIT 300",
+            ['d' => $target]
+        );
+        $n = 0;
+        foreach ($rows as $b) {
+            $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'checkout_followup');
+            if ($sent) $n++;
+        }
+        return ['affected' => $n, 'output' => "Sent $n checkout followup messages for $target"];
+    }
+
+    /** ส่ง review_request template ให้การจองที่ check_out = 3 วันที่แล้ว */
+    public static function sendReviewRequests(): array
+    {
+        $target = date('Y-m-d', strtotime('-3 days'));
+        $rows = Database::fetchAll(
+            "SELECT b.id, b.guest_line_user_id, b.property_id
+             FROM bookings b
+             WHERE b.status IN ('confirmed','completed')
+               AND DATE(b.check_out) = :d
+               AND b.guest_line_user_id IS NOT NULL
+               AND b.guest_line_user_id != ''
+             LIMIT 300",
+            ['d' => $target]
+        );
+        $n = 0;
+        foreach ($rows as $b) {
+            $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'review_request');
+            if ($sent) $n++;
+        }
+        return ['affected' => $n, 'output' => "Sent $n review request messages for checkouts on $target"];
     }
 
     public static function ownerWeeklyReport(): array

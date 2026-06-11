@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
+use App\Services\OwnerTier;
 use App\Services\PropertyLineService;
 
 class LineContactController extends Controller
@@ -36,10 +37,11 @@ class LineContactController extends Controller
         $page       = max(1, (int)($_GET['page'] ?? 1));
         $perPage    = 30;
 
-        $contacts = [];
-        $total    = 0;
-        $allTags  = [];
-        $filterTag = trim((string)($_GET['tag'] ?? ''));
+        $contacts     = [];
+        $total        = 0;
+        $allTags      = [];
+        $filterTag    = trim((string)($_GET['tag'] ?? ''));
+        $filterSegment = trim((string)($_GET['segment'] ?? ''));
 
         if ($propertyId) {
             $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', plc.phone' : '';
@@ -81,7 +83,16 @@ class LineContactController extends Controller
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
                             plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
                             COUNT(b.id) AS booking_count,
-                            MAX(b.check_in) AS last_booking_date
+                            MAX(b.check_in) AS last_booking_date,
+                            (SELECT b2.status FROM bookings b2
+                             WHERE b2.guest_line_user_id = plc.line_user_id
+                               AND b2.property_id = plc.property_id
+                             ORDER BY b2.created_at DESC LIMIT 1) AS last_booking_status,
+                            (SELECT b3.total_price FROM bookings b3
+                             WHERE b3.guest_line_user_id = plc.line_user_id
+                               AND b3.property_id = plc.property_id
+                               AND b3.status IN ('confirmed','completed')
+                             ORDER BY b3.created_at DESC LIMIT 1) AS last_booking_price
                      FROM property_line_contacts plc
                      LEFT JOIN bookings b
                             ON b.guest_line_user_id = plc.line_user_id
@@ -96,7 +107,8 @@ class LineContactController extends Controller
                 $contacts = Database::fetchAll(
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
                             plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
-                            0 AS booking_count, NULL AS last_booking_date
+                            0 AS booking_count, NULL AS last_booking_date,
+                            NULL AS last_booking_status, NULL AS last_booking_price
                      FROM property_line_contacts plc
                      WHERE {$where}
                      ORDER BY plc.last_seen_at DESC
@@ -104,6 +116,21 @@ class LineContactController extends Controller
                     $params
                 );
             }
+
+            // เพิ่ม auto-segment ให้แต่ละ contact
+            foreach ($contacts as &$c) {
+                $bookings = (int)($c['booking_count'] ?? 0);
+                $lastDate = $c['last_booking_date'] ?? null;
+                $daysSince = $lastDate ? (int)((time() - strtotime($lastDate)) / 86400) : null;
+                if ($bookings === 0) {
+                    $c['auto_segment'] = 'ทักแต่ไม่จอง';
+                } elseif ($daysSince !== null && $daysSince >= 90) {
+                    $c['auto_segment'] = 'ลูกค้าเก่า 90+ วัน';
+                } else {
+                    $c['auto_segment'] = null;
+                }
+            }
+            unset($c);
 
             // เก็บ tag ทั้งหมดที่ใช้ใน property นี้ (สำหรับ filter sidebar)
             if ($tagsCol !== '') {
@@ -124,17 +151,23 @@ class LineContactController extends Controller
             }
         }
 
+        // Client-side segment filter (done in PHP after query — avoids complex SQL)
+        if ($filterSegment !== '') {
+            $contacts = array_values(array_filter($contacts, fn($c) => ($c['auto_segment'] ?? '') === $filterSegment));
+        }
+
         View::render('owner/line_contacts/index', [
-            'page_title'  => 'รายชื่อแชท LINE',
-            'properties'  => $properties,
-            'propertyId'  => $propertyId,
-            'contacts'    => $contacts,
-            'total'       => $total,
-            'page'        => $page,
-            'perPage'     => $perPage,
-            'q'           => $q,
-            'allTags'     => $allTags,
-            'filterTag'   => $filterTag,
+            'page_title'    => 'รายชื่อแชท LINE',
+            'properties'    => $properties,
+            'propertyId'    => $propertyId,
+            'contacts'      => $contacts,
+            'total'         => $total,
+            'page'          => $page,
+            'perPage'       => $perPage,
+            'q'             => $q,
+            'allTags'       => $allTags,
+            'filterTag'     => $filterTag,
+            'filterSegment' => $filterSegment,
         ], 'layouts/owner');
     }
 
@@ -222,6 +255,11 @@ class LineContactController extends Controller
 
         if (!$this->canAccessProperty($propertyId)) {
             $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
+        }
+
+        $ownerId = Auth::ownerId();
+        if ($ownerId && !OwnerTier::can($ownerId, OwnerTier::FEATURE_BROADCAST)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Standard ขึ้นไป']); return;
         }
 
         $text = trim((string)($_POST['text'] ?? ''));

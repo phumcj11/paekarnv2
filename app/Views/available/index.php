@@ -101,17 +101,24 @@ $typeOptions = [
         $property['listing_unit_cover']  = null;
         $property['listing_unit_price']  = null;
 
-        // badge พิเศษ "ว่างวันนี้"
-        $avCount = (int)($property['available_unit_count'] ?? 0);
+        // badge พิเศษ "ว่างวันนี้" + "ปฏิทินอัปเดตล่าสุด"
+        $avCount  = (int)($property['available_unit_count'] ?? 0);
+        $calFresh = !empty($property['calendar_updated_at']);
       ?>
       <div class="relative">
         <?php require __DIR__ . '/../partials/property-card.php'; ?>
-        <!-- Available badge overlay -->
-        <div class="absolute bottom-[4.5rem] left-3 z-[8] pointer-events-none">
+        <!-- Available + freshness badges overlay -->
+        <div class="absolute bottom-[4.5rem] left-3 z-[8] pointer-events-none flex flex-col gap-1 items-start">
           <span class="px-2 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-lg shadow-md inline-flex items-center gap-1 ring-1 ring-white/30">
             <i data-lucide="check-circle-2" class="w-3 h-3 shrink-0"></i>
             ว่าง<?= $avCount > 1 ? " {$avCount} ยูนิต" : '' ?>
           </span>
+          <?php if ($calFresh): ?>
+          <span class="px-2 py-1 bg-sky-600 text-white text-[10px] font-bold rounded-lg shadow-md inline-flex items-center gap-1 ring-1 ring-white/30">
+            <i data-lucide="calendar-check" class="w-3 h-3 shrink-0"></i>
+            ปฏิทินอัปเดตล่าสุด
+          </span>
+          <?php endif; ?>
         </div>
       </div>
       <?php endforeach; ?>

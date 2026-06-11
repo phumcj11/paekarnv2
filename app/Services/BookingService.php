@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Coupon;
 use App\Models\PropertyUnit;
 use App\Services\BookingConfirmationService;
+use App\Services\MessageTemplateService;
 use App\Services\NotificationService;
 use App\Services\PropertyLineService;
 
@@ -120,8 +121,12 @@ class BookingService
             );
 
             // Push ลูกค้าผ่าน property LINE OA
+            // ถ้า Owner ตั้ง template booking_confirmed ไว้ ใช้ข้อความนั้น; ไม่งั้น fallback เป็น Flex message
             if ($sendToGuest && !empty($b['guest_line_user_id'])) {
-                PropertyLineService::sendBookingConfirmation($bookingId);
+                $sent = MessageTemplateService::sendToGuest($bookingId, 'booking_confirmed');
+                if (!$sent) {
+                    PropertyLineService::sendBookingConfirmation($bookingId);
+                }
             }
         } catch (\Throwable) { /* never block */ }
 

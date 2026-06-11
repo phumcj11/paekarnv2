@@ -1076,6 +1076,13 @@ class PropertyController extends Controller
             redirect(url('/property/' . $property['slug']));
             return;
         }
+        if ($type === 'map') {
+            $lat = floatval($property['latitude'] ?? 0) ?: 14.0228;
+            $lng = floatval($property['longitude'] ?? 0) ?: 99.5328;
+            redirect('https://www.google.com/maps/search/?api=1&query=' . $lat . ',' . $lng);
+            return;
+        }
+
         redirect(PropertyBookingCapabilities::bookUrl($propertyId, $unitId, 'book'));
     }
 

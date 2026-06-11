@@ -64,12 +64,14 @@ return function (Router $r): void {
         $r->post('/properties/{id:[0-9]+}/availability/booking', [AvailabilityController::class, 'storeBooking'])->middleware('csrf');
 
         // Analytics
-        $r->get('/analytics',        [OwnerAnalytics::class, 'index']);
+        $r->get('/analytics',            [OwnerAnalytics::class, 'index']);
+        $r->get('/analytics/ai-summary', [OwnerAnalytics::class, 'aiSummary']);
 
         // Automation templates
-        $r->get('/automation',       [OwnerAutomation::class, 'index']);
-        $r->post('/automation/save',     [OwnerAutomation::class, 'save']);
-        $r->post('/automation/ai-draft', [OwnerAutomation::class, 'aiDraft']);
+        $r->get('/automation',               [OwnerAutomation::class, 'index']);
+        $r->post('/automation/save',         [OwnerAutomation::class, 'save']);
+        $r->post('/automation/ai-draft',     [OwnerAutomation::class, 'aiDraft']);
+        $r->get('/automation/ai-campaign',   [OwnerAutomation::class, 'aiCampaign']);
 
         // Bookings
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
