@@ -68,6 +68,53 @@ $saveUrl = url('/owner/automation/save');
   </p>
 </div>
 
+<!-- Cron dry-run preview -->
+<?php if ($propertyId): ?>
+<div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 mb-5"
+     x-data="{ loading: false, preview: null, error: '', today: '' }">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+      <i data-lucide="clock" class="w-4 h-4 text-slate-500"></i>
+      ดูตัวอย่าง — ข้อความที่จะส่งวันนี้
+    </h3>
+    <button type="button"
+            @click="loading=true; preview=null; error='';
+                    fetch('<?= url('/owner/automation/cron-preview?property_id=' . $propertyId) ?>').then(r=>r.json()).then(d=>{ loading=false; if(d.ok){ preview=d.preview; today=d.today; } else error=d.error||'ผิดพลาด'; }).catch(()=>{ loading=false; error='ไม่สามารถเชื่อมต่อ'; })"
+            class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+            :disabled="loading">
+      <i data-lucide="play" class="w-3.5 h-3.5"></i>
+      <span x-text="loading ? 'กำลังโหลด...' : 'Dry-run'"></span>
+    </button>
+  </div>
+  <p class="text-xs text-slate-500 mb-3">ระบบแสดงการจองที่จะถูกส่งข้อความอัตโนมัติวันนี้ (ไม่มีการส่งจริง)</p>
+  <div x-show="preview !== null">
+    <p class="text-xs text-slate-400 mb-2" x-text="'วันที่ ' + today"></p>
+    <template x-if="preview.length === 0">
+      <div class="text-sm text-slate-400 italic py-2">ไม่มีการจองที่จะ trigger วันนี้</div>
+    </template>
+    <template x-if="preview.length > 0">
+      <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden text-sm">
+        <template x-for="(item, i) in preview" :key="i">
+          <div class="flex items-start gap-3 px-4 py-3 bg-slate-50/50">
+            <i data-lucide="send" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i>
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-700" x-text="item.label"></div>
+              <div class="text-xs text-slate-500 mt-0.5">
+                #<span x-text="item.booking_code"></span>
+                · <span x-text="item.guest_name"></span>
+                · <span x-text="item.date"></span>
+              </div>
+            </div>
+            <span class="ml-auto shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 self-center" x-text="item.status"></span>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+  <div x-show="error" class="text-sm text-rose-600 bg-rose-50 rounded-xl p-3 border border-rose-100" x-text="error"></div>
+</div>
+<?php endif; ?>
+
 <!-- AI Campaign from availability -->
 <?php if ($propertyId): ?>
 <div class="bg-white rounded-2xl border border-teal-200 shadow-soft p-5 mb-5"
@@ -102,18 +149,20 @@ $saveUrl = url('/owner/automation/save');
 <!-- Template cards -->
 <div class="space-y-4">
   <?php foreach ($eventTypes as $eventType => $meta):
-    $saved    = $templates[$eventType] ?? null;
-    $enabled  = (int)($saved['is_enabled'] ?? 0);
-    $text     = $saved['message_text'] ?? $meta['default'];
-    $c        = $colorMap[$meta['color']] ?? $colorMap['emerald'];
+    $saved      = $templates[$eventType] ?? null;
+    $enabled    = (int)($saved['is_enabled'] ?? 0);
+    $text       = $saved['message_text'] ?? $meta['default'];
+    $delayHrs   = (int)($saved['send_delay_hours'] ?? 0);
+    $c          = $colorMap[$meta['color']] ?? $colorMap['emerald'];
   ?>
   <div x-data="automationCard(<?= json_encode([
-    'propertyId' => $propertyId,
-    'eventType'  => $eventType,
-    'enabled'    => (bool)$enabled,
-    'text'       => $text,
-    'defaultText'=> $meta['default'],
-    'saveUrl'    => $saveUrl,
+    'propertyId'  => $propertyId,
+    'eventType'   => $eventType,
+    'enabled'     => (bool)$enabled,
+    'text'        => $text,
+    'defaultText' => $meta['default'],
+    'delayHours'  => $delayHrs,
+    'saveUrl'     => $saveUrl,
   ], JSON_UNESCAPED_UNICODE) ?>)"
        class="bg-white rounded-2xl border <?= $c['border'] ?> shadow-soft overflow-hidden">
 
@@ -151,6 +200,19 @@ $saveUrl = url('/owner/automation/save');
       <textarea x-model="text" rows="5" maxlength="2000"
                 class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y focus:border-[#06C755] outline-none font-mono leading-relaxed"
                 :class="enabled ? '' : 'bg-slate-50 text-slate-500'"></textarea>
+
+      <!-- Delay hours -->
+      <div class="flex items-center gap-3">
+        <label class="text-xs font-semibold text-slate-600 shrink-0">ส่งหลัง event</label>
+        <div class="flex items-center gap-1.5">
+          <input type="number" x-model.number="delayHours" min="0" max="720"
+                 class="w-20 px-2 py-1.5 rounded-lg border border-slate-200 text-sm text-center outline-none focus:border-[#06C755]">
+          <span class="text-xs text-slate-500">ชั่วโมง</span>
+        </div>
+        <span class="text-[10px] text-slate-400" x-show="delayHours === 0">ส่งทันที</span>
+        <span class="text-[10px] text-slate-400" x-show="delayHours > 0" x-text="'(หน่วงเวลา ' + delayHours + ' ชม.)'"></span>
+      </div>
+
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" @click="aiDraft()"
                 :disabled="aiLoading"
@@ -198,17 +260,18 @@ $saveUrl = url('/owner/automation/save');
 <script>
 function automationCard(cfg) {
   return {
-    propertyId: cfg.propertyId,
-    eventType:  cfg.eventType,
-    enabled:    cfg.enabled,
-    text:       cfg.text,
+    propertyId:  cfg.propertyId,
+    eventType:   cfg.eventType,
+    enabled:     cfg.enabled,
+    text:        cfg.text,
     defaultText: cfg.defaultText,
-    expanded:   false,
-    saving:     false,
-    saveMsg:    '',
-    saveOk:     true,
-    aiLoading:  false,
-    aiContext:  '',
+    delayHours:  cfg.delayHours ?? 0,
+    expanded:    false,
+    saving:      false,
+    saveMsg:     '',
+    saveOk:      true,
+    aiLoading:   false,
+    aiContext:   '',
 
     toggleEnabled() {
       this.enabled = !this.enabled;
@@ -245,10 +308,11 @@ function automationCard(cfg) {
       this.saveMsg = '';
       try {
         const fd = new FormData();
-        fd.set('property_id',  String(this.propertyId));
-        fd.set('event_type',   this.eventType);
-        fd.set('is_enabled',   this.enabled ? '1' : '0');
-        fd.set('message_text', this.text);
+        fd.set('property_id',      String(this.propertyId));
+        fd.set('event_type',       this.eventType);
+        fd.set('is_enabled',       this.enabled ? '1' : '0');
+        fd.set('message_text',     this.text);
+        fd.set('send_delay_hours', String(Math.max(0, parseInt(this.delayHours) || 0)));
         const r = await fetch('<?= $saveUrl ?>', { method: 'POST', body: fd });
         const d = await r.json();
         this.saveOk  = !!d.ok;

@@ -40,6 +40,18 @@ $tagColors = ['bg-violet-100 text-violet-800', 'bg-sky-100 text-sky-800', 'bg-am
 $tagColorFn = function(string $tag) use ($tagColors): string {
     return $tagColors[abs(crc32($tag)) % count($tagColors)];
 };
+
+// Preset tags library — ใช้งานบ่อยในธุรกิจที่พัก
+$presetTags = [
+    '⭐ VIP'          => 'bg-amber-100 text-amber-800',
+    '🔄 ลูกค้าประจำ'  => 'bg-emerald-100 text-emerald-800',
+    '👥 กรุ๊ปทัวร์'   => 'bg-sky-100 text-sky-800',
+    '🎂 วันเกิด'      => 'bg-rose-100 text-rose-800',
+    '🔥 ลีดร้อน'      => 'bg-orange-100 text-orange-800',
+    '💤 ยังไม่จอง'    => 'bg-slate-100 text-slate-700',
+    '✅ จองแล้ว'      => 'bg-violet-100 text-violet-800',
+    '📌 ติดตามต่อ'    => 'bg-indigo-100 text-indigo-800',
+];
 ?>
 
 <!-- Property selector + controls -->
@@ -114,6 +126,34 @@ $tagColorFn = function(string $tag) use ($tagColors): string {
      class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterSegment === 'ลูกค้าเก่า 90+ วัน' ? 'bg-violet-700 text-white' : 'bg-violet-100 text-violet-800 hover:opacity-80' ?>">
     ลูกค้าเก่า 90+ วัน
   </a>
+</div>
+
+<!-- Preset tag library -->
+<div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4 mb-4"
+     x-data="{ open: false }">
+  <button type="button" @click="open = !open"
+          class="flex items-center gap-2 w-full text-left">
+    <i data-lucide="tag" class="w-4 h-4 text-violet-500 shrink-0"></i>
+    <span class="text-sm font-semibold text-slate-700">Tag สำเร็จรูป (Preset Tags)</span>
+    <span class="ml-auto text-xs text-slate-400" x-text="open ? '▲ ย่อ' : '▼ ดูทั้งหมด'"></span>
+  </button>
+  <div x-show="open" x-cloak class="mt-3 border-t border-slate-100 pt-3">
+    <p class="text-xs text-slate-500 mb-2">คลิก tag เพื่อ copy ชื่อ tag ไว้พิมพ์ในช่อง "+" ของ contact แต่ละราย</p>
+    <div class="flex flex-wrap gap-2">
+      <?php foreach ($presetTags as $label => $cls): ?>
+      <button type="button"
+              @click="navigator.clipboard?.writeText(<?= json_encode($label) ?>).then(()=>{ $dispatch('preset-tag-copied', { tag: <?= json_encode($label) ?> }) })"
+              x-on:preset-tag-copied.window="$el.textContent = ($event.detail.tag === <?= json_encode($label) ?>) ? '✓ copied!' : $el.textContent; setTimeout(()=>$el.textContent=<?= json_encode($label) ?>, 1200)"
+              class="px-2.5 py-1 rounded-full text-xs font-semibold <?= $cls ?> hover:opacity-70 transition cursor-pointer select-none">
+        <?= e($label) ?>
+      </button>
+      <?php endforeach; ?>
+    </div>
+    <p class="text-[10px] text-slate-400 mt-3">
+      <i data-lucide="info" class="inline w-3 h-3 mr-0.5"></i>
+      เพิ่ม tag ด้วยการคลิก <strong>+</strong> บนแถว contact แล้ว paste หรือพิมพ์ชื่อ tag
+    </p>
+  </div>
 </div>
 
 <!-- Main content -->
@@ -603,6 +643,11 @@ function contactRow(id, initialPhone, initialTags) {
       if (!tag || this.tags.includes(tag)) { this.addingTag = false; this.newTagVal = ''; return; }
       const newTags = [...this.tags, tag];
       await this._saveTags(newTags);
+    },
+
+    async addPresetTag(tag) {
+      if (!tag || this.tags.includes(tag)) return;
+      await this._saveTags([...this.tags, tag]);
     },
 
     async removeTag(tag) {

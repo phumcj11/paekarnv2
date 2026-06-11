@@ -105,10 +105,11 @@ class AutomationController extends Controller
     /** POST /owner/automation/save — upsert template */
     public function save(): void
     {
-        $propertyId = (int)($_POST['property_id'] ?? 0);
-        $eventType  = trim((string)($_POST['event_type'] ?? ''));
-        $enabled    = (int)($_POST['is_enabled'] ?? 0);
-        $text       = mb_substr(trim((string)($_POST['message_text'] ?? '')), 0, 2000);
+        $propertyId  = (int)($_POST['property_id'] ?? 0);
+        $eventType   = trim((string)($_POST['event_type'] ?? ''));
+        $enabled     = (int)($_POST['is_enabled'] ?? 0);
+        $text        = mb_substr(trim((string)($_POST['message_text'] ?? '')), 0, 2000);
+        $delayHours  = max(0, min(720, (int)($_POST['send_delay_hours'] ?? 0)));
 
         if (!$propertyId || !$eventType || !array_key_exists($eventType, self::eventTypes())) {
             $this->json(['ok' => false, 'error' => 'ข้อมูลไม่ครบ']); return;
@@ -131,14 +132,15 @@ class AutomationController extends Controller
 
         if ($existing) {
             Database::update('property_message_templates',
-                ['is_enabled' => $enabled, 'message_text' => $text],
+                ['is_enabled' => $enabled, 'message_text' => $text, 'send_delay_hours' => $delayHours],
                 'id = :i', ['i' => $existing['id']]);
         } else {
             Database::insert('property_message_templates', [
-                'property_id'  => $propertyId,
-                'event_type'   => $eventType,
-                'is_enabled'   => $enabled,
-                'message_text' => $text,
+                'property_id'      => $propertyId,
+                'event_type'       => $eventType,
+                'is_enabled'       => $enabled,
+                'message_text'     => $text,
+                'send_delay_hours' => $delayHours,
             ]);
         }
         $this->json(['ok' => true]);
@@ -264,6 +266,92 @@ PROMPT;
             $this->json(['ok' => false, 'error' => 'AI ไม่พร้อมใช้งาน']); return;
         }
         $this->json(['ok' => true, 'text' => trim($text)]);
+    }
+
+    /**
+     * GET /owner/automation/cron-preview?property_id=X
+     * Dry-run: แสดงการจองที่จะถูก trigger ในวันนี้และ 7 วันข้างหน้า (ไม่ส่งจริง)
+     */
+    public function cronPreview(): void
+    {
+        $propertyId = (int)($_GET['property_id'] ?? 0);
+        if (!$propertyId || !$this->canAccess($propertyId)) {
+            $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
+        }
+
+        $today    = date('Y-m-d');
+        $in1day   = date('Y-m-d', strtotime('+1 day'));
+        $ago3days = date('Y-m-d', strtotime('-3 days'));
+
+        $preview = [];
+
+        // checkin_reminder_1d — เช็คอินพรุ่งนี้
+        $reminders = Database::fetchAll(
+            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+               FROM bookings b
+               JOIN property_units pu ON pu.id = b.unit_id
+              WHERE pu.property_id = :p
+                AND b.check_in_date = :d
+                AND b.status IN ('confirmed','pending')
+              ORDER BY b.check_in_date",
+            ['p' => $propertyId, 'd' => $in1day]
+        );
+        foreach ($reminders as $b) {
+            $preview[] = [
+                'event'        => 'checkin_reminder_1d',
+                'label'        => 'แจ้งเตือนก่อนเช็คอิน 1 วัน',
+                'booking_code' => $b['booking_code'],
+                'guest_name'   => $b['guest_name'],
+                'date'         => $b['check_in_date'],
+                'status'       => $b['status'],
+            ];
+        }
+
+        // send_checkout_followup — เช็คเอาท์วันนี้
+        $followups = Database::fetchAll(
+            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+               FROM bookings b
+               JOIN property_units pu ON pu.id = b.unit_id
+              WHERE pu.property_id = :p
+                AND b.check_out_date = :d
+                AND b.status IN ('confirmed','completed')
+              ORDER BY b.check_out_date",
+            ['p' => $propertyId, 'd' => $today]
+        );
+        foreach ($followups as $b) {
+            $preview[] = [
+                'event'        => 'checkout_followup',
+                'label'        => 'ติดตามหลังเช็คเอาท์',
+                'booking_code' => $b['booking_code'],
+                'guest_name'   => $b['guest_name'],
+                'date'         => $b['check_out_date'],
+                'status'       => $b['status'],
+            ];
+        }
+
+        // send_review_requests — เช็คเอาท์เมื่อ 3 วันก่อน
+        $reviews = Database::fetchAll(
+            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+               FROM bookings b
+               JOIN property_units pu ON pu.id = b.unit_id
+              WHERE pu.property_id = :p
+                AND b.check_out_date = :d
+                AND b.status IN ('confirmed','completed')
+              ORDER BY b.check_out_date",
+            ['p' => $propertyId, 'd' => $ago3days]
+        );
+        foreach ($reviews as $b) {
+            $preview[] = [
+                'event'        => 'review_request',
+                'label'        => 'ขอรีวิว (หลังเช็คเอาท์ 3 วัน)',
+                'booking_code' => $b['booking_code'],
+                'guest_name'   => $b['guest_name'],
+                'date'         => $b['check_out_date'],
+                'status'       => $b['status'],
+            ];
+        }
+
+        $this->json(['ok' => true, 'today' => $today, 'preview' => $preview]);
     }
 
     private function canAccess(int $propertyId): bool

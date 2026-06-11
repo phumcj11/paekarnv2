@@ -15,6 +15,9 @@ use App\Services\MessageTemplateService;
  */
 class CronService
 {
+    /** Set to true to simulate without sending messages or writing to DB */
+    public static bool $dryRun = false;
+
     /** ทุก job: name => callable returning ['affected'=>n, 'output'=>string] */
     public static function jobs(): array
     {
@@ -35,17 +38,19 @@ class CronService
     }
 
     /** Run ทุก job หรือเฉพาะ job ที่ระบุ */
-    public static function runAll(?string $only = null): array
+    public static function runAll(?string $only = null, bool $dryRun = false): array
     {
+        self::$dryRun = $dryRun;
         $results = [];
         foreach (self::jobs() as $name => $fn) {
             if ($only && $only !== $name) continue;
-            $results[$name] = self::runOne($name, $fn);
+            $results[$name] = self::runOne($name, $fn, $dryRun);
         }
+        self::$dryRun = false;
         return $results;
     }
 
-    private static function runOne(string $name, callable $fn): array
+    private static function runOne(string $name, callable $fn, bool $dryRun = false): array
     {
         $start = microtime(true);
         $status = 'success'; $output = ''; $affected = 0;
@@ -57,10 +62,12 @@ class CronService
             $status = 'failed'; $output = $e->getMessage();
         }
         $duration = (int)round((microtime(true) - $start) * 1000);
-        Database::insert('cron_logs', [
-            'job' => $name, 'status' => $status, 'affected' => $affected,
-            'output' => $output, 'duration_ms' => $duration,
-        ]);
+        if (!$dryRun) {
+            Database::insert('cron_logs', [
+                'job' => $name, 'status' => $status, 'affected' => $affected,
+                'output' => $output, 'duration_ms' => $duration,
+            ]);
+        }
         return compact('status','affected','output','duration');
     }
 
@@ -138,34 +145,39 @@ class CronService
 
             // LINE push สำหรับจองที่ผูก guest_line_user_id ไว้
             if (!empty($b['guest_line_user_id'])) {
-                try {
-                    // ใช้ owner template ถ้ามี, ไม่งั้น fallback เป็น hardcode
-                    $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'checkin_reminder_1d');
-                    if (!$sent) {
-                        $checkInThai  = self::thaiDate($b['check_in']);
-                        $checkOutThai = self::thaiDate($b['check_out']);
-                        $daysWord = $days === 1 ? 'พรุ่งนี้' : "อีก $days วัน";
-                        $msg = "แจ้งเตือน: เช็คอิน{$daysWord} 🏕️\n\n"
-                             . "📋 การจอง #{$b['code']}\n"
-                             . "🏡 {$b['pname']}\n"
-                             . "📅 เช็คอิน: {$checkInThai}\n"
-                             . "📅 เช็คเอาท์: {$checkOutThai}\n";
-                        if ($b['pci']) $msg .= "🕐 เวลาเช็คอิน: {$b['pci']} น.\n";
-                        if ($b['pphone']) $msg .= "📞 ติดต่อที่พัก: {$b['pphone']}";
+                if (self::$dryRun) {
+                    $lineN++;
+                } else {
+                    try {
+                        // ใช้ owner template ถ้ามี, ไม่งั้น fallback เป็น hardcode
+                        $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'checkin_reminder_1d');
+                        if (!$sent) {
+                            $checkInThai  = self::thaiDate($b['check_in']);
+                            $checkOutThai = self::thaiDate($b['check_out']);
+                            $daysWord = $days === 1 ? 'พรุ่งนี้' : "อีก $days วัน";
+                            $msg = "แจ้งเตือน: เช็คอิน{$daysWord} 🏕️\n\n"
+                                 . "📋 การจอง #{$b['code']}\n"
+                                 . "🏡 {$b['pname']}\n"
+                                 . "📅 เช็คอิน: {$checkInThai}\n"
+                                 . "📅 เช็คเอาท์: {$checkOutThai}\n";
+                            if ($b['pci']) $msg .= "🕐 เวลาเช็คอิน: {$b['pci']} น.\n";
+                            if ($b['pphone']) $msg .= "📞 ติดต่อที่พัก: {$b['pphone']}";
 
-                        $sent = PropertyLineService::push(
-                            (int)$b['property_id'],
-                            (string)$b['guest_line_user_id'],
-                            [['type' => 'text', 'text' => $msg]]
-                        );
-                    }
-                    if ($sent) $lineN++;
-                } catch (\Throwable) { /* never block */ }
+                            $sent = PropertyLineService::push(
+                                (int)$b['property_id'],
+                                (string)$b['guest_line_user_id'],
+                                [['type' => 'text', 'text' => $msg]]
+                            );
+                        }
+                        if ($sent) $lineN++;
+                    } catch (\Throwable) { /* never block */ }
+                }
             }
         }
+        $prefix = self::$dryRun ? '[DRY-RUN] Would send' : 'Sent';
         return [
             'affected' => $n + $lineN,
-            'output'   => "Sent $n in-app + $lineN LINE check-in reminders for $target",
+            'output'   => "$prefix $n in-app + $lineN LINE check-in reminders for $target",
         ];
     }
 
@@ -193,10 +205,12 @@ class CronService
         );
         $n = 0;
         foreach ($rows as $b) {
+            if (self::$dryRun) { $n++; continue; }
             $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'checkout_followup');
             if ($sent) $n++;
         }
-        return ['affected' => $n, 'output' => "Sent $n checkout followup messages for $target"];
+        $prefix = self::$dryRun ? '[DRY-RUN] Would send' : 'Sent';
+        return ['affected' => $n, 'output' => "$prefix $n checkout followup messages for $target"];
     }
 
     /** ส่ง review_request template ให้การจองที่ check_out = 3 วันที่แล้ว */
@@ -215,10 +229,12 @@ class CronService
         );
         $n = 0;
         foreach ($rows as $b) {
+            if (self::$dryRun) { $n++; continue; }
             $sent = MessageTemplateService::sendToGuest((int)$b['id'], 'review_request');
             if ($sent) $n++;
         }
-        return ['affected' => $n, 'output' => "Sent $n review request messages for checkouts on $target"];
+        $prefix = self::$dryRun ? '[DRY-RUN] Would send' : 'Sent';
+        return ['affected' => $n, 'output' => "$prefix $n review request messages for checkouts on $target"];
     }
 
     public static function ownerWeeklyReport(): array

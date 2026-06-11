@@ -68,10 +68,11 @@ return function (Router $r): void {
         $r->get('/analytics/ai-summary', [OwnerAnalytics::class, 'aiSummary']);
 
         // Automation templates
-        $r->get('/automation',               [OwnerAutomation::class, 'index']);
-        $r->post('/automation/save',         [OwnerAutomation::class, 'save']);
-        $r->post('/automation/ai-draft',     [OwnerAutomation::class, 'aiDraft']);
-        $r->get('/automation/ai-campaign',   [OwnerAutomation::class, 'aiCampaign']);
+        $r->get('/automation',                [OwnerAutomation::class, 'index']);
+        $r->post('/automation/save',          [OwnerAutomation::class, 'save']);
+        $r->post('/automation/ai-draft',      [OwnerAutomation::class, 'aiDraft']);
+        $r->get('/automation/ai-campaign',    [OwnerAutomation::class, 'aiCampaign']);
+        $r->get('/automation/cron-preview',   [OwnerAutomation::class, 'cronPreview']);
 
         // Bookings
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
