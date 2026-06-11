@@ -26,7 +26,7 @@ class LineHubController extends Controller
     public function index(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $units = Database::fetchAll(
             "SELECT id, name, total_units FROM property_units WHERE property_id = :p AND is_active = 1 ORDER BY sort_order, id",
@@ -79,7 +79,7 @@ class LineHubController extends Controller
     public function save(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         if (!Database::tableHasColumn('properties', 'line_messaging_enabled')) {
             Session::flash('error', 'ระบบยังไม่รองรับ LINE OA');

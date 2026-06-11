@@ -101,7 +101,7 @@ class UnitController extends Controller
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             http_response_code(403);
-            View::render('errors/403');
+            View::render('errors/403', [], 'layouts/owner');
 
             return;
         }
@@ -137,7 +137,7 @@ class UnitController extends Controller
         $property = $this->findOwnProperty($id);
         if (!$property) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -161,7 +161,7 @@ class UnitController extends Controller
         $property = $this->findOwnProperty($id);
         if (!$property) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -182,7 +182,7 @@ class UnitController extends Controller
         $property = $this->findOwnProperty($id);
         if (!$property) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -267,14 +267,14 @@ class UnitController extends Controller
         $unit = $this->findOwnUnit($id, $uid);
         if (!$unit) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
         $property = $this->findOwnProperty($id);
         if (!$property) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -300,14 +300,14 @@ class UnitController extends Controller
         $unit = $this->findOwnUnit($id, $uid);
         if (!$unit) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
         $property = $this->findOwnProperty($id);
         if (!$property) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -389,7 +389,7 @@ class UnitController extends Controller
         $unit = $this->findOwnUnit($id, $uid);
         if (!$unit) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }
@@ -404,7 +404,7 @@ class UnitController extends Controller
         $unit = $this->findOwnUnit($id, $uid);
         if (!$unit) {
             http_response_code(404);
-            View::render('errors/404');
+            View::render('errors/404', [], 'layouts/owner');
 
             return;
         }

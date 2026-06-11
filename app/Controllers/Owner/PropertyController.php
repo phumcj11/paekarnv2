@@ -117,7 +117,7 @@ class PropertyController extends Controller
     public function edit(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $amenities = Database::fetchAll("SELECT * FROM amenities ORDER BY sort_order");
         $selected = array_column(Database::fetchAll("SELECT amenity_id FROM property_amenities WHERE property_id = :id", ['id' => $id]), 'amenity_id');
@@ -149,7 +149,7 @@ class PropertyController extends Controller
     public function update(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $data = $this->validate([
             'name' => 'required|max:180',
@@ -353,7 +353,7 @@ class PropertyController extends Controller
     public function delete(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
         Property::destroy($id);
         Session::flash('success', 'ลบที่พักเรียบร้อย');
         redirect(url('/owner/properties'));
@@ -362,7 +362,7 @@ class PropertyController extends Controller
     public function uploadImage(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
         try {
             $path = Upload::image('image', 'properties');
             if ($path) {
@@ -384,7 +384,7 @@ class PropertyController extends Controller
     public function deleteImage(int $id, int $img): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
         $hasUnitImg = Database::tableHasColumn('property_images', 'unit_id');
         $row = Database::fetch(
             $hasUnitImg

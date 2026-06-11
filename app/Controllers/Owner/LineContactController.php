@@ -157,6 +157,9 @@ class LineContactController extends Controller
             $contacts = array_values(array_filter($contacts, fn($c) => ($c['auto_segment'] ?? '') === $filterSegment));
         }
 
+        $canBroadcast = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_BROADCAST));
+        $canAiDraft   = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_AI_DRAFT));
+
         View::render('owner/line_contacts/index', [
             'page_title'    => 'รายชื่อแชท LINE',
             'properties'    => $properties,
@@ -169,6 +172,8 @@ class LineContactController extends Controller
             'allTags'       => $allTags,
             'filterTag'     => $filterTag,
             'filterSegment' => $filterSegment,
+            'canBroadcast'  => $canBroadcast,
+            'canAiDraft'    => $canAiDraft,
         ], 'layouts/owner');
     }
 

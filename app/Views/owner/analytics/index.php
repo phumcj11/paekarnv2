@@ -222,6 +222,18 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
 
 <?php endif; ?>
 
+<?php if (!$canDeep): ?>
+<!-- Upsell: analytics_deep locked -->
+<div class="bg-violet-50 border border-violet-200 rounded-2xl p-5 mb-5 flex items-start gap-3">
+  <i data-lucide="lock" class="w-5 h-5 text-violet-400 shrink-0 mt-0.5"></i>
+  <div>
+    <p class="text-sm font-semibold text-violet-800">ฟีเจอร์นี้ต้องใช้แพ็กเกจ Standard ขึ้นไป</p>
+    <p class="text-xs text-violet-600 mt-0.5">แหล่งที่มาผู้เข้าชม (Referrer) และ AI วิเคราะห์สถิติ พร้อมให้ใช้เมื่ออัปเกรด</p>
+    <a href="<?= url('/owner/membership') ?>" class="inline-block mt-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-xl transition">ดูแพ็กเกจ →</a>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if ($aiSummaryUrl): ?>
 <!-- AI Weekly Summary -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 mb-5"

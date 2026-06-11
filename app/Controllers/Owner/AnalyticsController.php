@@ -247,8 +247,11 @@ class AnalyticsController extends Controller
         // อัตรา click-to-view (click rate %)
         $clickRate = $views > 0 ? round(($clicks['phone'] + $clicks['line'] + $clicks['book']) / $views * 100, 1) : 0;
 
+        $canDeep = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP));
+
         View::render('owner/analytics/index', [
-            'aiSummaryUrl' => $propertyId ? url('/owner/analytics/ai-summary?property_id=' . $propertyId . '&range=' . $range) : null,
+            'aiSummaryUrl' => ($canDeep && $propertyId) ? url('/owner/analytics/ai-summary?property_id=' . $propertyId . '&range=' . $range) : null,
+            'canDeep'      => $canDeep,
             'page_title'   => 'Analytics — สถิติที่พัก',
             'properties'   => $properties,
             'propertyId'   => $propertyId,

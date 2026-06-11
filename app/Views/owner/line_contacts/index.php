@@ -10,6 +10,8 @@
  * @var array   $allTags       ['tagName' => count]
  * @var string  $filterTag
  * @var string  $filterSegment
+ * @var bool    $canBroadcast
+ * @var bool    $canAiDraft
  */
 $pages    = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 $property = null;
@@ -175,6 +177,7 @@ $presetTags = [
     </button>
 
     <!-- Broadcast button -->
+    <?php if ($canBroadcast): ?>
     <button type="button" @click="showBroadcast = !showBroadcast; broadcastTag = ''"
             class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl shadow-sm transition">
       <i data-lucide="send" class="w-4 h-4"></i>
@@ -186,6 +189,14 @@ $presetTags = [
       <i data-lucide="tag" class="w-4 h-4"></i>
       ส่งตาม Tag
     </button>
+    <?php endif; ?>
+    <?php else: ?>
+    <a href="<?= url('/owner/membership') ?>"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-violet-200 text-violet-500 text-sm font-semibold rounded-xl shadow-sm cursor-pointer opacity-75 hover:opacity-100 transition"
+       title="ต้องใช้แพ็กเกจ Standard ขึ้นไป">
+      <i data-lucide="lock" class="w-4 h-4"></i>
+      Broadcast (Standard+)
+    </a>
     <?php endif; ?>
 
     <!-- sync result -->
@@ -220,6 +231,7 @@ $presetTags = [
               placeholder="พิมพ์ข้อความที่ต้องการส่ง... &#10;เช่น: สวัสดีครับ มีโปรโมชั่นพิเศษเดือนนี้นะครับ 🎉"
               class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-y focus:border-[#06C755] outline-none"></textarea>
 
+    <?php if ($canAiDraft): ?>
     <!-- AI draft helper -->
     <div class="flex items-center gap-2 flex-wrap">
       <button type="button" @click="aiBroadcastDraft()"
@@ -233,6 +245,7 @@ $presetTags = [
              class="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg border border-violet-200 text-xs outline-none focus:border-violet-400 bg-violet-50/60 text-slate-700">
       <p x-show="aiBroadcastMsg" x-text="aiBroadcastMsg" class="text-xs text-violet-700 flex-1 truncate"></p>
     </div>
+    <?php endif; ?>
 
     <div class="flex items-center gap-3">
       <button type="button" @click="sendBroadcast()"
@@ -404,6 +417,7 @@ $presetTags = [
             </td>
             <td class="px-4 py-3 text-right">
               <div class="flex items-center justify-end gap-1.5">
+                <?php if ($canAiDraft): ?>
                 <button type="button" @click="fetchAiReply()" :disabled="aiLoading"
                         title="AI ช่วยร่างข้อความ"
                         class="inline-flex items-center gap-1 px-2 py-1.5 bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs font-semibold rounded-lg transition disabled:opacity-60">
@@ -411,6 +425,7 @@ $presetTags = [
                   <span x-show="!aiLoading" class="hidden sm:inline">AI</span>
                   <span x-show="aiLoading">…</span>
                 </button>
+                <?php endif; ?>
                 <button type="button" @click="openMsg()"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755]/10 hover:bg-[#06C755]/20 text-[#067a2f] text-xs font-semibold rounded-lg transition">
                   <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> ส่งข้อความ
@@ -480,11 +495,13 @@ $presetTags = [
         </div>
         <!-- send msg + AI -->
         <div class="flex gap-2">
+          <?php if ($canAiDraft): ?>
           <button type="button" @click="fetchAiReply()" :disabled="aiLoading"
                   class="flex-none flex items-center gap-1.5 px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 text-xs font-semibold rounded-xl transition disabled:opacity-60">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
             <span x-show="!aiLoading">AI</span><span x-show="aiLoading">…</span>
           </button>
+          <?php endif; ?>
           <button type="button" @click="openMsg()"
                   class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#06C755]/10 hover:bg-[#06C755]/15 text-[#067a2f] text-sm font-semibold rounded-xl transition">
             <i data-lucide="message-circle" class="w-4 h-4"></i> ส่งข้อความ LINE

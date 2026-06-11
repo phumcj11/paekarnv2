@@ -25,7 +25,7 @@ class AvailabilityController extends Controller
     public function index(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $units = Database::fetchAll(
             "SELECT id, name, total_units, moderation_status FROM property_units WHERE property_id = :p AND is_active=1 ORDER BY sort_order, id",
@@ -60,7 +60,7 @@ class AvailabilityController extends Controller
     public function save(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $unitId = (int)($_POST['unit_id'] ?? 0);
         $u = Database::fetch("SELECT id FROM property_units WHERE id = :i AND property_id = :p", ['i' => $unitId, 'p' => $id]);
@@ -109,7 +109,7 @@ class AvailabilityController extends Controller
     public function storeBooking(int $id): void
     {
         $property = $this->findOwn($id);
-        if (!$property) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $unitId     = (int)($_POST['unit_id'] ?? 0);
         $guestName  = trim((string)($_POST['guest_name'] ?? ''));

@@ -187,8 +187,8 @@ $calendarUrl = $firstPropertyId
     <a href="<?= e($calendarUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/availability') ?>">
       <i data-lucide="calendar-days" class="w-5 h-5"></i><span>ปฏิทิน</span>
     </a>
-    <a href="<?= e($chatUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/line') ?>">
-      <i data-lucide="message-circle" class="w-5 h-5"></i><span>แชท</span>
+    <a href="<?= url('/owner/line-contacts' . ($firstPropertyId ? '?property_id=' . $firstPropertyId : '')) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/line-contacts') ?>">
+      <i data-lucide="message-circle" class="w-5 h-5"></i><span>LINE CRM</span>
     </a>
     <a href="<?= url('/owner/profile') ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/profile') ?>">
       <i data-lucide="user" class="w-5 h-5"></i><span>โปรไฟล์</span>

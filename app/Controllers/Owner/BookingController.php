@@ -65,7 +65,7 @@ class BookingController extends Controller
     public function show(int $id): void
     {
         $row = $this->fetchOwnedBooking($id);
-        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $payments = Database::fetchAll("SELECT * FROM booking_payments WHERE booking_id = :b ORDER BY created_at DESC", ['b' => $id]);
 
@@ -80,7 +80,7 @@ class BookingController extends Controller
     public function destroy(int $id): void
     {
         $row = $this->fetchOwnedBooking($id);
-        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         if (!BookingService::canHardDelete($row)) {
             Session::flash('error', 'ไม่สามารถลบการจองนี้ได้ — อนุญาตเฉพาะสถานะรอยืนยัน/ปฏิเสธ/ยกเลิก และไม่มีคูปองที่ใช้แล้ว');
@@ -124,7 +124,7 @@ class BookingController extends Controller
     public function updateStatus(int $id): void
     {
         $row = $this->fetchOwnedBooking($id);
-        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
         $status = $_POST['status'] ?? '';
         if (!in_array($status, ['confirmed','rejected','cancelled','completed','no_show','pending'])) {
             Session::flash('error', 'สถานะไม่ถูกต้อง'); back();
@@ -144,7 +144,7 @@ class BookingController extends Controller
     public function verifyPayment(int $id): void
     {
         $row = $this->fetchOwnedBooking($id);
-        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $action = $_POST['action'] ?? 'verify';
         $payId  = (int)($_POST['payment_id'] ?? 0);
@@ -385,7 +385,7 @@ class BookingController extends Controller
     public function update(int $id): void
     {
         $row = $this->fetchOwnedBooking($id);
-        if (!$row) { http_response_code(404); View::render('errors/404'); return; }
+        if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
         $input = $this->input();
 
