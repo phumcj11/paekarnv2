@@ -17,15 +17,15 @@ class AvailableController extends Controller
         $weekend = APS::nextWeekendDates();
 
         View::render('available/index', [
-            'page_title'  => 'แพและที่พักว่างวันนี้ — ' . APS::thaiDate($today),
-            'meta_desc'   => 'รายการแพและที่พักกาญจนบุรีที่ยังว่างวันนี้ จองได้ทันที ไม่ต้องรอ',
-            'rows'        => $rows,
-            'targetDate'  => $today,
-            'dateLabel'   => 'วันนี้ — ' . APS::thaiDate($today),
-            'mode'        => 'today',
-            'weekend'     => $weekend,
-            'filterType'  => $type,
-        ], 'layouts/main');
+            'meta_title'       => 'แพและที่พักว่างวันนี้ — ' . APS::thaiDate($today),
+            'meta_description' => 'รายการแพและที่พักกาญจนบุรีที่ยังว่างวันนี้ จองได้ทันที ไม่ต้องรอ',
+            'rows'             => $rows,
+            'targetDate'       => $today,
+            'dateLabel'        => 'วันนี้ — ' . APS::thaiDate($today),
+            'mode'             => 'today',
+            'weekend'          => $weekend,
+            'filterType'       => $type,
+        ], 'layouts/app');
     }
 
     /** GET /available-weekend */
@@ -39,14 +39,14 @@ class AvailableController extends Controller
 
         $dayTH = $dayKey === 'saturday' ? 'เสาร์' : 'อาทิตย์';
         View::render('available/index', [
-            'page_title'  => "แพและที่พักว่าง{$dayTH}นี้ — " . APS::thaiDate($date),
-            'meta_desc'   => "รายการแพและที่พักกาญจนบุรีที่ยังว่าง{$dayTH}นี้ จองได้ทันที",
-            'rows'        => $rows,
-            'targetDate'  => $date,
-            'dateLabel'   => "{$dayTH}นี้ — " . APS::thaiDate($date),
-            'mode'        => 'weekend',
-            'weekend'     => $weekend,
-            'filterType'  => $type,
-        ], 'layouts/main');
+            'meta_title'       => "แพและที่พักว่าง{$dayTH}นี้ — " . APS::thaiDate($date),
+            'meta_description' => "รายการแพและที่พักกาญจนบุรีที่ยังว่าง{$dayTH}นี้ จองได้ทันที",
+            'rows'             => $rows,
+            'targetDate'       => $date,
+            'dateLabel'        => "{$dayTH}นี้ — " . APS::thaiDate($date),
+            'mode'             => 'weekend',
+            'weekend'          => $weekend,
+            'filterType'       => $type,
+        ], 'layouts/app');
     }
 }
