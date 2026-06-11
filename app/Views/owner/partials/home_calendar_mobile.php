@@ -108,6 +108,7 @@ $csrfToken    = \App\Core\Csrf::token();
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></span>ว่าง</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></span>จอง</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-rose-100 border border-rose-300"></span>เต็ม</span>
+    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-100 border border-slate-300"></span>ยกเลิก</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-300 border border-slate-400"></span>ปิด</span>
   </div>
 
@@ -163,14 +164,17 @@ $csrfToken    = \App\Core\Csrf::token();
           </div>
 
           <template x-if="dayBookings.length">
-            <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm space-y-2">
-              <p class="font-semibold text-amber-900">มีการจองในวันนี้</p>
+            <div class="mb-4 p-3 rounded-xl border text-sm space-y-2"
+                 :class="dayBookings.some(b => ['pending','confirmed','completed'].includes(b.status)) ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'">
+              <p class="font-semibold"
+                 :class="dayBookings.some(b => ['pending','confirmed','completed'].includes(b.status)) ? 'text-amber-900' : 'text-slate-700'"
+                 x-text="dayBookings.some(b => ['pending','confirmed','completed'].includes(b.status)) ? 'มีการจองในวันนี้' : 'มีการจองที่ยกเลิกแล้ว'"></p>
               <template x-for="b in dayBookings" :key="b.id">
                 <div class="bg-white/80 rounded-xl px-3 py-2.5 space-y-2">
                   <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
                       <a :href="'<?= url('/owner/bookings') ?>/' + b.id" class="text-sm font-semibold text-core-700 truncate block" x-text="b.guest_name"></a>
-                      <p class="text-[10px] text-slate-500 font-mono mt-0.5" x-text="b.code + (b.unit_name ? ' · ' + b.unit_name : '')"></p>
+                      <p class="text-[10px] text-slate-500 font-mono mt-0.5" x-text="b.code + (b.unit_name ? ' · ' + b.unit_name : '') + ' · ' + bookingStatusLabel(b.status)"></p>
                     </div>
                     <a x-show="b.guest_phone" :href="'tel:' + b.guest_phone"
                        class="shrink-0 w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white grid place-items-center"
@@ -691,6 +695,10 @@ function homeCalManage() {
         && (this.editCheckIn !== this.rescheduleFromIn || this.checkOut !== this.rescheduleFromOut);
     },
     formatDate(ymd) { return thaiShort(ymd); },
+    bookingStatusLabel(status) {
+      const m = { pending: 'รอยืนยัน', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิกแล้ว', rejected: 'ปฏิเสธ', completed: 'เสร็จสิ้น', no_show: 'ไม่มา' };
+      return m[status] || status;
+    },
     formatMoney(n) {
       return '฿' + Number(n || 0).toLocaleString('th-TH');
     },

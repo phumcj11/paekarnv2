@@ -5,6 +5,12 @@ use App\Core\Database;
 
 class OwnerAvailabilityCalendar
 {
+    /** สถานะที่นับเป็นวันถูกจอง (บล็อกความว่าง) */
+    private const ACTIVE_STATUSES = ['pending', 'confirmed', 'completed'];
+
+    /** สถานะที่แสดงในรายการเมื่อแตะวัน (รวมยกเลิก — ไม่บล็อกวัน) */
+    private const DISPLAY_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'rejected', 'no_show'];
+
     /** ปฏิทินรายยูนิต (หน้าจัดการปฏิทินเต็ม) */
     public static function buildMonth(int $unitId, int $month, int $year, int $totalUnits): array
     {
@@ -73,6 +79,10 @@ class OwnerAvailabilityCalendar
                 }
             }
 
+        }
+
+        // ดึงการจองเสมอ (แม้ไม่มียูนิต active — กรณีที่พักไม่มี unit แยก)
+        if ($propertyId > 0) {
             $bookings = self::fetchBookings($propertyId, null, $start, $end);
             self::applyBookingsToMaps($bookings, $start, $end, $availMap, $bookingsByDate);
         }
@@ -89,14 +99,18 @@ class OwnerAvailabilityCalendar
         if (in_array($status, ['closed', 'blocked', 'fully_booked'], true)) {
             return ['key' => 'closed', 'label' => 'ปิด', 'cls' => 'bg-slate-300 border-slate-400 text-slate-700'];
         }
-        $booked = (int)($row['booked'] ?? 0);
+        $booked    = (int)($row['booked'] ?? 0);
+        $cancelled = (int)($row['cancelled'] ?? 0);
         if ($booked >= $totalUnits) {
-            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800', 'booked' => $booked];
+            return ['key' => 'full', 'label' => 'เต็ม', 'cls' => 'bg-rose-100 border-rose-300 text-rose-800', 'booked' => $booked, 'cancelled' => $cancelled];
         }
         if ($booked > 0) {
-            return ['key' => 'booked', 'label' => 'จอง', 'cls' => 'bg-amber-100 border-amber-300 text-amber-900', 'booked' => $booked];
+            return ['key' => 'booked', 'label' => 'จอง', 'cls' => 'bg-amber-100 border-amber-300 text-amber-900', 'booked' => $booked, 'cancelled' => $cancelled];
         }
-        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800', 'booked' => 0];
+        if ($cancelled > 0) {
+            return ['key' => 'cancelled', 'label' => 'ยกเลิก', 'cls' => 'bg-slate-100 border-slate-300 text-slate-600', 'booked' => 0, 'cancelled' => $cancelled];
+        }
+        return ['key' => 'open', 'label' => 'ว่าง', 'cls' => 'bg-emerald-100 border-emerald-300 text-emerald-800', 'booked' => 0, 'cancelled' => 0];
     }
 
     private static function ymd(?string $date): string
@@ -120,6 +134,8 @@ class OwnerAvailabilityCalendar
             return [];
         }
 
+        $statusList = implode(',', array_map(static fn(string $s): string => "'{$s}'", self::DISPLAY_STATUSES));
+
         return Database::fetchAll(
             "SELECT b.id, b.code, b.guest_name, b.guest_phone,
                     DATE(b.check_in) AS check_in, DATE(b.check_out) AS check_out,
@@ -131,8 +147,8 @@ class OwnerAvailabilityCalendar
                     ), 0) AS paid_amount
              FROM bookings b
              LEFT JOIN property_units u ON u.id = b.unit_id
-             WHERE $where AND b.status IN ('pending','confirmed','completed')
-             AND b.check_in <= :e AND b.check_out > :s
+             WHERE $where AND b.status IN ({$statusList})
+             AND DATE(b.check_in) <= :e AND DATE(b.check_out) > :s
              ORDER BY b.check_in ASC",
             ['scope' => $scope, 's' => $start, 'e' => $end]
         );
@@ -143,11 +159,17 @@ class OwnerAvailabilityCalendar
     {
         foreach ($bookings as $b) {
             $summary = self::bookingSummary($b);
+            $status  = (string)($b['status'] ?? '');
+            $isActive = in_array($status, self::ACTIVE_STATUSES, true);
             $cur  = self::ymd($b['check_in']);
             $stop = self::ymd($b['check_out']);
             while ($cur && $stop && $cur < $stop) {
                 if ($cur >= $start && $cur <= $end) {
-                    $availMap[$cur]['booked'] = ($availMap[$cur]['booked'] ?? 0) + 1;
+                    if ($isActive) {
+                        $availMap[$cur]['booked'] = ($availMap[$cur]['booked'] ?? 0) + 1;
+                    } elseif ($status === 'cancelled') {
+                        $availMap[$cur]['cancelled'] = ($availMap[$cur]['cancelled'] ?? 0) + 1;
+                    }
                     $bookingsByDate[$cur][] = $summary;
                 }
                 $cur = date('Y-m-d', strtotime($cur . ' +1 day'));

@@ -60,7 +60,8 @@ class DashboardController extends Controller
              JOIN properties p ON p.id=b.property_id
              LEFT JOIN property_units u ON u.id=b.unit_id
              WHERE 1=1 $whereOwner
-             ORDER BY b.created_at DESC LIMIT 8", $params);
+             ORDER BY CASE WHEN b.status IN ('pending','confirmed') THEN 0 ELSE 1 END,
+                      b.created_at DESC LIMIT 8", $params);
 
         $todayBookings = Database::fetchAll(
             "SELECT $bookingSelect FROM bookings b

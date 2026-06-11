@@ -48,6 +48,7 @@ $csrfToken    = \App\Core\Csrf::token();
   <div class="flex flex-wrap gap-2 text-[10px] text-slate-500 mb-2">
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></span>ว่าง</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></span>จอง</span>
+    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-100 border border-slate-300"></span>ยกเลิก</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-rose-100 border border-rose-300"></span>เต็ม</span>
     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-300 border border-slate-400"></span>ปิด</span>
   </div>

@@ -12,6 +12,14 @@ $propStatusLabels = [
 ];
 $bookingStatusIcons = ['pending'=>'clock','confirmed'=>'check-circle','rejected'=>'x-circle','cancelled'=>'ban','completed'=>'flag','no_show'=>'user-x'];
 $bookingColors = ['pending'=>'amber','confirmed'=>'emerald','rejected'=>'rose','cancelled'=>'slate','completed'=>'blue','no_show'=>'slate'];
+$bookingStatusLabels = [
+  'pending'   => 'รอยืนยัน',
+  'confirmed' => 'ยืนยันแล้ว',
+  'cancelled' => 'ยกเลิกแล้ว',
+  'rejected'  => 'ปฏิเสธ',
+  'completed' => 'เสร็จสิ้น',
+  'no_show'   => 'ไม่มา',
+];
 $scheduleUrl = !empty($myProperties[0]['id'])
   ? url('/owner/properties/' . (int)$myProperties[0]['id'] . '/availability')
   : url('/owner/properties');
@@ -108,7 +116,7 @@ $scheduleUrl = !empty($myProperties[0]['id'])
             <div class="font-semibold text-sm truncate"><?= e($b['guest_name']) ?></div>
             <div class="text-xs text-slate-500"><?= format_date_th($b['check_in']) ?> → <?= format_date_th($b['check_out']) ?></div>
           </div>
-          <span class="text-[10px] font-bold bg-<?= $c ?>-100 text-<?= $c ?>-700 px-2 py-0.5 rounded-full shrink-0"><?= e($b['status']) ?></span>
+          <span class="text-[10px] font-bold bg-<?= $c ?>-100 text-<?= $c ?>-700 px-2 py-0.5 rounded-full shrink-0"><?= e($bookingStatusLabels[$b['status']] ?? $b['status']) ?></span>
         </div>
       </a>
       <?php endforeach; ?>
@@ -291,7 +299,7 @@ $scheduleUrl = !empty($myProperties[0]['id'])
             <td class="px-5 py-3"><?= e($b['property_name']) ?></td>
             <td class="px-5 py-3 text-xs whitespace-nowrap"><?= format_date_th($b['check_in']) ?> → <?= format_date_th($b['check_out']) ?></td>
             <td class="px-5 py-3 font-semibold text-core-700"><?= format_money($b['total_price']) ?></td>
-            <td class="px-5 py-3"><span class="inline-flex items-center gap-1 text-xs font-semibold bg-<?= $c ?>-100 text-<?= $c ?>-700 px-2 py-1 rounded-full"><i data-lucide="<?= e($sti) ?>" class="w-3.5 h-3.5"></i><?= e($b['status']) ?></span></td>
+            <td class="px-5 py-3"><span class="inline-flex items-center gap-1 text-xs font-semibold bg-<?= $c ?>-100 text-<?= $c ?>-700 px-2 py-1 rounded-full"><i data-lucide="<?= e($sti) ?>" class="w-3.5 h-3.5"></i><?= e($bookingStatusLabels[$b['status']] ?? $b['status']) ?></span></td>
             <td class="px-5 py-3 text-right"><a href="<?= url('/owner/bookings/' . $b['id']) ?>" class="ow-btn-primary !py-1.5 !px-3 !text-xs">ดู</a></td>
           </tr>
         <?php endforeach; ?>
