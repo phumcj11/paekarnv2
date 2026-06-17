@@ -19,7 +19,7 @@ class HomeController extends Controller
 {
     public function index(): void
     {
-        $cacheKey = 'home_index_v1';
+        $cacheKey = 'home_index_v2';
         $cached   = PageCache::get($cacheKey);
 
         if ($cached !== null) {
@@ -44,11 +44,12 @@ class HomeController extends Controller
             return Property::attachUnitStats($rows);
         };
 
+        $featuredLimit = static fn (string $key, int $cap = 4): int => min($cap, max(1, (int)($featuredLabels[$key]['limit'] ?? $cap)));
         $featuredByKey = [
-            'raft'   => $prepareHomepageCards(Property::featuredByType('raft', $featuredLabels['raft']['limit'], $boostCoupon)),
-            'resort' => $prepareHomepageCards(Property::featuredByType('resort', $featuredLabels['resort']['limit'], $boostCoupon)),
-            'hotel'  => $prepareHomepageCards(Property::featuredByType('hotel', $featuredLabels['hotel']['limit'], $boostCoupon)),
-            'stay'   => $prepareHomepageCards(Property::featuredByType(['homestay', 'house'], $featuredLabels['stay']['limit'], $boostCoupon)),
+            'raft'   => $prepareHomepageCards(Property::featuredByType('raft', $featuredLimit('raft'), $boostCoupon)),
+            'resort' => $prepareHomepageCards(Property::featuredByType('resort', $featuredLimit('resort'), $boostCoupon)),
+            'hotel'  => $prepareHomepageCards(Property::featuredByType('hotel', $featuredLimit('hotel'), $boostCoupon)),
+            'stay'   => $prepareHomepageCards(Property::featuredByType(['homestay', 'house'], $featuredLimit('stay'), $boostCoupon)),
         ];
 
         $newestRafts = array_slice(
@@ -58,8 +59,8 @@ class HomeController extends Controller
         );
 
         $reviews = Review::latest(6);
-        $reviewVideos = ReviewVideo::activeOrdered(6);
-        $activities = ActivityProduct::featured(8);
+        $reviewVideos = ReviewVideo::activeOrdered(4);
+        $activities = ActivityProduct::featured(4);
         $blogs = BlogPost::published(3);
         $zones = Property::attachZoneCoverImages(Property::distinctZones());
         $amenities = Database::fetchAll('SELECT * FROM amenities ORDER BY sort_order, name');
@@ -71,7 +72,7 @@ class HomeController extends Controller
 
         $bannersBySlot = Banner::groupedForHome();
         $heroSlides = [];
-        foreach ($bannersBySlot['hero'] ?? [] as $b) {
+        foreach (array_slice($bannersBySlot['hero'] ?? [], 0, 3) as $b) {
             $heroSlides[] = [
                 'img'      => upload_img((string) ($b['image_path'] ?? ''), 'md'),
                 'title'    => $b['title'],
@@ -93,9 +94,9 @@ class HomeController extends Controller
         $zoneRaftPayload = [];
         foreach (Property::homeZoneSectionDefinitions() as $def) {
             $rows = array_slice(
-                $preparePropertyRows(Property::publishedInZonesByType($def['zones'], 'raft', 8)),
+                $preparePropertyRows(Property::publishedInZonesByType($def['zones'], 'raft', 4)),
                 0,
-                8
+                4
             );
             $primaryZone = $def['zones'][0] ?? '';
             $zoneAds = [];

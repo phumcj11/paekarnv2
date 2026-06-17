@@ -45,7 +45,7 @@ $comparePayload = $compareEnabled ? [
     'unit_id' => $listingUid,
     'title' => $cardTitle,
     'subtitle' => (string)($property['name'] ?? ''),
-    'image' => upload_url($coverImg) ?: 'https://placehold.co/800x600?text=Paekan',
+    'image' => upload_img($coverImg, 'thumb') ?: 'https://placehold.co/800x600?text=Paekan',
     'detail_url' => $pUrl,
 ] : [];
 $compareJson = $compareEnabled ? htmlspecialchars(json_encode($comparePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE), ENT_QUOTES, 'UTF-8') : '';
@@ -53,7 +53,7 @@ $compareJson = $compareEnabled ? htmlspecialchars(json_encode($comparePayload, J
 <div class="group flex flex-row items-stretch rounded-xl border border-slate-200/90 bg-white shadow-[0_8px_28px_-12px_rgba(15,23,42,0.16)] overflow-hidden hover:shadow-[0_14px_36px_-14px_rgba(15,23,42,0.22)] hover:border-forest-200/70 transition active:bg-slate-50/80">
   <div class="paekan-hcard-photo">
     <a href="<?= e($pUrl) ?>" class="absolute inset-0 z-[1]" aria-label="<?= e($ariaListing) ?>"><span class="sr-only"><?= e($ariaListing) ?></span></a>
-    <img src="<?= e(upload_url($coverImg) ?: 'https://placehold.co/800x600?text=Paekan') ?>"
+    <img src="<?= e(upload_img($coverImg, 'thumb') ?: 'https://placehold.co/800x600?text=Paekan') ?>"
          alt=""
          class="paekan-hcard-photo__img group-hover:scale-105 transition duration-500 pointer-events-none"
          width="160"
@@ -146,7 +146,7 @@ $compareJson = $compareEnabled ? htmlspecialchars(json_encode($comparePayload, J
       <div class="flex gap-1 mt-0.5 overflow-x-auto" aria-hidden="true">
         <?php foreach (array_slice($galleryThumbs, 0, 4) as $tp): ?>
         <div class="w-8 h-8 rounded-md overflow-hidden ring-1 ring-slate-200/90 shrink-0 bg-slate-100">
-          <img src="<?= e(upload_url($tp)) ?>" alt="" class="w-full h-full object-cover pointer-events-none" loading="lazy">
+          <img src="<?= e(upload_img($tp, 'thumb')) ?>" alt="" class="w-full h-full object-cover pointer-events-none" loading="lazy">
         </div>
         <?php endforeach; ?>
       </div>

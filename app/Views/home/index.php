@@ -857,7 +857,7 @@ function paekanDesktopHeroSearch() {
              x-transition:enter-start="opacity-0 scale-105"
              x-transition:enter-end="opacity-100 scale-100"
              class="absolute inset-0">
-          <img :src="s.img" alt="" class="w-full h-full object-cover" loading="eager">
+          <img :src="s.img" alt="" class="w-full h-full object-cover" :loading="idx === 0 ? 'eager' : 'lazy'" :fetchpriority="idx === 0 ? 'high' : 'low'">
           <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/25"></div>
         </div>
       </template>
