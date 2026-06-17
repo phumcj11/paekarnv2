@@ -258,6 +258,7 @@ $saveUrl = url('/owner/automation/save');
 <?php endif; ?>
 
 <script>
+const __CSRF__ = window.__PAEKAN_CSRF__ || document.querySelector('meta[name="csrf-token"]')?.content || '';
 function automationCard(cfg) {
   return {
     propertyId:  cfg.propertyId,
@@ -284,6 +285,7 @@ function automationCard(cfg) {
       this.aiLoading = true;
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('property_id', String(this.propertyId));
         fd.set('event_type',  this.eventType);
         fd.set('context',     this.aiContext);
@@ -308,6 +310,7 @@ function automationCard(cfg) {
       this.saveMsg = '';
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('property_id',      String(this.propertyId));
         fd.set('event_type',       this.eventType);
         fd.set('is_enabled',       this.enabled ? '1' : '0');

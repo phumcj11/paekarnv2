@@ -523,7 +523,9 @@ function avCalManage() {
       this.lineContactsSyncing = true;
       this.lineContactsSyncMsg = '';
       try {
-        const r = await fetch(`<?= url('/owner/api/line-contacts/sync') ?>?property_id=${pid}`, { method: 'POST' });
+        const fd = new FormData();
+        fd.append('_csrf', window.__PAEKAN_CSRF__ || '');
+        const r = await fetch(`<?= url('/owner/api/line-contacts/sync') ?>?property_id=${pid}`, { method: 'POST', body: fd });
         const d = await r.json();
         if (d.ok) {
           this.lineContactsSyncMsg = `ซิงค์สำเร็จ — นำเข้าใหม่ ${d.imported} คน, อัปเดต ${d.skipped} คน`;

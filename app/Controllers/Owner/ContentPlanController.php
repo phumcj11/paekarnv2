@@ -70,19 +70,31 @@ class ContentPlanController extends Controller
         $hasMarketingTables = self::hasMarketingTables();
 
         // ---- Groups (FB) ----
-        $groups = ($ownerId && $hasMarketingTables)
-            ? Database::fetchAll("SELECT * FROM marketing_fb_groups WHERE owner_id = :o ORDER BY created_at ASC", ['o' => $ownerId])
-            : [];
+        if ($isAdmin && $hasMarketingTables) {
+            $groups = Database::fetchAll("SELECT * FROM marketing_fb_groups ORDER BY created_at ASC");
+        } elseif ($ownerId && $hasMarketingTables) {
+            $groups = Database::fetchAll("SELECT * FROM marketing_fb_groups WHERE owner_id = :o ORDER BY created_at ASC", ['o' => $ownerId]);
+        } else {
+            $groups = [];
+        }
 
         // ---- Leads ----
-        $leads = ($ownerId && $hasMarketingTables)
-            ? Database::fetchAll(
+        if ($isAdmin && $hasMarketingTables) {
+            $leads = Database::fetchAll(
+                "SELECT l.*, p.name AS property_name FROM marketing_leads l
+                 LEFT JOIN properties p ON p.id = l.property_id
+                 ORDER BY l.found_at DESC, l.id DESC LIMIT 200"
+            );
+        } elseif ($ownerId && $hasMarketingTables) {
+            $leads = Database::fetchAll(
                 "SELECT l.*, p.name AS property_name FROM marketing_leads l
                  LEFT JOIN properties p ON p.id = l.property_id
                  WHERE l.owner_id = :o ORDER BY l.found_at DESC, l.id DESC LIMIT 200",
                 ['o' => $ownerId]
-            )
-            : [];
+            );
+        } else {
+            $leads = [];
+        }
 
         View::render('owner/content_plans/index', [
             'page_title'   => 'Marketing Center',

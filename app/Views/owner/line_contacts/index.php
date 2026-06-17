@@ -576,7 +576,8 @@ $presetTags = [
 <script>
 const __LC_PROP_ID__ = <?= (int)$propertyId ?>;
 const __LC_SYNC_URL__ = '<?= url('/owner/api/line-contacts/sync') ?>';
-const __LC_MSG_URL__  = '<?= url('/owner/line-contacts') ?>'; // base for /{id}/message
+const __LC_MSG_URL__  = '<?= url('/owner/line-contacts') ?>';
+const __CSRF__ = window.__PAEKAN_CSRF__ || document.querySelector('meta[name="csrf-token"]')?.content || '';
 
 function lineContactsPage() {
   return {
@@ -602,7 +603,9 @@ function lineContactsPage() {
       this.syncing = true;
       this.syncMsg = '';
       try {
-        const r = await fetch(__LC_SYNC_URL__ + '?property_id=' + __LC_PROP_ID__, { method: 'POST' });
+        const fd = new FormData();
+        fd.append('_csrf', __CSRF__);
+        const r = await fetch(__LC_SYNC_URL__ + '?property_id=' + __LC_PROP_ID__, { method: 'POST', body: fd });
         const d = await r.json();
         this.syncOk = !!d.ok;
         this.syncMsg = d.ok
@@ -621,6 +624,7 @@ function lineContactsPage() {
       this.aiBroadcastMsg = '';
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('property_id', String(__LC_PROP_ID__));
         fd.set('event_type', 'broadcast');
         fd.set('context', this.aiBroadcastContext || 'ข้อความทั่วไปถึงลูกค้า LINE');
@@ -645,6 +649,7 @@ function lineContactsPage() {
       this.broadcastMsg = '';
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('property_id', String(__LC_PROP_ID__));
         fd.set('text', this.broadcastText);
         if (this.broadcastTag) fd.set('tag', this.broadcastTag);
@@ -652,7 +657,7 @@ function lineContactsPage() {
         const d = await r.json();
         this.broadcastOk = !!d.ok;
         this.broadcastMsg = d.ok
-          ? `ส่งสำเร็จ ${d.sent} คน${d.failed > 0 ? ` · ล้มเหลว ${d.failed} คน` : ''}`
+          ? `ส่งสำเร็จ ${d.sent}/${d.total ?? d.sent} คน${d.failed > 0 ? ` · ล้มเหลว ${d.failed} คน` : ''}`
           : ('ส่งไม่สำเร็จ: ' + (d.error || 'ไม่ทราบสาเหตุ'));
       } catch(e) { this.broadcastOk = false; this.broadcastMsg = 'เกิดข้อผิดพลาด'; }
       this.broadcasting = false;
@@ -678,6 +683,7 @@ function contactRow(id, initialPhone, initialTags) {
     async savePhone() {
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('phone', this.editPhoneVal);
         const r = await fetch(`<?= url('/owner/line-contacts') ?>/${this.id}/phone`, { method: 'POST', body: fd });
         const d = await r.json();
@@ -731,6 +737,7 @@ function contactRow(id, initialPhone, initialTags) {
     async _saveTags(newTags) {
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('tags', JSON.stringify(newTags));
         const r = await fetch(`<?= url('/owner/line-contacts') ?>/${this.id}/tags`, { method: 'POST', body: fd });
         const d = await r.json();
@@ -779,6 +786,7 @@ function msgSheet() {
       this.result  = '';
       try {
         const fd = new FormData();
+        fd.set('_csrf', __CSRF__);
         fd.set('text', this.text);
         const r = await fetch(`<?= url('/owner/line-contacts') ?>/${this.contactId}/message`, { method: 'POST', body: fd });
         const d = await r.json();

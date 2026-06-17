@@ -57,6 +57,8 @@ $calendarUrl = $firstPropertyId
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($meta_title ?? $page_title ?? 'พอร์ทัลเจ้าของแพ — แพกาญ.com') ?></title>
+<meta name="csrf-token" content="<?= \App\Core\Csrf::token() ?>">
+<script>window.__PAEKAN_CSRF__ = <?= json_encode(\App\Core\Csrf::token(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;</script>
 <link rel="icon" href="<?= asset('site-logo.png') ?>" type="image/png">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
