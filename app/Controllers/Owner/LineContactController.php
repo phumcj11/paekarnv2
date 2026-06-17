@@ -46,6 +46,8 @@ class LineContactController extends Controller
 
         if ($propertyId) {
             $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', plc.phone' : '';
+            $tagsCol  = Database::tableHasColumn('property_line_contacts', 'tags')  ? ', plc.tags'  : '';
+            $notesCol = Database::tableHasColumn('property_line_contacts', 'notes') ? ', plc.notes' : '';
             $where    = 'plc.property_id = :p';
             $params   = ['p' => $propertyId];
 
@@ -61,25 +63,40 @@ class LineContactController extends Controller
                 $where .= ')';
             }
 
-            $countRow = Database::fetch(
-                "SELECT COUNT(*) AS cnt FROM property_line_contacts plc WHERE {$where}",
-                $params
-            );
-            $total  = (int)($countRow['cnt'] ?? 0);
-            $offset = ($page - 1) * $perPage;
-
-            $tagsCol  = Database::tableHasColumn('property_line_contacts', 'tags')  ? ', plc.tags'  : '';
-            $notesCol = Database::tableHasColumn('property_line_contacts', 'notes') ? ', plc.notes' : '';
-
-            // filter by tag
-            $filterTag = trim((string)($_GET['tag'] ?? ''));
             if ($filterTag !== '' && $tagsCol !== '') {
                 $where .= " AND JSON_CONTAINS(plc.tags, :ft, '$')";
                 $params['ft'] = json_encode($filterTag, JSON_UNESCAPED_UNICODE);
             }
 
             $hasLineUid = Database::tableHasColumn('bookings', 'guest_line_user_id');
+            $having     = '';
+            if ($filterSegment === 'ทักแต่ไม่จอง') {
+                if ($hasLineUid) {
+                    $having = 'HAVING COUNT(b.id) = 0';
+                }
+            } elseif ($filterSegment === 'ลูกค้าเก่า 90+ วัน') {
+                if ($hasLineUid) {
+                    $having = 'HAVING COUNT(b.id) > 0 AND MAX(b.check_in) <= DATE_SUB(CURDATE(), INTERVAL 90 DAY)';
+                } else {
+                    $where .= ' AND 1=0';
+                }
+            }
+
             if ($hasLineUid) {
+                $countSql = "SELECT COUNT(*) AS cnt FROM (
+                    SELECT plc.id
+                    FROM property_line_contacts plc
+                    LEFT JOIN bookings b
+                           ON b.guest_line_user_id = plc.line_user_id
+                          AND b.property_id = plc.property_id
+                    WHERE {$where}
+                    GROUP BY plc.id
+                    {$having}
+                ) sub";
+                $countRow = Database::fetch($countSql, $params);
+                $total    = (int)($countRow['cnt'] ?? 0);
+                $offset   = ($page - 1) * $perPage;
+
                 $contacts = Database::fetchAll(
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
                             plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
@@ -100,11 +117,19 @@ class LineContactController extends Controller
                            AND b.property_id = plc.property_id
                      WHERE {$where}
                      GROUP BY plc.id
+                     {$having}
                      ORDER BY plc.last_seen_at DESC
                      LIMIT {$perPage} OFFSET {$offset}",
                     $params
                 );
             } else {
+                $countRow = Database::fetch(
+                    "SELECT COUNT(*) AS cnt FROM property_line_contacts plc WHERE {$where}",
+                    $params
+                );
+                $total  = (int)($countRow['cnt'] ?? 0);
+                $offset = ($page - 1) * $perPage;
+
                 $contacts = Database::fetchAll(
                     "SELECT plc.id, plc.line_user_id, plc.display_name, plc.picture_url,
                             plc.followed_at, plc.unfollowed_at, plc.last_seen_at{$phoneCol}{$tagsCol}{$notesCol},
@@ -150,11 +175,6 @@ class LineContactController extends Controller
                 }
                 arsort($allTags);
             }
-        }
-
-        // Client-side segment filter (done in PHP after query — avoids complex SQL)
-        if ($filterSegment !== '') {
-            $contacts = array_values(array_filter($contacts, fn($c) => ($c['auto_segment'] ?? '') === $filterSegment));
         }
 
         $canBroadcast = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_BROADCAST));
@@ -332,6 +352,19 @@ PROMPT;
         if ($text === '') { $this->json(['ok' => false, 'error' => 'ข้อความว่าง']); return; }
         if (mb_strlen($text) > 2000) { $this->json(['ok' => false, 'error' => 'ข้อความยาวเกิน 2000 ตัวอักษร']); return; }
 
+        $tokenCol = Database::tableHasColumn('properties', 'line_channel_access_token')
+            ? 'line_channel_access_token' : null;
+        if ($tokenCol) {
+            $propRow = Database::fetch(
+                "SELECT {$tokenCol} AS line_token FROM properties WHERE id = :p LIMIT 1",
+                ['p' => $propertyId]
+            );
+            if (empty(trim((string)($propRow['line_token'] ?? '')))) {
+                $this->json(['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า LINE Channel Access Token — ไปที่หน้า LINE Hub ของที่พัก']);
+                return;
+            }
+        }
+
         // filter by tag ถ้าระบุมา
         $filterTag  = trim((string)($_POST['tag'] ?? ''));
         $tagWhere   = '';
@@ -349,6 +382,11 @@ PROMPT;
             $tagParams
         );
 
+        if (empty($contacts)) {
+            $this->json(['ok' => false, 'error' => 'ไม่มีผู้ติดตามที่พร้อมรับข้อความ (หรือไม่ตรงเงื่อนไข tag)']);
+            return;
+        }
+
         $sent    = 0;
         $failed  = 0;
         $msgs    = [['type' => 'text', 'text' => $text]];
@@ -360,7 +398,12 @@ PROMPT;
             if (($sent + $failed) % 10 === 0) usleep(100000); // 0.1s per 10 msgs
         }
 
-        $this->json(['ok' => true, 'sent' => $sent, 'failed' => $failed]);
+        $this->json([
+            'ok'     => true,
+            'sent'   => $sent,
+            'failed' => $failed,
+            'total'  => count($contacts),
+        ]);
     }
 
     // ─────────────────────────────────────────────

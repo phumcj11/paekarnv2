@@ -1054,9 +1054,12 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
             <p class="text-sm font-semibold text-emerald-800"><?= e($prop['facebook_page_name'] ?? $prop['facebook_page_id']) ?></p>
             <p class="text-xs text-emerald-600">เชื่อมต่อแล้ว — สามารถโพสต์ได้จาก Marketing Center</p>
           </div>
-          <a href="<?= url('/owner/facebook/disconnect/' . (int)$prop['id']) ?>"
-             onclick="return confirm('ยืนยันตัดการเชื่อมต่อ Facebook Page?')"
-             class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition">ตัดเชื่อมต่อ</a>
+          <form method="post" action="<?= url('/owner/facebook/disconnect/' . (int)$prop['id']) ?>"
+                onsubmit="return confirm('ยืนยันตัดการเชื่อมต่อ Facebook Page?')"
+                class="inline">
+            <?= csrf() ?>
+            <button type="submit" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition">ตัดเชื่อมต่อ</button>
+          </form>
         </div>
         <?php else: ?>
         <?php if (\App\Services\FacebookService::isConfigured()): ?>

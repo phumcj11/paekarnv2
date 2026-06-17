@@ -20,6 +20,7 @@ class MembershipController extends Controller
         if (!$ownerId) {
             Session::flash('error', 'ไม่พบข้อมูลเจ้าของแพ');
             redirect(url('/owner/dashboard'));
+            return;
         }
         $owner = OwnerMembership::ownerRow($ownerId);
         $plans = MembershipPlan::activeOrdered();

@@ -9,11 +9,29 @@ use App\Core\View;
 use App\Models\Coupon;
 use App\Services\CouponRedeemTokenService;
 use App\Services\CouponService;
+use App\Services\OwnerTier;
 
 class CouponController extends Controller
 {
+    private function requireCouponFeature(): bool
+    {
+        if (Auth::isAdmin()) {
+            return true;
+        }
+        $oid = Auth::ownerId();
+        if (!$oid || !OwnerTier::can($oid, OwnerTier::FEATURE_COUPON)) {
+            Session::flash('error', 'ฟีเจอร์ใช้คูปองต้องใช้แพ็กเกจ Standard ขึ้นไป');
+            redirect(url('/owner/membership'));
+            return false;
+        }
+        return true;
+    }
+
     public function index(): void
     {
+        if (!$this->requireCouponFeature()) {
+            return;
+        }
         $properties = $this->ownerProperties();
         $usages = $this->recentUsages();
         View::render('owner/coupons/verify', [
@@ -27,6 +45,9 @@ class CouponController extends Controller
 
     public function check(): void
     {
+        if (!$this->requireCouponFeature()) {
+            return;
+        }
         $code  = strtoupper(trim((string)($_POST['code'] ?? '')));
         $phone = trim((string)($_POST['phone'] ?? ''));
 
@@ -49,6 +70,9 @@ class CouponController extends Controller
 
     public function markUsed(): void
     {
+        if (!$this->requireCouponFeature()) {
+            return;
+        }
         $couponId   = (int)($_POST['coupon_id'] ?? 0);
         $propertyId = (int)($_POST['property_id'] ?? 0);
         $bookingId  = (int)($_POST['booking_id'] ?? 0); // optional
@@ -93,6 +117,9 @@ class CouponController extends Controller
 
     public function scan(): void
     {
+        if (!$this->requireCouponFeature()) {
+            return;
+        }
         View::render('owner/coupons/scan', [
             'page_title' => 'สแกนคูปอง',
         ], 'layouts/owner');
@@ -100,6 +127,9 @@ class CouponController extends Controller
 
     public function scanResolve(): void
     {
+        if (!$this->requireCouponFeature()) {
+            return;
+        }
         $raw = trim((string) ($_POST['raw'] ?? ''));
         if ($raw === '') {
             Session::flash('error', 'ไม่พบข้อมูลจาก QR');

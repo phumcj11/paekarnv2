@@ -25,6 +25,7 @@ class ContentPlanController extends Controller
     public function index(): void
     {
         $ownerId = $this->ownerId();
+        $isAdmin = Auth::isAdmin();
         $tab     = in_array($_GET['tab'] ?? '', ['calendar', 'groups', 'leads', 'settings']) ? $_GET['tab'] : 'calendar';
 
         // ---- Calendar data ----
@@ -35,8 +36,13 @@ class ContentPlanController extends Controller
             $month = (int)date('n');
         }
 
-        $plans   = $ownerId ? ContentPlan::forMonth($ownerId, $year, $month) : [];
-        $counts  = $ownerId ? ContentPlan::countThisMonth($ownerId) : array_fill_keys(ContentPlan::STATUSES, 0);
+        if ($isAdmin) {
+            $plans  = ContentPlan::forMonthAll($year, $month);
+            $counts = ContentPlan::countThisMonthAll();
+        } else {
+            $plans  = $ownerId ? ContentPlan::forMonth($ownerId, $year, $month) : [];
+            $counts = $ownerId ? ContentPlan::countThisMonth($ownerId) : array_fill_keys(ContentPlan::STATUSES, 0);
+        }
         $calMap  = [];
         foreach ($plans as $p) {
             $calMap[$p['post_date']][] = $p;
@@ -52,8 +58,13 @@ class ContentPlanController extends Controller
         $socialSel = 'id, name, facebook_url, line_id'
             . ($hasSocial ? ', instagram_url, tiktok_url' : ', NULL AS instagram_url, NULL AS tiktok_url')
             . ($hasFbPage ? ', facebook_page_id, facebook_page_name, facebook_page_token' : ', NULL AS facebook_page_id, NULL AS facebook_page_name, NULL AS facebook_page_token');
-        $properties = $ownerId
-            ? Database::fetchAll("SELECT {$socialSel} FROM properties WHERE owner_id = :o ORDER BY name", ['o' => $ownerId])
+        $properties = ($isAdmin || $ownerId)
+            ? Database::fetchAll(
+                "SELECT {$socialSel} FROM properties"
+                . ($isAdmin ? '' : ' WHERE owner_id = :o')
+                . ' ORDER BY name',
+                $isAdmin ? [] : ['o' => $ownerId]
+            )
             : [];
 
         $hasMarketingTables = self::hasMarketingTables();

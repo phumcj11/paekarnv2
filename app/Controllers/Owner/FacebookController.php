@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\Session;
+use App\Core\Csrf;
 use App\Services\FacebookService;
 
 /**
@@ -136,24 +137,27 @@ class FacebookController extends Controller
         echo '<p class="text-sm text-slate-500 mb-4">เลือก Page ที่ต้องการเชื่อมต่อกับที่พักนี้</p>';
         echo '<div class="space-y-2">';
         foreach ($pages as $page) {
-            $url = url('/owner/facebook/save-page') . '?prop=' . $propId . '&page_id=' . urlencode($page['id']);
-            echo '<a href="' . e($url) . '" class="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 hover:border-primary-400 hover:bg-primary-50 transition">';
+            echo '<form method="post" action="' . e(url('/owner/facebook/save-page')) . '" class="block">';
+            echo Csrf::field();
+            echo '<input type="hidden" name="prop" value="' . (int)$propId . '">';
+            echo '<input type="hidden" name="page_id" value="' . e($page['id']) . '">';
+            echo '<button type="submit" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 hover:border-primary-400 hover:bg-primary-50 transition text-left">';
             echo '<span class="text-2xl">📘</span>';
             echo '<div><div class="font-semibold text-slate-800 text-sm">' . e($page['name']) . '</div>';
             echo '<div class="text-xs text-slate-400">' . e($page['category'] ?? '') . ' · ID: ' . e($page['id']) . '</div></div>';
-            echo '</a>';
+            echo '</button></form>';
         }
         echo '</div></div></body></html>';
     }
 
-    /** GET /owner/facebook/save-page?prop=N&page_id=XXX — save selected page from picker */
+    /** POST /owner/facebook/save-page — save selected page from picker */
     public function savePage(): void
     {
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 
-        $propId    = (int)($_GET['prop'] ?? 0);
-        $pageId    = trim($_GET['page_id'] ?? '');
+        $propId    = (int)($_POST['prop'] ?? $_GET['prop'] ?? 0);
+        $pageId    = trim((string)($_POST['page_id'] ?? $_GET['page_id'] ?? ''));
         $pagesJson = Session::get('_fb_pages', '');
         $pages     = $pagesJson ? json_decode($pagesJson, true) : [];
 
@@ -175,7 +179,7 @@ class FacebookController extends Controller
         redirect(url('/owner/content-plans?tab=settings'));
     }
 
-    /** GET /owner/facebook/disconnect/{property_id} */
+    /** POST /owner/facebook/disconnect/{property_id} */
     public function disconnect(int $propertyId): void
     {
         $ownerId = $this->ownerId();

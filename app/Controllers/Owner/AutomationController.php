@@ -287,66 +287,66 @@ PROMPT;
 
         // checkin_reminder_1d — เช็คอินพรุ่งนี้
         $reminders = Database::fetchAll(
-            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+            "SELECT b.id, b.code, b.guest_name, b.check_in, b.check_out, b.status
                FROM bookings b
                JOIN property_units pu ON pu.id = b.unit_id
               WHERE pu.property_id = :p
-                AND b.check_in_date = :d
+                AND b.check_in = :d
                 AND b.status IN ('confirmed','pending')
-              ORDER BY b.check_in_date",
+              ORDER BY b.check_in",
             ['p' => $propertyId, 'd' => $in1day]
         );
         foreach ($reminders as $b) {
             $preview[] = [
                 'event'        => 'checkin_reminder_1d',
                 'label'        => 'แจ้งเตือนก่อนเช็คอิน 1 วัน',
-                'booking_code' => $b['booking_code'],
+                'booking_code' => $b['code'],
                 'guest_name'   => $b['guest_name'],
-                'date'         => $b['check_in_date'],
+                'date'         => $b['check_in'],
                 'status'       => $b['status'],
             ];
         }
 
         // send_checkout_followup — เช็คเอาท์วันนี้
         $followups = Database::fetchAll(
-            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+            "SELECT b.id, b.code, b.guest_name, b.check_in, b.check_out, b.status
                FROM bookings b
                JOIN property_units pu ON pu.id = b.unit_id
               WHERE pu.property_id = :p
-                AND b.check_out_date = :d
+                AND b.check_out = :d
                 AND b.status IN ('confirmed','completed')
-              ORDER BY b.check_out_date",
+              ORDER BY b.check_out",
             ['p' => $propertyId, 'd' => $today]
         );
         foreach ($followups as $b) {
             $preview[] = [
                 'event'        => 'checkout_followup',
                 'label'        => 'ติดตามหลังเช็คเอาท์',
-                'booking_code' => $b['booking_code'],
+                'booking_code' => $b['code'],
                 'guest_name'   => $b['guest_name'],
-                'date'         => $b['check_out_date'],
+                'date'         => $b['check_out'],
                 'status'       => $b['status'],
             ];
         }
 
         // send_review_requests — เช็คเอาท์เมื่อ 3 วันก่อน
         $reviews = Database::fetchAll(
-            "SELECT b.id, b.booking_code, b.guest_name, b.check_in_date, b.check_out_date, b.status
+            "SELECT b.id, b.code, b.guest_name, b.check_in, b.check_out, b.status
                FROM bookings b
                JOIN property_units pu ON pu.id = b.unit_id
               WHERE pu.property_id = :p
-                AND b.check_out_date = :d
+                AND b.check_out = :d
                 AND b.status IN ('confirmed','completed')
-              ORDER BY b.check_out_date",
+              ORDER BY b.check_out",
             ['p' => $propertyId, 'd' => $ago3days]
         );
         foreach ($reviews as $b) {
             $preview[] = [
                 'event'        => 'review_request',
                 'label'        => 'ขอรีวิว (หลังเช็คเอาท์ 3 วัน)',
-                'booking_code' => $b['booking_code'],
+                'booking_code' => $b['code'],
                 'guest_name'   => $b['guest_name'],
-                'date'         => $b['check_out_date'],
+                'date'         => $b['check_out'],
                 'status'       => $b['status'],
             ];
         }

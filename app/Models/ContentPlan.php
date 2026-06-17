@@ -29,6 +29,21 @@ class ContentPlan
         'cancelled' => 'bg-red-100 text-red-600',
     ];
 
+    /** รายการตามเดือน (admin — ทุก owner) */
+    public static function forMonthAll(int $year, int $month): array
+    {
+        $from = sprintf('%04d-%02d-01', $year, $month);
+        $to   = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
+        return Database::fetchAll(
+            "SELECT cp.*, p.name AS property_name
+             FROM content_plans cp
+             LEFT JOIN properties p ON p.id = cp.property_id
+             WHERE cp.post_date BETWEEN :f AND :t
+             ORDER BY cp.post_date ASC, cp.id ASC",
+            ['f' => $from, 't' => $to]
+        );
+    }
+
     /** รายการตามเดือน */
     public static function forMonth(int $ownerId, int $year, int $month): array
     {
@@ -83,6 +98,23 @@ class ContentPlan
     public static function delete(int $id): void
     {
         Database::delete('content_plans', ['id' => $id]);
+    }
+
+    /** จำนวนโพสต์ในเดือนนี้ per status (admin — ทุก owner) */
+    public static function countThisMonthAll(): array
+    {
+        $rows = Database::fetchAll(
+            "SELECT status, COUNT(*) c FROM content_plans
+             WHERE DATE_FORMAT(post_date,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m')
+             GROUP BY status"
+        );
+        $map = ['draft' => 0, 'scheduled' => 0, 'published' => 0, 'cancelled' => 0];
+        foreach ($rows as $r) {
+            if (isset($map[$r['status']])) {
+                $map[$r['status']] = (int)$r['c'];
+            }
+        }
+        return $map;
     }
 
     /** จำนวนโพสต์ในเดือนนี้ per status */

@@ -70,8 +70,8 @@ return function (Router $r): void {
 
         // Automation templates
         $r->get('/automation',                [OwnerAutomation::class, 'index']);
-        $r->post('/automation/save',          [OwnerAutomation::class, 'save']);
-        $r->post('/automation/ai-draft',      [OwnerAutomation::class, 'aiDraft']);
+        $r->post('/automation/save',          [OwnerAutomation::class, 'save'])->middleware('csrf');
+        $r->post('/automation/ai-draft',      [OwnerAutomation::class, 'aiDraft'])->middleware('csrf');
         $r->get('/automation/ai-campaign',    [OwnerAutomation::class, 'aiCampaign']);
         $r->get('/automation/cron-preview',   [OwnerAutomation::class, 'cronPreview']);
 
@@ -79,16 +79,16 @@ return function (Router $r): void {
         $r->get('/bookings',                       [OwnerBooking::class, 'index']);
         $r->get('/bookings/create',                [OwnerBooking::class, 'create']);
         $r->get('/api/line-contacts',              [OwnerBooking::class, 'lineContacts']);
-        $r->post('/api/line-contacts/sync',        [OwnerBooking::class, 'syncLineContacts']);
+        $r->post('/api/line-contacts/sync',        [OwnerBooking::class, 'syncLineContacts'])->middleware('csrf');
 
         // LINE Contacts management page
         $r->get('/line-contacts',                              [LineContactController::class, 'index']);
-        $r->post('/line-contacts/{id:[0-9]+}/phone',           [LineContactController::class, 'updatePhone']);
-        $r->post('/line-contacts/{id:[0-9]+}/message',         [LineContactController::class, 'sendMessage']);
-        $r->post('/line-contacts/{id:[0-9]+}/tags',            [LineContactController::class, 'updateTags']);
-        $r->post('/line-contacts/{id:[0-9]+}/notes',           [LineContactController::class, 'updateNotes']);
+        $r->post('/line-contacts/{id:[0-9]+}/phone',           [LineContactController::class, 'updatePhone'])->middleware('csrf');
+        $r->post('/line-contacts/{id:[0-9]+}/message',         [LineContactController::class, 'sendMessage'])->middleware('csrf');
+        $r->post('/line-contacts/{id:[0-9]+}/tags',            [LineContactController::class, 'updateTags'])->middleware('csrf');
+        $r->post('/line-contacts/{id:[0-9]+}/notes',           [LineContactController::class, 'updateNotes'])->middleware('csrf');
         $r->get('/line-contacts/{id:[0-9]+}/ai-reply',         [LineContactController::class, 'aiReply']);
-        $r->post('/line-contacts/broadcast',                   [LineContactController::class, 'broadcast']);
+        $r->post('/line-contacts/broadcast',                   [LineContactController::class, 'broadcast'])->middleware('csrf');
         $r->get('/api/booking-quote',              [OwnerBooking::class, 'quote']);
         $r->post('/bookings',                      [OwnerBooking::class, 'store'])->middleware('csrf');
         $r->get('/bookings/{id:[0-9]+}',           [OwnerBooking::class, 'show']);
@@ -128,8 +128,8 @@ return function (Router $r): void {
         $r->get('/facebook/connect/{id:[0-9]+}',  [FacebookController::class, 'connect']);
         $r->get('/facebook/callback',             [FacebookController::class, 'callback']);
         $r->get('/facebook/pick-page',            [FacebookController::class, 'pickPage']);
-        $r->get('/facebook/save-page',            [FacebookController::class, 'savePage']);
-        $r->get('/facebook/disconnect/{id:[0-9]+}', [FacebookController::class, 'disconnect']);
+        $r->post('/facebook/save-page',           [FacebookController::class, 'savePage'])->middleware('csrf');
+        $r->post('/facebook/disconnect/{id:[0-9]+}', [FacebookController::class, 'disconnect'])->middleware('csrf');
 
         // Profile + Banking
         $r->get('/profile',          [ProfileController::class, 'index']);

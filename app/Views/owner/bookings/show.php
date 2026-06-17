@@ -29,6 +29,78 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
       </div>
     </div>
 
+    <?php
+    $paidTotal = 0.0;
+    foreach ($payments as $p) {
+        if (($p['status'] ?? '') === 'verified') {
+            $paidTotal += (float)($p['amount'] ?? 0);
+        }
+    }
+    $remaining = max(0, (float)($b['total_price'] ?? 0) - $paidTotal);
+    $statusSteps = [
+        'pending'   => ['label' => 'รอยืนยัน', 'icon' => 'clock'],
+        'confirmed' => ['label' => 'ยืนยันแล้ว', 'icon' => 'check-circle'],
+        'completed' => ['label' => 'เข้าพักเสร็จ', 'icon' => 'flag'],
+    ];
+    $terminalMap = [
+        'rejected'  => ['label' => 'ปฏิเสธ', 'icon' => 'x-circle'],
+        'cancelled' => ['label' => 'ยกเลิก', 'icon' => 'ban'],
+        'no_show'   => ['label' => 'No-show', 'icon' => 'user-x'],
+    ];
+    $currentStatus = (string)($b['status'] ?? 'pending');
+    $flowKeys = array_keys($statusSteps);
+    $currentIdx = array_search($currentStatus, $flowKeys, true);
+    if ($currentIdx === false && isset($terminalMap[$currentStatus])) {
+        $timelineSteps = [$terminalMap[$currentStatus]];
+    } else {
+        $timelineSteps = [];
+        foreach ($statusSteps as $key => $meta) {
+            $idx = array_search($key, $flowKeys, true);
+            $state = 'upcoming';
+            if ($currentIdx !== false) {
+                if ($idx < $currentIdx) {
+                    $state = 'done';
+                } elseif ($idx === $currentIdx) {
+                    $state = 'current';
+                }
+            }
+            $timelineSteps[] = array_merge($meta, ['key' => $key, 'state' => $state]);
+        }
+    }
+    ?>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <h3 class="font-bold mb-4 flex items-center gap-2"><i data-lucide="git-branch" class="w-5 h-5 text-accent-600"></i> สถานะการจอง</h3>
+      <ol class="space-y-3">
+        <?php foreach ($timelineSteps as $step): ?>
+        <?php
+          $state = $step['state'] ?? 'current';
+          $dotClass = match ($state) {
+              'done'    => 'bg-emerald-500 text-white ring-emerald-100',
+              'current' => 'bg-accent-600 text-white ring-accent-100',
+              default   => 'bg-slate-200 text-slate-500 ring-slate-100',
+          };
+          $textClass = $state === 'upcoming' ? 'text-slate-400' : 'text-slate-800';
+        ?>
+        <li class="flex items-start gap-3">
+          <span class="w-8 h-8 rounded-full ring-4 grid place-items-center shrink-0 <?= $dotClass ?>">
+            <i data-lucide="<?= e($step['icon']) ?>" class="w-4 h-4"></i>
+          </span>
+          <div class="pt-0.5">
+            <div class="text-sm font-semibold <?= $textClass ?>"><?= e($step['label']) ?></div>
+            <?php if (($step['state'] ?? '') === 'current'): ?>
+              <div class="text-xs text-accent-700 font-medium mt-0.5">สถานะปัจจุบัน</div>
+            <?php elseif (($step['state'] ?? '') === 'done'): ?>
+              <div class="text-xs text-emerald-600 mt-0.5">ดำเนินการแล้ว</div>
+            <?php endif; ?>
+          </div>
+        </li>
+        <?php endforeach; ?>
+      </ol>
+      <?php if (!empty($b['created_at'])): ?>
+      <p class="text-xs text-slate-500 mt-4 pt-3 border-t border-slate-100">สร้างเมื่อ <?= format_date_th($b['created_at']) ?></p>
+      <?php endif; ?>
+    </div>
+
     <!-- Stay -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
       <h3 class="font-bold mb-3 flex items-center gap-2"><i data-lucide="calendar" class="w-5 h-5 text-accent-600"></i> รายละเอียดการเข้าพัก</h3>
@@ -68,6 +140,20 @@ $modeHdrIc = ($bmHdr === 'info_only') ? 'info' : 'calendar-check';
     <!-- Payment -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
       <h3 class="font-bold mb-3 flex items-center gap-2"><i data-lucide="receipt" class="w-5 h-5 text-accent-600"></i> การชำระเงิน</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 text-sm">
+        <div class="rounded-xl bg-slate-50 border border-slate-100 p-3">
+          <div class="text-xs text-slate-500">ชำระแล้ว</div>
+          <div class="font-bold text-emerald-700 tabular-nums"><?= format_money($paidTotal) ?></div>
+        </div>
+        <div class="rounded-xl bg-slate-50 border border-slate-100 p-3">
+          <div class="text-xs text-slate-500">คงเหลือ</div>
+          <div class="font-bold text-amber-700 tabular-nums"><?= format_money($remaining) ?></div>
+        </div>
+        <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 col-span-2 md:col-span-1">
+          <div class="text-xs text-slate-500">สถานะการชำระ</div>
+          <div class="font-bold text-slate-800"><?= e($b['payment_status']) ?></div>
+        </div>
+      </div>
       <?php if (empty($payments)): ?>
         <p class="text-sm text-slate-500">ยังไม่มีการชำระเงิน</p>
       <?php else: ?>
