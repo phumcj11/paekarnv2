@@ -1,17 +1,25 @@
 #!/bin/bash
 # =============================================================================
-# VPS Setup Script — paekarn.com (HostingLotus Cloud VPS Linux 1)
-# IP: 119.59.102.235
-# รัน: bash vps-setup.sh
+# VPS Setup Script — paekarn.com
+# รันบน VPS:
+#   export DB_NAME='...'
+#   export DB_USER='...'
+#   export DB_PASS='...'
+#   bash scripts/vps-setup.sh
 # =============================================================================
 set -e
 
-DOMAIN="paekarn.com"
-APP_DIR="/var/www/paekarn"
-GITHUB_REPO="https://github.com/phumcj11/paekarnv2.git"
-DB_NAME="pcj_paekarn"
-DB_USER="pcj_paekarn"
-DB_PASS="uwRjK/szPYSUVtUhfuY8"
+DOMAIN="${DOMAIN:-paekarn.com}"
+APP_DIR="${APP_DIR:-/var/www/paekarn}"
+GITHUB_REPO="${GITHUB_REPO:-https://github.com/phumcj11/paekarnv2.git}"
+DB_NAME="${DB_NAME:-}"
+DB_USER="${DB_USER:-}"
+DB_PASS="${DB_PASS:-}"
+
+if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
+  echo "ERROR: Set DB_NAME, DB_USER, and DB_PASS before running this script."
+  exit 1
+fi
 
 echo "============================================"
 echo " paekarn.com VPS Setup"
@@ -51,7 +59,7 @@ fi
 # 4) สร้าง config production บน VPS (ไม่ commit ขึ้น git)
 # -----------------------------------------------------------------------
 echo "[4/9] Writing production config..."
-cat > "$APP_DIR/app/Config/database.php" <<PHP
+cat > "$APP_DIR/app/Config/database.local.php" <<PHP
 <?php
 return [
     'driver'    => 'mysql',
@@ -66,10 +74,13 @@ return [
 ];
 PHP
 
-# เปลี่ยน env=production, debug=false
-sed -i "s/'env'.*=>.*'local'/'env' => 'production'/" "$APP_DIR/app/Config/app.php"
-sed -i "s/'env'.*=>.*'development'/'env' => 'production'/" "$APP_DIR/app/Config/app.php"
-sed -i "s/'debug'.*=>.*true/'debug' => false/" "$APP_DIR/app/Config/app.php"
+cat > "$APP_DIR/app/Config/app.local.php" <<'PHP'
+<?php
+return [
+    'env'   => 'production',
+    'debug' => false,
+];
+PHP
 echo "    Config written."
 
 # -----------------------------------------------------------------------
@@ -158,7 +169,7 @@ echo ""
 echo "NEXT STEPS:"
 echo ""
 echo "1) Import database (SCP dump file ขึ้น VPS ก่อน):"
-echo "   mysql -u ${DB_USER} -p'${DB_PASS}' ${DB_NAME} < /tmp/paekarnv2_export.sql"
+echo "   mysql -u ${DB_USER} -p ${DB_NAME} < /tmp/paekarnv2_export.sql"
 echo ""
 echo "2) Add this DEPLOY KEY to GitHub repo:"
 echo "   (Settings > Deploy keys > Add key — Read access)"

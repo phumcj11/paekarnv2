@@ -4,7 +4,8 @@
  * รัน: php scripts/export_db_safe.php > /dev/null (ไฟล์จะอยู่ที่ scripts/dump_safe.sql)
  * หรือ: C:\xampp\php\php.exe scripts\export_db_safe.php
  */
-$cfg = require __DIR__ . '/../app/Config/database.php';
+$localConfig = __DIR__ . '/../app/Config/database.local.php';
+$cfg = require (is_file($localConfig) ? $localConfig : __DIR__ . '/../app/Config/database.php');
 
 $pdo = new PDO(
     "mysql:host={$cfg['host']};port={$cfg['port']};dbname={$cfg['database']};charset=utf8mb4",

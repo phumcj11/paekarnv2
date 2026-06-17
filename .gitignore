@@ -1,4 +1,5 @@
 # Environment / Secrets
+/app/Config/app.local.php
 /app/Config/database.local.php
 .env
 .env.*
@@ -12,6 +13,7 @@
 !/storage/logs/.gitkeep
 /storage/cache/*
 !/storage/cache/.gitkeep
+!/storage/cache/login_throttle/
 !/storage/cache/login_throttle/.gitkeep
 /storage/backups/*
 !/storage/backups/.gitkeep
@@ -36,3 +38,6 @@ composer.lock
 
 # SQL dumps
 *.sql
+
+# Archived/removed hosting artifacts
+/deleted/

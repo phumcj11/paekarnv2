@@ -3,15 +3,17 @@
  * Web-trigger cron endpoint (for shared hosting without CLI access).
  * Call:  https://yoursite.com/cron.php?key=YOUR_SECRET&job=expire_coupons
  */
-require __DIR__ . '/../app/Core/Application.php';
-\App\Core\Application::boot(__DIR__ . '/..');
+$basePath = defined('APP_BASE') ? APP_BASE : dirname(__DIR__);
+
+require $basePath . '/app/Core/Application.php';
+\App\Core\Application::boot($basePath);
 
 header('Content-Type: text/plain; charset=utf-8');
 
 $expectedKey = (string)\App\Models\Setting::get('cron_secret', '');
 $gotKey = $_GET['key'] ?? '';
 
-if (!$expectedKey || $gotKey !== $expectedKey) {
+if ($expectedKey === '' || !is_string($gotKey) || !hash_equals($expectedKey, $gotKey)) {
     http_response_code(403);
     echo "Forbidden — invalid cron key\n";
     exit;

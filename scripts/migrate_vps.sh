@@ -1,6 +1,17 @@
 #!/bin/bash
 # รัน migration content_plans บน VPS
-mysql -u pcj_paekarn -pPaekarn@2026! pcj_paekarn <<'SQL'
+set -e
+
+DB_NAME="${DB_NAME:-}"
+DB_USER="${DB_USER:-}"
+DB_PASS="${DB_PASS:-}"
+
+if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
+  echo "ERROR: Set DB_NAME, DB_USER, and DB_PASS before running this script."
+  exit 1
+fi
+
+MYSQL_PWD="$DB_PASS" mysql -u "$DB_USER" "$DB_NAME" <<'SQL'
 CREATE TABLE IF NOT EXISTS `content_plans` (
   `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `owner_id`      INT UNSIGNED NOT NULL,
@@ -21,4 +32,4 @@ CREATE TABLE IF NOT EXISTS `content_plans` (
 SQL
 
 echo "Migration result: $?"
-mysql -u pcj_paekarn -pPaekarn@2026! pcj_paekarn -e "SHOW TABLES LIKE 'content_plans';"
+MYSQL_PWD="$DB_PASS" mysql -u "$DB_USER" "$DB_NAME" -e "SHOW TABLES LIKE 'content_plans';"

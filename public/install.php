@@ -14,6 +14,12 @@ require_once dirname(__DIR__) . '/app/Core/Application.php';
 
 use App\Core\Application;
 
+if ((Application::$config['app']['env'] ?? 'production') === 'production'
+    && getenv('PAEKAN_ALLOW_INSTALL') !== '1') {
+    http_response_code(404);
+    exit('Not found');
+}
+
 $cfg     = Application::$config['db'];
 $logs    = [];
 $success = true;

@@ -2,10 +2,17 @@
 # เพิ่ม phone column ใน property_line_contacts สำหรับ auto-match จองกับ LINE — idempotent
 set -e
 
-DB_USER="pcj_paekarn"
-DB_PASS="Paekarn@2026!"
-DB_NAME="pcj_paekarn"
-MYSQL="mysql -u${DB_USER} -p${DB_PASS} ${DB_NAME}"
+DB_NAME="${DB_NAME:-}"
+DB_USER="${DB_USER:-}"
+DB_PASS="${DB_PASS:-}"
+
+if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
+  echo "ERROR: Set DB_NAME, DB_USER, and DB_PASS before running this script."
+  exit 1
+fi
+
+export MYSQL_PWD="$DB_PASS"
+MYSQL="mysql -u${DB_USER} ${DB_NAME}"
 
 add_column() {
   local table="$1" column="$2" definition="$3"

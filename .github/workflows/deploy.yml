@@ -29,39 +29,66 @@ jobs:
             --exclude='public/uploads/' \
             --exclude='storage/' \
             --exclude='.env' \
+            --exclude='app/Config/app.local.php' \
+            --exclude='app/Config/database.local.php' \
             --exclude='scripts/dump_safe.sql' \
             ./ deploy/
 
       - name: Upload to VPS
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           install -m 600 -D /dev/stdin ~/.ssh/deploy_key <<< "$SSH_KEY"
-          ssh-keyscan -H 119.59.102.235 >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           rsync -avz -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
-            deploy/ root@119.59.102.235:/tmp/paekarn-deploy-src/
+            deploy/ "$VPS_USER@$VPS_HOST:/tmp/paekarn-deploy-src/"
 
       - name: Install on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 119.59.102.235
-          username: root
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           command_timeout: 10m
           script: |
             set -e
-            APP=/home/pcj/domains/paekarn.com/paekarnv2
-            PUBLIC_HTML=/home/pcj/domains/paekarn.com/public_html
+            APP="${{ secrets.VPS_APP_DIR }}"
+            PUBLIC_HTML="${{ secrets.VPS_PUBLIC_HTML }}"
+            FILE_OWNER="${{ secrets.VPS_FILE_OWNER }}"
+            export DB_NAME="${{ secrets.VPS_DB_NAME }}"
+            export DB_USER="${{ secrets.VPS_DB_USER }}"
+            export DB_PASS="${{ secrets.VPS_DB_PASS }}"
             SRC=/tmp/paekarn-deploy-src
+
+            if [ -z "$APP" ] || [ -z "$PUBLIC_HTML" ]; then
+              echo "Missing VPS_APP_DIR or VPS_PUBLIC_HTML secret"
+              exit 1
+            fi
+            if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
+              echo "Missing VPS_DB_NAME, VPS_DB_USER, or VPS_DB_PASS secret"
+              exit 1
+            fi
+            if [ -z "$FILE_OWNER" ]; then
+              FILE_OWNER="$(whoami)"
+            fi
 
             echo "=== sync app files ==="
             rsync -av \
               --exclude='public/uploads/' \
               --exclude='app/Config/database.php' \
+              --exclude='app/Config/app.local.php' \
+              --exclude='app/Config/database.local.php' \
               "$SRC/" "$APP/"
 
-            echo "=== sync public_html (exclude index.php — managed separately) ==="
-            rsync -av --exclude='uploads/' --exclude='.htaccess' --exclude='index.php' \
+            echo "=== sync public_html (exclude entrypoints managed separately) ==="
+            rsync -av \
+              --exclude='uploads/' \
+              --exclude='.htaccess' \
+              --exclude='index.php' \
+              --exclude='install.php' \
+              --exclude='cron.php' \
               "$APP/public/" "$PUBLIC_HTML/"
 
             echo "=== ensure public_html/index.php points to paekarnv2 ==="
@@ -76,7 +103,18 @@ jobs:
 
             echo "=== permissions ==="
             mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
-            chown -R pcj:pcj "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
+            if [ -L "$PUBLIC_HTML/uploads" ]; then
+              :
+            elif [ -d "$PUBLIC_HTML/uploads" ] && [ -z "$(ls -A "$PUBLIC_HTML/uploads" 2>/dev/null)" ]; then
+              rmdir "$PUBLIC_HTML/uploads"
+              ln -s "$APP/public/uploads" "$PUBLIC_HTML/uploads"
+            elif [ ! -e "$PUBLIC_HTML/uploads" ]; then
+              ln -s "$APP/public/uploads" "$PUBLIC_HTML/uploads"
+            else
+              echo "WARN: $PUBLIC_HTML/uploads exists and is not empty; keep it as-is"
+            fi
+            chown -R "$FILE_OWNER:$FILE_OWNER" "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
+            chmod -R 775 "$APP/storage" "$APP/public/uploads"
 
             echo "=== run DB migrations ==="
             if [ -f "$APP/scripts/migrate_owner_manual_booking.sh" ]; then

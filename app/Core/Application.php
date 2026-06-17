@@ -34,9 +34,20 @@ class Application
         });
 
         // ---------- Load config ----------
+        $appConfig = require self::$basePath . '/app/Config/app.php';
+        $appLocal = self::$basePath . '/app/Config/app.local.php';
+        if (is_file($appLocal)) {
+            $appConfig = array_replace_recursive($appConfig, require $appLocal);
+        }
+
+        $dbConfigFile = self::$basePath . '/app/Config/database.local.php';
+        if (!is_file($dbConfigFile)) {
+            $dbConfigFile = self::$basePath . '/app/Config/database.php';
+        }
+
         self::$config = [
-            'app' => require self::$basePath . '/app/Config/app.php',
-            'db'  => require self::$basePath . '/app/Config/database.php',
+            'app' => $appConfig,
+            'db'  => require $dbConfigFile,
         ];
 
         date_default_timezone_set(self::$config['app']['timezone'] ?? 'Asia/Bangkok');
