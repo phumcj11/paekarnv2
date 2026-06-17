@@ -21,6 +21,46 @@ class ContentPlanController extends Controller
         return (int)$id;
     }
 
+    /** Owner จาก session หรือจาก property ที่ admin เลือก */
+    private function resolveOwnerId(?int $propertyId = null): int
+    {
+        $ownerId = Auth::ownerId();
+        if ($ownerId) {
+            return (int)$ownerId;
+        }
+        if ($propertyId) {
+            $row = Database::fetch("SELECT owner_id FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
+            if ($row && (int)$row['owner_id'] > 0) {
+                return (int)$row['owner_id'];
+            }
+        }
+        return 0;
+    }
+
+    private function findOwnedPlan(int $id): ?array
+    {
+        if (Auth::isAdmin()) {
+            return ContentPlan::find($id);
+        }
+        $ownerId = Auth::ownerId();
+        return $ownerId ? ContentPlan::findForOwner($id, $ownerId) : null;
+    }
+
+    private function ownedProperty(int $propertyId, ?int $ownerId = null): ?array
+    {
+        if (Auth::isAdmin()) {
+            return Database::fetch("SELECT * FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
+        }
+        $oid = $ownerId ?? Auth::ownerId();
+        if (!$oid) {
+            return null;
+        }
+        return Database::fetch(
+            "SELECT * FROM properties WHERE id = :i AND owner_id = :o LIMIT 1",
+            ['i' => $propertyId, 'o' => $oid]
+        );
+    }
+
     /** GET /owner/content-plans?month=Y-m&tab=calendar|groups|leads */
     public function index(): void
     {
@@ -124,10 +164,10 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans */
     public function store(): void
     {
-        $ownerId = $this->ownerId();
+        $data       = $this->input();
+        $propertyId = (int)($data['property_id'] ?? 0);
+        $ownerId    = $this->resolveOwnerId($propertyId ?: null);
         if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
-
-        $data     = $this->input();
         $postDate = trim((string)($data['post_date'] ?? ''));
         $body     = trim((string)($data['body'] ?? ''));
         if (!$postDate || !$body) {
@@ -142,20 +182,18 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/update */
     public function update(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $plan    = ContentPlan::findForOwner($id, $ownerId);
-        if (!$plan && !Auth::isAdmin()) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
+        $plan = $this->findOwnedPlan($id);
+        if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         $data = $this->input();
-        ContentPlan::update($id, array_merge($data, ['owner_id' => $plan['owner_id'] ?? $ownerId]));
+        ContentPlan::update($id, array_merge($data, ['owner_id' => (int)$plan['owner_id']]));
         $this->json(['ok' => true, 'plan' => ContentPlan::find($id)]);
     }
 
     /** POST /owner/content-plans/{id}/delete */
     public function destroy(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $plan    = ContentPlan::findForOwner($id, $ownerId);
-        if (!$plan && !Auth::isAdmin()) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
+        $plan = $this->findOwnedPlan($id);
+        if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         ContentPlan::delete($id);
         $this->json(['ok' => true]);
     }
@@ -163,10 +201,10 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/ai-generate */
     public function aiGenerate(): void
     {
-        $ownerId = $this->ownerId();
+        $data       = $this->input();
+        $propertyId = (int)($data['property_id'] ?? 0);
+        $ownerId    = $this->resolveOwnerId($propertyId ?: null);
         if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
-
-        $data        = $this->input();
         $platform    = $data['platform'] ?? 'facebook';
         $postType    = $data['post_type'] ?? 'page';    // page | group | line_broadcast
         $propName    = trim((string)($data['property_name'] ?? ''));
@@ -231,12 +269,14 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/groups/save — create or update a group */
     public function groupSave(): void
     {
-        $ownerId = $this->ownerId();
-        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
         if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
         $id   = (int)($data['id'] ?? 0);
+        $ownerId = $id && Auth::isAdmin()
+            ? (int)(Database::fetch("SELECT owner_id FROM marketing_fb_groups WHERE id = :i", ['i' => $id])['owner_id'] ?? 0)
+            : $this->resolveOwnerId((int)($data['property_id'] ?? 0));
+        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
         $name = mb_substr(trim((string)($data['name'] ?? '')), 0, 200);
         $url  = mb_substr(trim((string)($data['url'] ?? '')), 0, 1000);
         $rules = mb_substr(trim((string)($data['rules'] ?? '')), 0, 1000);
@@ -246,7 +286,9 @@ class ContentPlanController extends Controller
         }
 
         if ($id) {
-            $existing = Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
+            $existing = Auth::isAdmin()
+                ? Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i", ['i' => $id])
+                : Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
             if (!$existing) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
             Database::update('marketing_fb_groups', ['name' => $name, 'url' => $url, 'rules' => $rules ?: null], 'id = :i', ['i' => $id]);
         } else {
@@ -260,8 +302,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/groups/{id}/delete */
     public function groupDelete(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $row     = Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
+        $row = Auth::isAdmin()
+            ? Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i", ['i' => $id])
+            : Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => Auth::ownerId()]);
         if (!$row) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         Database::delete('marketing_fb_groups', 'id = :i', ['i' => $id]);
         $this->json(['ok' => true]);
@@ -270,8 +313,7 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/log-post — log that a content plan was posted to a group */
     public function logPost(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $plan    = ContentPlan::findForOwner($id, $ownerId);
+        $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 
         $data    = $this->input();
@@ -293,8 +335,7 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/{id}/post-logs — get posting history for a plan */
     public function postLogs(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $plan    = ContentPlan::findForOwner($id, $ownerId);
+        $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 
         $logs = Database::fetchAll(
@@ -314,12 +355,14 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/leads/save — create or update a lead */
     public function leadSave(): void
     {
-        $ownerId = $this->ownerId();
-        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
         if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
         $id   = (int)($data['id'] ?? 0);
+        $ownerId = $id && Auth::isAdmin()
+            ? (int)(Database::fetch("SELECT owner_id FROM marketing_leads WHERE id = :i", ['i' => $id])['owner_id'] ?? 0)
+            : $this->resolveOwnerId((int)($data['property_id'] ?? 0));
+        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
 
         $customerText = mb_substr(trim((string)($data['customer_text'] ?? '')), 0, 5000);
         if (!$customerText) { $this->json(['ok' => false, 'error' => 'กรอกข้อความลูกค้า']); return; }
@@ -340,7 +383,9 @@ class ContentPlanController extends Controller
         ];
 
         if ($id) {
-            $existing = Database::fetch("SELECT id FROM marketing_leads WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
+            $existing = Auth::isAdmin()
+                ? Database::fetch("SELECT id FROM marketing_leads WHERE id = :i", ['i' => $id])
+                : Database::fetch("SELECT id FROM marketing_leads WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
             if (!$existing) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
             Database::update('marketing_leads', $payload, 'id = :i', ['i' => $id]);
         } else {
@@ -359,8 +404,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/leads/{id}/delete */
     public function leadDelete(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $row     = Database::fetch("SELECT id FROM marketing_leads WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => $ownerId]);
+        $row = Auth::isAdmin()
+            ? Database::fetch("SELECT id FROM marketing_leads WHERE id = :i", ['i' => $id])
+            : Database::fetch("SELECT id FROM marketing_leads WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => Auth::ownerId()]);
         if (!$row) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         Database::delete('marketing_leads', 'id = :i', ['i' => $id]);
         $this->json(['ok' => true]);
@@ -369,14 +415,21 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/leads/{id}/ai-comment — AI draft comment */
     public function leadAiComment(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $lead    = Database::fetch(
-            "SELECT l.*, p.name AS property_name, p.type AS property_type, p.zone AS property_zone
-             FROM marketing_leads l
-             LEFT JOIN properties p ON p.id = l.property_id
-             WHERE l.id = :i AND l.owner_id = :o",
-            ['i' => $id, 'o' => $ownerId]
-        );
+        $lead = Auth::isAdmin()
+            ? Database::fetch(
+                "SELECT l.*, p.name AS property_name, p.type AS property_type, p.zone AS property_zone
+                 FROM marketing_leads l
+                 LEFT JOIN properties p ON p.id = l.property_id
+                 WHERE l.id = :i",
+                ['i' => $id]
+            )
+            : Database::fetch(
+                "SELECT l.*, p.name AS property_name, p.type AS property_type, p.zone AS property_zone
+                 FROM marketing_leads l
+                 LEFT JOIN properties p ON p.id = l.property_id
+                 WHERE l.id = :i AND l.owner_id = :o",
+                ['i' => $id, 'o' => Auth::ownerId()]
+            );
         if (!$lead) { $this->json(['ok' => false, 'error' => 'ไม่พบ lead']); return; }
 
         $pax      = $lead['pax'] ? "{$lead['pax']} คน" : 'ไม่ระบุจำนวน';
@@ -423,11 +476,10 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/property-images?property_id=N — returns images for picker */
     public function propertyImages(): void
     {
-        $ownerId    = $this->ownerId();
         $propertyId = (int)($_GET['property_id'] ?? 0);
-        if (!$ownerId || !$propertyId) { $this->json(['ok' => false, 'images' => []]); return; }
+        if (!$propertyId) { $this->json(['ok' => false, 'images' => []]); return; }
 
-        $prop = Database::fetch("SELECT id FROM properties WHERE id = :id AND owner_id = :o", ['id' => $propertyId, 'o' => $ownerId]);
+        $prop = $this->ownedProperty($propertyId);
         if (!$prop) { $this->json(['ok' => false, 'images' => []]); return; }
 
         $hasUnitImg = Database::tableHasColumn('property_images', 'unit_id');
@@ -443,8 +495,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/upload-image — upload image file, return public URL */
     public function uploadImage(): void
     {
-        $ownerId = $this->ownerId();
-        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+        if (!Auth::ownerId() && !Auth::isAdmin()) {
+            $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return;
+        }
         try {
             $path = \App\Core\Upload::image('image', 'marketing');
             if (!$path) { $this->json(['ok' => false, 'error' => 'ไม่ได้เลือกไฟล์']); return; }
@@ -457,14 +510,12 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/social-save — update social links for a property */
     public function socialSave(): void
     {
-        $ownerId = $this->ownerId();
-        if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
-
         $data       = $this->input();
         $propertyId = (int)($data['property_id'] ?? 0);
         if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ระบุที่พัก']); return; }
 
-        $prop = Database::fetch("SELECT id FROM properties WHERE id = :id AND owner_id = :o", ['id' => $propertyId, 'o' => $ownerId]);
+        $ownerId = $this->resolveOwnerId($propertyId);
+        $prop    = $this->ownedProperty($propertyId, $ownerId ?: null);
         if (!$prop) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
 
         $update = [
@@ -497,8 +548,7 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/post-facebook */
     public function postToFacebook(int $id): void
     {
-        $ownerId = $this->ownerId();
-        $plan    = ContentPlan::findForOwner($id, $ownerId);
+        $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 
         if (!FacebookService::isConfigured()) {
@@ -513,11 +563,8 @@ class ContentPlanController extends Controller
             return;
         }
 
-        $prop = Database::fetch(
-            "SELECT facebook_page_id, facebook_page_token, facebook_page_name FROM properties WHERE id = :id AND owner_id = :o",
-            ['id' => $propId, 'o' => $ownerId]
-        );
-        if (!$prop || !$prop['facebook_page_token']) {
+        $prop = $this->ownedProperty($propId, (int)($plan['owner_id'] ?? 0) ?: null);
+        if (!$prop || empty($prop['facebook_page_token'])) {
             $this->json(['ok' => false, 'error' => 'ยังไม่ได้เชื่อมต่อ Facebook Page — ไปที่ ตั้งค่า Social']);
             return;
         }

@@ -351,6 +351,36 @@ PROMPT;
             ];
         }
 
+        // reengagement_30d — LINE contacts ที่ checkout 60–90 วันก่อน (หรือไม่เคยจอง + ทัก 90+ วัน)
+        $ago60 = date('Y-m-d', strtotime('-60 days'));
+        $ago90 = date('Y-m-d', strtotime('-90 days'));
+        $reengagements = Database::fetchAll(
+            "SELECT plc.id, plc.display_name, plc.line_user_id,
+                    MAX(b.check_out) AS last_checkout, plc.last_seen_at
+             FROM property_line_contacts plc
+             LEFT JOIN bookings b
+                    ON b.guest_line_user_id = plc.line_user_id
+                   AND b.property_id = plc.property_id
+                   AND b.status IN ('confirmed','completed')
+             WHERE plc.property_id = :p
+               AND plc.unfollowed_at IS NULL
+             GROUP BY plc.id, plc.display_name, plc.line_user_id, plc.last_seen_at
+             HAVING (last_checkout IS NOT NULL AND last_checkout BETWEEN :ago90 AND :ago60)
+                 OR (last_checkout IS NULL AND plc.last_seen_at < :ago90s)
+             ORDER BY last_checkout DESC, plc.last_seen_at ASC
+             LIMIT 50",
+            ['p' => $propertyId, 'ago60' => $ago60, 'ago90' => $ago90, 'ago90s' => $ago90 . ' 00:00:00']
+        );
+        foreach ($reengagements as $c) {
+            $preview[] = [
+                'event'      => 'reengagement_30d',
+                'label'      => 'ดึงกลับลูกค้าเก่า (60–90 วัน)',
+                'guest_name' => $c['display_name'] ?: $c['line_user_id'],
+                'date'       => $c['last_checkout'] ?: substr((string)$c['last_seen_at'], 0, 10),
+                'status'     => $c['last_checkout'] ? 'last_checkout' : 'no_booking',
+            ];
+        }
+
         $this->json(['ok' => true, 'today' => $today, 'preview' => $preview]);
     }
 

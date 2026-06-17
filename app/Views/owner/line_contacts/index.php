@@ -71,12 +71,24 @@ $presetTags = [
     <?php if ($q !== ''): ?>
       <input type="hidden" name="q" value="<?= e($q) ?>">
     <?php endif; ?>
+    <?php if ($filterTag !== ''): ?>
+      <input type="hidden" name="tag" value="<?= e($filterTag) ?>">
+    <?php endif; ?>
+    <?php if ($filterSegment !== ''): ?>
+      <input type="hidden" name="segment" value="<?= e($filterSegment) ?>">
+    <?php endif; ?>
   </form>
   <?php endif; ?>
 
   <!-- search -->
   <form method="get" action="<?= url('/owner/line-contacts') ?>" class="flex items-center gap-2 flex-1 min-w-[200px]">
     <input type="hidden" name="property_id" value="<?= $propertyId ?>">
+    <?php if ($filterTag !== ''): ?>
+      <input type="hidden" name="tag" value="<?= e($filterTag) ?>">
+    <?php endif; ?>
+    <?php if ($filterSegment !== ''): ?>
+      <input type="hidden" name="segment" value="<?= e($filterSegment) ?>">
+    <?php endif; ?>
     <div class="relative flex-1">
       <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
       <input type="search" name="q" value="<?= e($q) ?>" placeholder="ค้นหาชื่อหรือเบอร์..."

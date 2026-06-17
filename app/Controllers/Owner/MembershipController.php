@@ -45,12 +45,14 @@ class MembershipController extends Controller
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             redirect(url('/owner/dashboard'));
+            return;
         }
         $planId = (int)($_GET['plan'] ?? 0);
         $plan   = $planId ? MembershipPlan::find($planId) : null;
         if (!$plan || !(int)$plan['is_active']) {
             Session::flash('error', 'เลือกแพ็กเกจจากหน้ารายการ');
             redirect(url('/owner/membership'));
+            return;
         }
         $bank = [
             'bank_name'    => \App\Models\Setting::get('bank_name', ''),
@@ -70,6 +72,7 @@ class MembershipController extends Controller
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             redirect(url('/owner/dashboard'));
+            return;
         }
         $data = $this->validate([
             'plan_id' => 'required|integer',
@@ -112,6 +115,7 @@ class MembershipController extends Controller
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             redirect(url('/owner/dashboard'));
+            return;
         }
         $order = Database::fetch(
             "SELECT mo.*, mp.code AS plan_code FROM membership_orders mo
