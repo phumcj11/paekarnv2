@@ -41,8 +41,21 @@ class LineContactController extends Controller
         $contacts     = [];
         $total        = 0;
         $allTags      = [];
-        $filterTag    = trim((string)($_GET['tag'] ?? ''));
+        $filterTag     = trim((string)($_GET['tag'] ?? ''));
         $filterSegment = trim((string)($_GET['segment'] ?? ''));
+        $filterTags    = [];
+        if (isset($_GET['tags']) && (string)$_GET['tags'] !== '') {
+            $rawTags = is_array($_GET['tags']) ? $_GET['tags'] : explode(',', (string)$_GET['tags']);
+            foreach ($rawTags as $t) {
+                $t = trim((string)$t);
+                if ($t !== '' && !in_array($t, $filterTags, true)) {
+                    $filterTags[] = $t;
+                }
+            }
+        }
+        if ($filterTag !== '' && empty($filterTags)) {
+            $filterTags = [$filterTag];
+        }
 
         if ($propertyId) {
             $phoneCol = Database::tableHasColumn('property_line_contacts', 'phone') ? ', plc.phone' : '';
@@ -63,9 +76,14 @@ class LineContactController extends Controller
                 $where .= ')';
             }
 
-            if ($filterTag !== '' && $tagsCol !== '') {
-                $where .= " AND JSON_CONTAINS(plc.tags, :ft, '$')";
-                $params['ft'] = json_encode($filterTag, JSON_UNESCAPED_UNICODE);
+            if (!empty($filterTags) && $tagsCol !== '') {
+                $tagParts = [];
+                foreach ($filterTags as $i => $t) {
+                    $key = 'ft' . $i;
+                    $tagParts[] = "JSON_CONTAINS(plc.tags, :{$key}, '$')";
+                    $params[$key] = json_encode($t, JSON_UNESCAPED_UNICODE);
+                }
+                $where .= ' AND (' . implode(' OR ', $tagParts) . ')';
             }
 
             $hasLineUid = Database::tableHasColumn('bookings', 'guest_line_user_id');
@@ -191,6 +209,7 @@ class LineContactController extends Controller
             'q'             => $q,
             'allTags'       => $allTags,
             'filterTag'     => $filterTag,
+            'filterTags'    => $filterTags,
             'filterSegment' => $filterSegment,
             'canBroadcast'  => $canBroadcast,
             'canAiDraft'    => $canAiDraft,
@@ -365,14 +384,29 @@ PROMPT;
             }
         }
 
-        // filter by tag ถ้าระบุมา
-        $filterTag  = trim((string)($_POST['tag'] ?? ''));
-        $tagWhere   = '';
-        $tagParams  = ['p' => $propertyId];
+        // filter by tag(s) ถ้าระบุมา — OR logic
+        $filterTags = [];
+        if (isset($_POST['tags']) && is_array($_POST['tags'])) {
+            $filterTags = array_values(array_filter(array_map('trim', $_POST['tags'])));
+        } else {
+            $singleTag = trim((string)($_POST['tag'] ?? ''));
+            if ($singleTag !== '') {
+                $filterTags = [$singleTag];
+            } elseif (isset($_POST['tags']) && (string)$_POST['tags'] !== '') {
+                $filterTags = array_values(array_filter(array_map('trim', explode(',', (string)$_POST['tags']))));
+            }
+        }
+        $tagWhere  = '';
+        $tagParams = ['p' => $propertyId];
 
-        if ($filterTag !== '' && Database::tableHasColumn('property_line_contacts', 'tags')) {
-            $tagWhere = " AND JSON_CONTAINS(tags, :tag, '$')";
-            $tagParams['tag'] = json_encode($filterTag, JSON_UNESCAPED_UNICODE);
+        if (!empty($filterTags) && Database::tableHasColumn('property_line_contacts', 'tags')) {
+            $parts = [];
+            foreach ($filterTags as $i => $t) {
+                $key = 'tag' . $i;
+                $parts[] = "JSON_CONTAINS(tags, :{$key}, '$')";
+                $tagParams[$key] = json_encode($t, JSON_UNESCAPED_UNICODE);
+            }
+            $tagWhere = ' AND (' . implode(' OR ', $parts) . ')';
         }
 
         $contacts = Database::fetchAll(

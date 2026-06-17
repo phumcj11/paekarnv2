@@ -10,6 +10,10 @@ $prevM = $month === 1 ? 12 : $month - 1;
 $prevY = $month === 1 ? $year - 1 : $year;
 $nextM = $month === 12 ? 1 : $month + 1;
 $nextY = $month === 12 ? $year + 1 : $year;
+$todayY = (int)date('Y');
+$todayM = (int)date('n');
+$todayD = (int)date('j');
+$isCurrentMonth = ($year === $todayY && $month === $todayM);
 
 $baseQ = static fn(array $extra = []) => url('/owner/properties/' . $pid . '/availability') . '?' . http_build_query(array_merge([
     'unit'  => $unitId,
@@ -38,9 +42,15 @@ $csrfToken    = \App\Core\Csrf::token();
   <?php endif; ?>
 
   <!-- Month navigation -->
-  <div class="flex items-center justify-between mb-2">
+  <div class="flex items-center justify-between mb-2 gap-2">
     <a href="<?= e($baseQ(['month' => $prevM, 'year' => $prevY])) ?>" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50"><i data-lucide="chevron-left" class="w-4 h-4"></i></a>
-    <span class="text-sm font-bold"><?= $thaiMonths[$month] ?> <?= $year + 543 ?></span>
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="text-sm font-bold truncate"><?= $thaiMonths[$month] ?> <?= $year + 543 ?></span>
+      <?php if (!$isCurrentMonth): ?>
+      <a href="<?= e($baseQ(['month' => $todayM, 'year' => $todayY])) ?>"
+         class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-core-100 text-core-700 hover:bg-core-200 transition">วันนี้</a>
+      <?php endif; ?>
+    </div>
     <a href="<?= e($baseQ(['month' => $nextM, 'year' => $nextY])) ?>" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50"><i data-lucide="chevron-right" class="w-4 h-4"></i></a>
   </div>
 
@@ -68,9 +78,11 @@ $csrfToken    = \App\Core\Csrf::token();
     <div class="aspect-square rounded-lg border border-slate-100 bg-slate-50 flex flex-col items-center justify-center opacity-50">
       <span class="text-xs font-bold text-slate-400"><?= $d ?></span>
     </div>
-    <?php else: ?>
+    <?php else:
+      $isToday = $isCurrentMonth && $d === $todayD;
+    ?>
     <button type="button" @click="openDay('<?= $date ?>', '<?= e($meta['label']) ?>', '<?= e($meta['key']) ?>')"
-            class="aspect-square rounded-lg border <?= e($meta['cls']) ?> flex flex-col items-center justify-center hover:shadow-sm transition active:scale-95">
+            class="aspect-square rounded-lg border <?= e($meta['cls']) ?> flex flex-col items-center justify-center hover:shadow-sm transition active:scale-95 <?= $isToday ? 'ring-2 ring-core-500 ring-offset-1' : '' ?>">
       <span class="text-xs font-bold leading-none"><?= $d ?></span>
       <?php if (!empty($meta['label'])): ?>
       <span class="text-[8px] font-medium leading-tight mt-0.5"><?= e($meta['label']) ?></span>

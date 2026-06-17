@@ -247,6 +247,28 @@ class AnalyticsController extends Controller
         // อัตรา click-to-view (click rate %)
         $clickRate = $views > 0 ? round(($clicks['phone'] + $clicks['line'] + $clicks['book']) / $views * 100, 1) : 0;
 
+        $bookingsInRange = ['total' => 0, 'confirmed' => 0, 'revenue' => 0.0];
+        if ($propertyId) {
+            $bRow = Database::fetch(
+                "SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN b.status IN ('confirmed','completed') THEN 1 ELSE 0 END) AS confirmed,
+                        COALESCE(SUM(CASE WHEN b.status IN ('confirmed','completed') THEN b.total_price ELSE 0 END), 0) AS revenue
+                 FROM bookings b
+                 WHERE b.property_id = :p AND b.created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                ['p' => $propertyId, 'r' => $range]
+            );
+            if ($bRow) {
+                $bookingsInRange = [
+                    'total'     => (int)$bRow['total'],
+                    'confirmed' => (int)$bRow['confirmed'],
+                    'revenue'   => (float)$bRow['revenue'],
+                ];
+            }
+        }
+        $contactClicks  = $clicks['phone'] + $clicks['line'] + $clicks['book'];
+        $viewToContact  = $views > 0 ? round($contactClicks / $views * 100, 1) : 0;
+        $contactToBook  = $contactClicks > 0 ? round($bookingsInRange['confirmed'] / $contactClicks * 100, 1) : 0;
+
         $canDeep = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP));
 
         View::render('owner/analytics/index', [
@@ -263,6 +285,10 @@ class AnalyticsController extends Controller
             'dailyClicks'  => $dailyClicks,
             'dailyViews'   => $dailyViews,
             'clickRate'    => $clickRate,
+            'bookingsInRange' => $bookingsInRange,
+            'contactClicks'   => $contactClicks,
+            'viewToContact'   => $viewToContact,
+            'contactToBook'   => $contactToBook,
             'topReferrers' => $topReferrers,
             'hasLeadTable' => $hasLeadTable,
             'hasViewTable' => $hasViewTable,

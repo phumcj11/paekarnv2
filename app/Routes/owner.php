@@ -124,6 +124,8 @@ return function (Router $r): void {
         $r->post('/content-plans/social-save',                      [ContentPlanController::class, 'socialSave'])->middleware('csrf');
         $r->post('/content-plans/upload-image',                     [ContentPlanController::class, 'uploadImage'])->middleware('csrf');
         $r->post('/content-plans/{id:[0-9]+}/post-facebook',        [ContentPlanController::class, 'postToFacebook'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/post-line',            [ContentPlanController::class, 'postToLine'])->middleware('csrf');
+        $r->post('/content-plans/{id:[0-9]+}/post-instagram',       [ContentPlanController::class, 'postToInstagram'])->middleware('csrf');
         // Facebook OAuth
         $r->get('/facebook/connect/{id:[0-9]+}',  [FacebookController::class, 'connect']);
         $r->get('/facebook/callback',             [FacebookController::class, 'callback']);

@@ -516,19 +516,59 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
             <span class="text-sm font-semibold text-blue-800">โพสต์ไปยัง Facebook Page ทันที</span>
             <span class="text-xs text-blue-500 ml-auto" x-text="fbPageName()"></span>
           </div>
-          <div class="flex items-center gap-2">
-            <button type="button" @click="postToFacebook()" :disabled="fbPosting"
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" @click="postNow('facebook')" :disabled="socialPosting"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-semibold transition disabled:opacity-50">
-              <i data-lucide="send" class="w-3.5 h-3.5" x-show="!fbPosting"></i>
-              <i data-lucide="loader-circle" class="w-3.5 h-3.5 animate-spin" x-show="fbPosting" x-cloak></i>
-              <span x-text="fbPosting ? 'กำลังโพสต์...' : 'โพสต์เลย'"></span>
+              <i data-lucide="send" class="w-3.5 h-3.5" x-show="!socialPosting"></i>
+              <i data-lucide="loader-circle" class="w-3.5 h-3.5 animate-spin" x-show="socialPosting" x-cloak></i>
+              <span x-text="socialPosting ? 'กำลังโพสต์...' : 'โพสต์เลย'"></span>
             </button>
-            <span x-show="fbResult" x-cloak class="text-xs font-semibold"
-                  :class="fbResult?.ok ? 'text-emerald-700' : 'text-red-600'"
-                  x-text="fbResult?.ok ? '✓ โพสต์แล้ว' : ('⚠ ' + fbResult?.error)"></span>
-            <a x-show="fbResult?.url" x-cloak :href="fbResult?.url" target="_blank" rel="noopener"
+            <span x-show="socialResult?.platform==='facebook'" x-cloak class="text-xs font-semibold"
+                  :class="socialResult?.ok ? 'text-emerald-700' : 'text-red-600'"
+                  x-text="socialResult?.ok ? '✓ โพสต์แล้ว' : ('⚠ ' + socialResult?.error)"></span>
+            <a x-show="socialResult?.platform==='facebook' && socialResult?.url" x-cloak :href="socialResult?.url" target="_blank" rel="noopener"
                class="text-xs text-blue-600 underline">ดูโพสต์</a>
           </div>
+        </div>
+      </template>
+
+      <!-- LINE Broadcast -->
+      <template x-if="editId && lineConnected()">
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">💚</span>
+            <span class="text-sm font-semibold text-emerald-800">ส่ง Broadcast ไปผู้ติดตาม LINE</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" @click="postNow('line')" :disabled="socialPosting"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#06C755] hover:bg-[#05b34c] text-white text-sm font-semibold transition disabled:opacity-50">
+              <span x-text="socialPosting ? 'กำลังส่ง...' : 'ส่ง Broadcast'"></span>
+            </button>
+            <span x-show="socialResult?.platform==='line'" x-cloak class="text-xs font-semibold"
+                  :class="socialResult?.ok ? 'text-emerald-700' : 'text-red-600'"
+                  x-text="socialResult?.ok ? ('✓ ส่ง ' + (socialResult.sent||0) + '/' + (socialResult.total||0) + ' คน') : ('⚠ ' + socialResult?.error)"></span>
+          </div>
+          <p class="text-[11px] text-emerald-700">ส่งถึงผู้ติดตาม LINE ทุกคนของที่พักนี้ — ใช้ token จาก LINE Hub</p>
+        </div>
+      </template>
+
+      <!-- Instagram Post -->
+      <template x-if="editId && fbPageConnected() && formHasImages()">
+        <div class="rounded-xl border border-pink-200 bg-pink-50 p-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📸</span>
+            <span class="text-sm font-semibold text-pink-800">โพสต์ไปยัง Instagram (ผ่าน FB Page ที่เชื่อม)</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" @click="postNow('instagram')" :disabled="socialPosting"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 text-white text-sm font-semibold transition disabled:opacity-50">
+              <span x-text="socialPosting ? 'กำลังโพสต์...' : 'โพสต์ Instagram'"></span>
+            </button>
+            <span x-show="socialResult?.platform==='instagram'" x-cloak class="text-xs font-semibold"
+                  :class="socialResult?.ok ? 'text-emerald-700' : 'text-red-600'"
+                  x-text="socialResult?.ok ? '✓ โพสต์แล้ว' : ('⚠ ' + socialResult?.error)"></span>
+          </div>
+          <p class="text-[11px] text-pink-700">ต้องมีรูปอย่างน้อย 1 รูป และ Page ต้องผูก Instagram Business ใน Meta</p>
         </div>
       </template>
 
@@ -1107,6 +1147,8 @@ const __CP_ENDPOINTS__ = {
   socialSave:      '<?= e(url('/owner/content-plans/social-save')) ?>',
   uploadImage:     '<?= e(url('/owner/content-plans/upload-image')) ?>',
   postFacebook:    '<?= e(url('/owner/content-plans')) ?>/{id}/post-facebook',
+  postLine:        '<?= e(url('/owner/content-plans')) ?>/{id}/post-line',
+  postInstagram:   '<?= e(url('/owner/content-plans')) ?>/{id}/post-instagram',
 };
 
 // ── Calendar + AI Content Planner ─────────────────────────
@@ -1119,9 +1161,9 @@ function contentPlanApp() {
     aiPrompt: '',
     aiError: '',
     copied: false,
-    // Facebook posting
-    fbPosting: false,
-    fbResult: null,
+    // Social posting
+    socialPosting: false,
+    socialResult: null,
     // multi-image
     imgPickerOpen: false,
     imgPickerLoading: false,
@@ -1165,8 +1207,8 @@ function contentPlanApp() {
       this.imgUploadingCount = 0;
       this.imgLibraryOpen    = false;
       this.manualUrl         = '';
-      this.fbPosting         = false;
-      this.fbResult          = null;
+      this.socialPosting = false;
+      this.socialResult  = null;
     },
 
     fbPageConnected() {
@@ -1183,29 +1225,49 @@ function contentPlanApp() {
       return p?.facebook_page_name || '';
     },
 
-    async postToFacebook() {
-      if (!this.editId || this.fbPosting) return;
-      this.fbPosting = true;
-      this.fbResult  = null;
+    lineConnected() {
+      const propId = this.form.property_id;
+      if (!propId) return false;
+      const p = this.props.find(x => x.id == propId);
+      return !!(p?.line_channel_access_token && String(p.line_channel_access_token).trim());
+    },
+
+    formHasImages() {
+      return Array.isArray(this.form.images) && this.form.images.length > 0;
+    },
+
+    async postNow(platform) {
+      if (!this.editId || this.socialPosting) return;
+      const endpoints = {
+        facebook:  __CP_ENDPOINTS__.postFacebook,
+        line:      __CP_ENDPOINTS__.postLine,
+        instagram: __CP_ENDPOINTS__.postInstagram,
+      };
+      const urlTpl = endpoints[platform];
+      if (!urlTpl) return;
+
+      this.socialPosting = true;
+      this.socialResult  = null;
       try {
         const fd = new FormData();
         fd.append('_csrf', __CSRF__);
-        const url = __CP_ENDPOINTS__.postFacebook.replace('{id}', this.editId);
+        const url = urlTpl.replace('{id}', this.editId);
         const r   = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
         const j   = await r.json();
-        this.fbResult = j;
+        this.socialResult = { ...j, platform, url: j.post_url || j.url || '' };
         if (j.ok) {
-          // Update plan status locally
           const idx = this.plans.findIndex(p => p.id == this.editId);
           if (idx >= 0) this.plans[idx].status = 'published';
         }
       } catch(e) {
-        this.fbResult = { ok: false, error: 'เชื่อมต่อไม่สำเร็จ' };
+        this.socialResult = { ok: false, error: 'เชื่อมต่อไม่สำเร็จ', platform };
       } finally {
-        this.fbPosting = false;
+        this.socialPosting = false;
         this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
       }
     },
+
+    async postToFacebook() { return this.postNow('facebook'); },
 
     _parseImages(raw) {
       if (!raw) return [];

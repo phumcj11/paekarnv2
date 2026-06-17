@@ -9,6 +9,7 @@
  * @var string  $q
  * @var array   $allTags       ['tagName' => count]
  * @var string  $filterTag
+ * @var array   $filterTags
  * @var string  $filterSegment
  * @var bool    $canBroadcast
  * @var bool    $canAiDraft
@@ -32,10 +33,27 @@ function lineThaiDate(?string $ymd): string {
     return (int)floor($diff / 365) . ' ปีที่แล้ว';
 }
 
+$filterTags = $filterTags ?? ($filterTag !== '' ? [$filterTag] : []);
+$tagsQuery  = !empty($filterTags) ? implode(',', $filterTags) : '';
+
 $buildUrl = fn(array $extra): string => url('/owner/line-contacts?' . http_build_query(array_filter(
-    array_merge(['property_id' => $propertyId, 'q' => $q, 'page' => $page, 'tag' => $filterTag, 'segment' => $filterSegment], $extra),
+    array_merge([
+        'property_id' => $propertyId,
+        'q'           => $q,
+        'page'        => $page,
+        'tags'        => array_key_exists('tags', $extra) ? ($extra['tags'] === '' ? null : $extra['tags']) : ($tagsQuery ?: null),
+        'segment'     => $filterSegment,
+    ], array_diff_key($extra, ['tags' => 1])),
     fn($v) => $v !== '' && $v !== null && $v !== 0
 )));
+
+$toggleTagUrl = static function(string $tag) use ($filterTags, $buildUrl): string {
+    $active = in_array($tag, $filterTags, true);
+    $next   = $active
+        ? array_values(array_filter($filterTags, static fn($t) => $t !== $tag))
+        : array_merge($filterTags, [$tag]);
+    return $buildUrl(['tags' => implode(',', $next), 'page' => 1]);
+};
 
 $tagColors = ['bg-violet-100 text-violet-800', 'bg-sky-100 text-sky-800', 'bg-amber-100 text-amber-800',
               'bg-rose-100 text-rose-800', 'bg-emerald-100 text-emerald-800', 'bg-orange-100 text-orange-800'];
@@ -71,8 +89,8 @@ $presetTags = [
     <?php if ($q !== ''): ?>
       <input type="hidden" name="q" value="<?= e($q) ?>">
     <?php endif; ?>
-    <?php if ($filterTag !== ''): ?>
-      <input type="hidden" name="tag" value="<?= e($filterTag) ?>">
+    <?php if ($tagsQuery !== ''): ?>
+      <input type="hidden" name="tags" value="<?= e($tagsQuery) ?>">
     <?php endif; ?>
     <?php if ($filterSegment !== ''): ?>
       <input type="hidden" name="segment" value="<?= e($filterSegment) ?>">
@@ -83,8 +101,8 @@ $presetTags = [
   <!-- search -->
   <form method="get" action="<?= url('/owner/line-contacts') ?>" class="flex items-center gap-2 flex-1 min-w-[200px]">
     <input type="hidden" name="property_id" value="<?= $propertyId ?>">
-    <?php if ($filterTag !== ''): ?>
-      <input type="hidden" name="tag" value="<?= e($filterTag) ?>">
+    <?php if ($tagsQuery !== ''): ?>
+      <input type="hidden" name="tags" value="<?= e($tagsQuery) ?>">
     <?php endif; ?>
     <?php if ($filterSegment !== ''): ?>
       <input type="hidden" name="segment" value="<?= e($filterSegment) ?>">
@@ -109,19 +127,24 @@ $presetTags = [
 </div>
 
 <?php if (!empty($allTags)): ?>
-<!-- Tag filter strip -->
+<!-- Tag filter strip (multi-select) -->
 <div class="flex flex-wrap items-center gap-2 mb-4">
   <span class="text-xs text-slate-500 font-semibold shrink-0">กรองด้วย Tag:</span>
-  <a href="<?= $buildUrl(['tag' => '', 'page' => 1]) ?>"
-     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterTag === '' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
+  <a href="<?= $buildUrl(['tags' => '', 'page' => 1]) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= empty($filterTags) ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' ?>">
     ทั้งหมด
   </a>
-  <?php foreach ($allTags as $tag => $cnt): ?>
-  <a href="<?= $buildUrl(['tag' => $tag, 'page' => 1]) ?>"
-     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $filterTag === $tag ? 'bg-slate-800 text-white' : $tagColorFn($tag) . ' hover:opacity-80' ?>">
+  <?php foreach ($allTags as $tag => $cnt):
+    $isActive = in_array($tag, $filterTags, true);
+  ?>
+  <a href="<?= e($toggleTagUrl($tag)) ?>"
+     class="px-2.5 py-1 rounded-full text-xs font-semibold transition <?= $isActive ? 'bg-slate-800 text-white ring-2 ring-slate-400' : $tagColorFn($tag) . ' hover:opacity-80' ?>">
     <?= e($tag) ?> (<?= $cnt ?>)
   </a>
   <?php endforeach; ?>
+  <?php if (!empty($filterTags)): ?>
+  <span class="text-[10px] text-slate-400 ml-1">เลือก <?= count($filterTags) ?> tag · คลิกซ้ำเพื่อเอาออก</span>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

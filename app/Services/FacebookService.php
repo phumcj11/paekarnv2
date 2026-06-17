@@ -10,7 +10,7 @@ class FacebookService
 {
     private const GRAPH   = 'https://graph.facebook.com/v19.0';
     private const DIALOG  = 'https://www.facebook.com/v19.0/dialog/oauth';
-    private const SCOPES  = 'pages_manage_posts,pages_read_engagement,pages_show_list';
+    private const SCOPES  = 'pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish';
 
     // ─────────────────────────────────────────────────────────────
     // App credentials (from admin settings)
@@ -133,6 +133,61 @@ class FacebookService
             return ['post_id' => $res['id'], 'url' => "https://www.facebook.com/{$res['id']}"];
         }
         return isset($res['error']) ? ['error' => $res['error']['message'] ?? 'Facebook error'] : null;
+    }
+
+    /**
+     * Post to Instagram Business account linked to a Facebook Page.
+     * Requires at least one public image URL.
+     */
+    public static function postToInstagram(
+        string $pageId,
+        string $pageToken,
+        string $caption,
+        array  $imageUrls = []
+    ): ?array {
+        $imageUrls = array_values(array_filter($imageUrls));
+        if (!$imageUrls) {
+            return ['error' => 'Instagram ต้องมีรูปภาพอย่างน้อย 1 รูป'];
+        }
+
+        $pageRes = self::get(self::GRAPH . "/{$pageId}", [
+            'fields'       => 'instagram_business_account',
+            'access_token' => $pageToken,
+        ]);
+        $igUserId = $pageRes['instagram_business_account']['id'] ?? null;
+        if (!$igUserId) {
+            return ['error' => 'Page นี้ยังไม่ได้เชื่อม Instagram Business — ตั้งค่าใน Meta Business Suite'];
+        }
+
+        $container = self::post(self::GRAPH . "/{$igUserId}/media", [
+            'image_url'    => $imageUrls[0],
+            'caption'      => $caption,
+            'access_token' => $pageToken,
+        ]);
+        if (empty($container['id'])) {
+            $msg = $container['error']['message'] ?? 'สร้าง media container ไม่สำเร็จ';
+            return ['error' => $msg];
+        }
+
+        $publish = self::post(self::GRAPH . "/{$igUserId}/media_publish", [
+            'creation_id'  => $container['id'],
+            'access_token' => $pageToken,
+        ]);
+        if (empty($publish['id'])) {
+            $msg = $publish['error']['message'] ?? 'publish ไม่สำเร็จ';
+            return ['error' => $msg];
+        }
+
+        return [
+            'post_id' => $publish['id'],
+            'url'     => 'https://www.instagram.com/p/' . self::shortcodeFromMediaId($publish['id']),
+        ];
+    }
+
+    /** Best-effort permalink — IG API may return numeric media id only */
+    private static function shortcodeFromMediaId(string $mediaId): string
+    {
+        return $mediaId;
     }
 
     // ─────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ use App\Services\LineService;
 use App\Services\MessageTemplateService;
 use App\Services\PropertyLineService;
 use App\Services\FacebookService;
+use App\Services\ContentPlanPublishService;
 
 /**
  * Job runner for scheduled automation tasks.
@@ -647,27 +648,21 @@ class CronService
         return \App\Services\ActivityFeaturedService::expireCampaigns();
     }
 
-    /** Auto-publish content_plans ที่ status=scheduled และ post_date <= วันนี้ (Facebook เท่านั้น) */
+    /** Auto-publish content_plans ที่ status=scheduled และ post_date <= วันนี้ */
     public static function publishScheduledPosts(): array
     {
         if (!Database::tableHasColumn('content_plans', 'id')) {
             return ['affected' => 0, 'output' => 'Skipped (content_plans table missing)'];
         }
-        if (!FacebookService::isConfigured()) {
-            return ['affected' => 0, 'output' => 'Skipped (Facebook App not configured)'];
-        }
-        if (!Database::tableHasColumn('properties', 'facebook_page_token')) {
-            return ['affected' => 0, 'output' => 'Skipped (facebook_page_token column missing)'];
-        }
 
         $today = date('Y-m-d');
         $rows  = Database::fetchAll(
-            "SELECT cp.*, p.facebook_page_id, p.facebook_page_token
+            "SELECT cp.*, p.facebook_page_id, p.facebook_page_token, p.line_channel_access_token
              FROM content_plans cp
              LEFT JOIN properties p ON p.id = cp.property_id
              WHERE cp.status = 'scheduled'
                AND cp.post_date <= :d
-               AND cp.platform = 'facebook'
+               AND cp.platform IN ('facebook','line','instagram')
              ORDER BY cp.post_date ASC, cp.id ASC
              LIMIT 50",
             ['d' => $today]
@@ -679,9 +674,27 @@ class CronService
 
         foreach ($rows as $plan) {
             $propId = (int)($plan['property_id'] ?? 0);
-            if (!$propId || empty($plan['facebook_page_token']) || empty($plan['facebook_page_id'])) {
+            if (!$propId) {
                 $skipped++;
                 continue;
+            }
+
+            $platform = (string)($plan['platform'] ?? 'facebook');
+            if ($platform === 'facebook') {
+                if (!FacebookService::isConfigured() || empty($plan['facebook_page_token'])) {
+                    $skipped++;
+                    continue;
+                }
+            } elseif ($platform === 'line') {
+                if (empty(trim((string)($plan['line_channel_access_token'] ?? '')))) {
+                    $skipped++;
+                    continue;
+                }
+            } elseif ($platform === 'instagram') {
+                if (!FacebookService::isConfigured() || empty($plan['facebook_page_token'])) {
+                    $skipped++;
+                    continue;
+                }
             }
 
             if (self::$dryRun) {
@@ -689,28 +702,13 @@ class CronService
                 continue;
             }
 
-            $body     = trim((string)($plan['body'] ?? ''));
-            $hashtags = trim((string)($plan['hashtags'] ?? ''));
-            $message  = $body . ($hashtags !== '' ? "\n\n" . $hashtags : '');
-
-            $imageUrls = [];
-            foreach (ContentPlan::parseImages($plan['image_url'] ?? null) as $img) {
-                $imageUrls[] = preg_match('#^https?://#i', (string)$img) ? (string)$img : upload_url((string)$img);
-            }
-
-            $result = FacebookService::postToPage(
-                (string)$plan['facebook_page_id'],
-                (string)$plan['facebook_page_token'],
-                $message,
-                $imageUrls
-            );
-
-            if (!$result || isset($result['error'])) {
+            $result = ContentPlanPublishService::publish($plan, null);
+            if (empty($result['ok'])) {
                 $failed++;
                 continue;
             }
 
-            ContentPlan::update((int)$plan['id'], ['status' => 'published', 'owner_id' => (int)$plan['owner_id']]);
+            ContentPlanPublishService::markPublished((int)$plan['id'], (int)$plan['owner_id']);
             $published++;
         }
 

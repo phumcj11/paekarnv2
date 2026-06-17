@@ -141,6 +141,37 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
   </div>
 </div>
 
+<!-- Conversion funnel -->
+<?php if ($hasViewTable || $hasLeadTable): ?>
+<div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 mb-6">
+  <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+    <i data-lucide="filter" class="w-4 h-4 text-accent-600"></i>
+    Funnel การตลาด (<?= $range ?> วัน)
+  </h3>
+  <div class="grid sm:grid-cols-4 gap-3 text-center">
+    <div class="rounded-xl bg-blue-50 border border-blue-100 p-3">
+      <div class="text-[10px] text-blue-600 font-semibold uppercase tracking-wide">เข้าชม</div>
+      <div class="text-xl font-bold text-slate-800 mt-1"><?= number_format($views) ?></div>
+    </div>
+    <div class="rounded-xl bg-violet-50 border border-violet-100 p-3">
+      <div class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">กด Contact</div>
+      <div class="text-xl font-bold text-slate-800 mt-1"><?= number_format($contactClicks ?? 0) ?></div>
+      <div class="text-[10px] text-violet-500 mt-1"><?= $viewToContact ?? 0 ?>% จากผู้เข้าชม</div>
+    </div>
+    <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+      <div class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">จองยืนยัน</div>
+      <div class="text-xl font-bold text-slate-800 mt-1"><?= number_format($bookingsInRange['confirmed'] ?? 0) ?></div>
+      <div class="text-[10px] text-emerald-500 mt-1"><?= $contactToBook ?? 0 ?>% จาก contact</div>
+    </div>
+    <div class="rounded-xl bg-amber-50 border border-amber-100 p-3">
+      <div class="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">รายได้จอง</div>
+      <div class="text-xl font-bold text-slate-800 mt-1">฿<?= number_format($bookingsInRange['revenue'] ?? 0) ?></div>
+      <div class="text-[10px] text-amber-500 mt-1">ยืนยัน/เสร็จแล้ว</div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if (!empty($dailyClicks) && $hasLeadTable): ?>
 <!-- Daily clicks chart -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 mb-5">
