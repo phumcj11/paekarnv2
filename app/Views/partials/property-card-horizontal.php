@@ -23,7 +23,7 @@ $couponSale = (int)\App\Models\Setting::get('coupon_sale_price', 250);
 $amenLine = \App\Models\Property::listingUnitSummaryLine($property);
 $amenIcon = in_array((string)($property['type'] ?? ''), ['hotel', 'resort'], true) ? 'building-2' : 'bed-double';
 
-$favHref = Auth::check() ? url('/account/favorites') : url('/login');
+$favPid  = (int)($property['id'] ?? 0);
 $listingUid = (int)($property['listing_unit_id'] ?? 0);
 $pUrl = $listingUid > 0
     ? url('/property/' . $property['slug'] . '?unit=' . $listingUid)
@@ -76,11 +76,15 @@ $compareJson = $compareEnabled ? htmlspecialchars(json_encode($comparePayload, J
     </div>
     <?php endif; ?>
 
-    <a href="<?= e($favHref) ?>"
-       class="absolute top-2 right-2 z-[5] w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm shadow-md ring-1 ring-slate-200/80 grid place-items-center text-slate-600 hover:text-rose-600 hover:ring-rose-200 transition"
-       aria-label="บันทึกที่พัก">
-      <i data-lucide="heart" class="w-4 h-4"></i>
-    </a>
+    <div x-data="favBtn(<?= $favPid ?>)" class="absolute top-2 right-2 z-[5]">
+      <button @click.stop.prevent="toggle"
+              :aria-label="faved ? 'เอาออกจากที่บันทึก' : 'บันทึกที่พัก'"
+              :disabled="loading"
+              class="w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm shadow-md ring-1 ring-slate-200/80 grid place-items-center transition"
+              :class="faved ? 'text-rose-600 ring-rose-200' : 'text-slate-600 hover:text-rose-600 hover:ring-rose-200'">
+        <i data-lucide="heart" class="w-4 h-4 pointer-events-none" :class="faved ? 'fill-rose-500' : ''"></i>
+      </button>
+    </div>
     <?php if ($compareEnabled): ?>
     <div class="absolute bottom-2 left-2 z-[6]" x-data="{ item: <?= $compareJson ?> }">
       <button type="button"

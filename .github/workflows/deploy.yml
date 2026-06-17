@@ -138,6 +138,12 @@ jobs:
             if [ -f "$APP/scripts/migrate_marketing_tables.sh" ]; then
               bash "$APP/scripts/migrate_marketing_tables.sh" || echo "WARN: migrate_marketing_tables failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_password_reset.sh" ]; then
+              bash "$APP/scripts/migrate_password_reset.sh" || echo "WARN: migrate_password_reset failed (may already be applied)"
+            fi
+            if [ -f "$APP/scripts/migrate_vps.sh" ]; then
+              bash "$APP/scripts/migrate_vps.sh" || echo "WARN: migrate_vps failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"

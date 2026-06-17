@@ -38,6 +38,7 @@ $canonicalUrl = isset($meta_canonical) && $meta_canonical !== '' ? (string)$meta
 <title><?= e($pageTitle) ?></title>
 <meta name="description" content="<?= e($pageDesc) ?>">
 <meta name="theme-color" content="#14532D">
+<meta name="csrf-token" content="<?= \App\Core\Csrf::token() ?>">
 <link rel="icon" href="<?= asset('site-logo.png') ?>" type="image/png">
 <link rel="apple-touch-icon" href="<?= asset('site-logo.png') ?>">
 <?php if ($canonicalUrl !== ''): ?>
@@ -408,6 +409,36 @@ document.addEventListener('alpine:init', () => {
       });
     }
   });
+
+  // Favourite toggle — works on any card across the site
+  Alpine.data('favBtn', (propertyId) => ({
+    pid: parseInt(propertyId, 10),
+    faved: false,
+    loading: false,
+    toggleUrl: <?= json_encode(url('/account/favorites/toggle'), JSON_UNESCAPED_SLASHES) ?>,
+    loginUrl:  <?= json_encode(url('/login'), JSON_UNESCAPED_SLASHES) ?>,
+    get csrf() {
+      return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+    },
+    async toggle() {
+      if (this.loading) return;
+      this.loading = true;
+      try {
+        const body = new URLSearchParams({ property_id: this.pid, _csrf: this.csrf });
+        const res  = await fetch(this.toggleUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: body.toString()
+        });
+        if (res.status === 401) { window.location.href = this.loginUrl; return; }
+        if (res.ok) { const data = await res.json(); this.faved = !!data.favorited; }
+      } catch (_) {}
+      this.loading = false;
+    }
+  }));
 });
 </script>
 <script>

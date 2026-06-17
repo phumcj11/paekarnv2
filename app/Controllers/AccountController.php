@@ -69,6 +69,41 @@ class AccountController extends Controller
         ]);
     }
 
+    public function toggleFavorite(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $cid = Auth::customerId();
+        if (!$cid) {
+            http_response_code(401);
+            echo json_encode(['redirect' => url('/login')]);
+            exit;
+        }
+        $pid = (int)($_POST['property_id'] ?? 0);
+        if ($pid <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'invalid property_id']);
+            exit;
+        }
+        $exists = Database::fetch(
+            "SELECT id FROM favorites WHERE customer_id = :c AND property_id = :p LIMIT 1",
+            ['c' => $cid, 'p' => $pid]
+        );
+        if ($exists) {
+            Database::query(
+                "DELETE FROM favorites WHERE customer_id = :c AND property_id = :p",
+                ['c' => $cid, 'p' => $pid]
+            );
+            echo json_encode(['favorited' => false]);
+        } else {
+            Database::query(
+                "INSERT IGNORE INTO favorites (customer_id, property_id, created_at) VALUES (:c, :p, NOW())",
+                ['c' => $cid, 'p' => $pid]
+            );
+            echo json_encode(['favorited' => true]);
+        }
+        exit;
+    }
+
     public function profile(): void
     {
         $fresh = \App\Models\User::find((int)Auth::id());

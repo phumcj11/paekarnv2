@@ -103,7 +103,8 @@ return function (Router $r): void {
         $r->get('',          [AccountController::class, 'index']);
         $r->get('/bookings', [AccountController::class, 'bookings']);
         $r->get('/coupons',  [AccountController::class, 'coupons']);
-        $r->get('/favorites',[AccountController::class, 'favorites']);
+        $r->get('/favorites', [AccountController::class, 'favorites']);
+        $r->post('/favorites/toggle', [AccountController::class, 'toggleFavorite'])->middleware('csrf');
         $r->get('/profile',  [AccountController::class, 'profile']);
         $r->get('/notifications', [NotificationController::class, 'index']);
     });

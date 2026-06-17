@@ -100,6 +100,12 @@ class DashboardController extends Controller
             $chart[] = ['date' => date('j/n', strtotime($d)), 'count' => (int)$row['c']];
         }
 
+        // ปฏิทินสำหรับหน้าแรกมือถือ — ต้อง query ก่อน analyticsPreview เพราะใช้ $calProperties[0]
+        $calProperties = Database::fetchAll(
+            "SELECT p.id, p.name FROM properties p WHERE 1=1 $whereOwner ORDER BY p.created_at DESC",
+            $params
+        );
+
         // Analytics preview (30 วัน)
         $analyticsPreview = ['phone' => 0, 'line' => 0, 'book' => 0, 'views' => 0, 'property_id' => 0];
         if ($ownerId && !empty($calProperties)) {
@@ -152,11 +158,6 @@ class DashboardController extends Controller
             }
         }
 
-        // ปฏิทินสำหรับหน้าแรกมือถือ
-        $calProperties = Database::fetchAll(
-            "SELECT p.id, p.name FROM properties p WHERE 1=1 $whereOwner ORDER BY p.created_at DESC",
-            $params
-        );
         $calPropertyId = isset($_GET['cal_p']) ? (int)$_GET['cal_p'] : (int)($calProperties[0]['id'] ?? 0);
         $validCalProperty = false;
         foreach ($calProperties as $cp) {
