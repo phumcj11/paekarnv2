@@ -37,11 +37,17 @@ class MembershipController extends Controller
             'owner'      => $owner,
             'plans'      => $plans,
             'orders'     => $orders,
+            'salesOpen'  => MembershipService::salesOpen(),
         ], 'layouts/owner');
     }
 
     public function buy(): void
     {
+        if (!MembershipService::salesOpen()) {
+            Session::flash('error', 'แพ็กเกจยังไม่เปิดให้บริการ — เปิดให้บริการเร็วๆนี้');
+            redirect(url('/owner/membership'));
+            return;
+        }
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             redirect(url('/owner/dashboard'));
@@ -69,6 +75,11 @@ class MembershipController extends Controller
 
     public function checkout(): void
     {
+        if (!MembershipService::salesOpen()) {
+            Session::flash('error', 'แพ็กเกจยังไม่เปิดให้บริการ — เปิดให้บริการเร็วๆนี้');
+            redirect(url('/owner/membership'));
+            return;
+        }
         $ownerId = Auth::ownerId();
         if (!$ownerId) {
             redirect(url('/owner/dashboard'));

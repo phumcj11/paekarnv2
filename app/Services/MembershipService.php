@@ -164,4 +164,10 @@ class MembershipService
 
         MembershipListingBoostService::syncOwnerBoost($ownerId);
     }
+
+    /** เปิดรับสมัครแพ็กเกจแล้วหรือยัง (false = แสดง "เปิดให้บริการเร็วๆนี้") */
+    public static function salesOpen(): bool
+    {
+        return false;
+    }
 }

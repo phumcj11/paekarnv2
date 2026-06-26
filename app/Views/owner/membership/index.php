@@ -2,9 +2,11 @@
 /** @var array|null $owner @var array $plans @var array<int,array<string,mixed>> $orders */
 use App\Services\OwnerMembership;
 use App\Services\OwnerTier;
+use App\Services\MembershipService;
 
 $tier          = $owner ? ($owner['membership_tier'] ?? 'none') : 'none';
 $benefitsOk    = $owner ? OwnerMembership::hasActiveBenefits($owner) : false;
+$salesOpen     = MembershipService::salesOpen();
 $expRaw        = $owner ? ($owner['membership_expires_at'] ?? null) : null;
 $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
 ?>
@@ -38,8 +40,24 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
     <div class="p-5 border-b border-slate-100">
       <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="package" class="w-5 h-5 text-accent-600"></i> เลือกแพ็กเกจ</h2>
+      <?php if ($salesOpen): ?>
       <p class="text-sm text-slate-600 mt-1">ชำระตามข้อมูลบัญชีด้านล่าง — อัปโหลดสลิปเพื่อเปิดสิทธิ์ทันที หรือส่งคำสั่งซื้อรอแอดมินตรวจ</p>
+      <?php else: ?>
+      <p class="text-sm text-slate-600 mt-1">กำลังจัดเตรียมแพ็กเกจและราคา — เปิดให้บริการเร็วๆนี้</p>
+      <?php endif; ?>
     </div>
+    <?php if (!$salesOpen): ?>
+    <div class="p-8 sm:p-12 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-sky-50 grid place-items-center mx-auto mb-4">
+        <i data-lucide="clock" class="w-8 h-8 text-sky-600"></i>
+      </div>
+      <h3 class="font-bold text-lg text-slate-800">เปิดให้บริการเร็วๆนี้</h3>
+      <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">ทีมงานกำลังสรุปแพ็กเกจและราคาให้เหมาะกับเจ้าของที่พัก — ดูสิทธิ์แต่ละระดับได้จากตารางด้านบน</p>
+      <a href="<?= url('/contact') ?>" class="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition">
+        <i data-lucide="message-circle" class="w-4 h-4"></i> ติดต่อสอบถาม
+      </a>
+    </div>
+    <?php else: ?>
     <div class="p-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <?php foreach ($plans as $pl):
         $isVip = ($pl['tier'] ?? '') === 'vip';
@@ -86,6 +104,7 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
         </div>
       <?php endforeach; ?>
     </div>
+    <?php endif; ?>
   </div>
 
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">

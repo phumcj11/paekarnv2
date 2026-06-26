@@ -5,12 +5,14 @@
 
 use App\Services\OwnerFeatureGate;
 use App\Services\OwnerTier;
+use App\Services\MembershipService;
 
 $canAvailability = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
 $canAnalytics    = OwnerFeatureGate::allowed(OwnerTier::FEATURE_ANALYTICS);
 $canBooking      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_BOOKING);
 $canCoupon       = OwnerFeatureGate::allowed(OwnerTier::FEATURE_COUPON);
 $membershipUrl   = url('/owner/membership');
+$salesOpen       = MembershipService::salesOpen();
 
 $propStatusLabels = [
   'published' => ['published', 'ow-status-pill--published'],
@@ -113,10 +115,10 @@ $showUpsell = $upsellFeatures !== [];
       <span class="text-sm font-semibold text-slate-700">ตรวจคูปอง</span>
     </a>
     <?php else: ?>
-    <a href="<?= e($membershipUrl) ?>" class="ow-quick-btn ow-quick-btn--upgrade group">
-      <div class="ow-quick-btn__icon"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
-      <span class="text-sm font-bold text-amber-800">อัปเกรดแพ็กเกจ</span>
-    </a>
+    <div class="ow-quick-btn ow-quick-btn--upgrade group cursor-default">
+      <div class="ow-quick-btn__icon"><i data-lucide="clock" class="w-6 h-6"></i></div>
+      <span class="text-sm font-bold text-amber-800">เร็วๆนี้</span>
+    </div>
     <?php endif; ?>
   </div>
 
@@ -249,10 +251,10 @@ $showUpsell = $upsellFeatures !== [];
       <span class="text-sm font-semibold">ตรวจคูปอง</span>
     </a>
     <?php else: ?>
-    <a href="<?= e($membershipUrl) ?>" class="ow-quick-btn ow-quick-btn--upgrade group !flex-row !text-left !p-4">
-      <div class="ow-quick-btn__icon !w-10 !h-10"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
-      <span class="text-sm font-bold text-amber-800">อัปเกรดแพ็กเกจ</span>
-    </a>
+    <div class="ow-quick-btn ow-quick-btn--upgrade group !flex-row !text-left !p-4 cursor-default">
+      <div class="ow-quick-btn__icon !w-10 !h-10"><i data-lucide="clock" class="w-5 h-5"></i></div>
+      <span class="text-sm font-bold text-amber-800">เปิดให้บริการเร็วๆนี้</span>
+    </div>
     <?php endif; ?>
   </div>
 
@@ -349,10 +351,7 @@ $showUpsell = $upsellFeatures !== [];
         <i data-lucide="bar-chart-3" class="w-7 h-7"></i>
       </div>
       <p class="text-sm font-semibold text-slate-600">กราฟการจอง & รายได้</p>
-      <p class="text-xs text-slate-400 mt-1 max-w-xs">ปลดล็อกเมื่อสมัครแพ็กเกจ — ดูสถิติ 14 วันและรายได้แบบ real-time</p>
-      <?php if (!$showUpsell): ?>
-      <a href="<?= e($membershipUrl) ?>" class="ow-upsell__cta mt-4 !text-xs !py-2 !px-4">ดูแพ็กเกจ</a>
-      <?php endif; ?>
+      <p class="text-xs text-slate-400 mt-1 max-w-xs">ปลดล็อกเมื่อสมัครแพ็กเกจ — เปิดให้บริการเร็วๆนี้</p>
     </section>
     <?php endif; ?>
 

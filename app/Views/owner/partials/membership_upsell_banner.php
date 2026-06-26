@@ -5,9 +5,13 @@
  * @var string $membershipUrl
  * @var list<array{icon:string,title:string,desc:string}> $features
  * @var string $variant  hero | compact
+ * @var bool $salesOpen
  */
-$variant  = $variant ?? 'hero';
-$features = $features ?? [];
+use App\Services\MembershipService;
+
+$variant   = $variant ?? 'hero';
+$features  = $features ?? [];
+$salesOpen = $salesOpen ?? MembershipService::salesOpen();
 if ($features === []) {
     return;
 }
@@ -32,9 +36,15 @@ $isCompact = $variant === 'compact';
         </p>
       </div>
       <?php if ($isCompact): ?>
-      <a href="<?= e($membershipUrl) ?>" class="ow-upsell__cta shrink-0">
-        ดูแพ็กเกจ <i data-lucide="arrow-right" class="w-4 h-4"></i>
-      </a>
+        <?php if ($salesOpen): ?>
+        <a href="<?= e($membershipUrl) ?>" class="ow-upsell__cta shrink-0">
+          ดูแพ็กเกจ <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+        <?php else: ?>
+        <span class="ow-upsell__cta ow-upsell__cta--soon shrink-0">
+          <i data-lucide="clock" class="w-4 h-4"></i> เปิดให้บริการเร็วๆนี้
+        </span>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
 
@@ -55,12 +65,20 @@ $isCompact = $variant === 'compact';
 
     <?php if (!$isCompact): ?>
     <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <?php if ($salesOpen): ?>
       <a href="<?= e($membershipUrl) ?>" class="ow-upsell__cta w-full sm:w-auto justify-center">
         <i data-lucide="award" class="w-4 h-4"></i>
         ดูแพ็กเกจและราคา
         <i data-lucide="arrow-right" class="w-4 h-4"></i>
       </a>
       <p class="text-[11px] text-sky-100/60 text-center sm:text-left">เปรียบเทียบสิทธิ์ฟรี vs Starter vs VIP ได้ในหน้าถัดไป</p>
+      <?php else: ?>
+      <span class="ow-upsell__cta ow-upsell__cta--soon w-full sm:w-auto justify-center">
+        <i data-lucide="clock" class="w-4 h-4"></i>
+        เปิดให้บริการเร็วๆนี้
+      </span>
+      <p class="text-[11px] text-sky-100/60 text-center sm:text-left">กำลังจัดเตรียมแพ็กเกจและราคา — สนใจติดต่อทีมงานได้ที่ <a href="<?= url('/contact') ?>" class="underline text-sky-200 hover:text-white">ติดต่อเรา</a></p>
+      <?php endif; ?>
     </div>
     <?php endif; ?>
   </div>
