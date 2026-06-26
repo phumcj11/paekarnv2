@@ -4,15 +4,57 @@ use App\Services\OwnerMembership;
 use App\Services\OwnerTier;
 use App\Services\MembershipService;
 
-$tier          = $owner ? ($owner['membership_tier'] ?? 'none') : 'none';
-$benefitsOk    = $owner ? OwnerMembership::hasActiveBenefits($owner) : false;
+$tier          = $owner ? OwnerMembership::featureTier($owner) : 'none';
+$serviceTier   = $owner ? OwnerMembership::serviceTier($owner) : 'none';
+$featureActive = $owner ? OwnerMembership::hasActiveFeatureBenefits($owner) : false;
+$serviceActive = $owner ? OwnerMembership::hasActiveServiceBenefits($owner) : false;
+$benefitsOk    = $featureActive || $serviceActive;
+$splitTiers    = OwnerMembership::splitTiersAvailable();
 $salesOpen     = MembershipService::salesOpen();
-$expRaw        = $owner ? ($owner['membership_expires_at'] ?? null) : null;
-$graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
+$featureExp    = $owner ? ($owner['feature_expires_at'] ?? $owner['membership_expires_at'] ?? null) : null;
+$serviceExp    = $owner ? ($owner['service_expires_at'] ?? null) : null;
+$featureGrace  = $owner ? ($owner['feature_grace_until'] ?? $owner['membership_grace_until'] ?? null) : null;
+$serviceGrace  = $owner ? ($owner['service_grace_until'] ?? null) : null;
 ?>
 <section class="max-w-4xl mx-auto space-y-6">
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 sm:p-6">
     <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="award" class="w-5 h-5 text-amber-500"></i> สถานะสมาชิก</h2>
+    <?php if ($splitTiers): ?>
+    <div class="mt-4 grid sm:grid-cols-2 gap-3">
+      <?php
+        $statusBlocks = [
+          ['label' => 'แพ็กเกจระบบ', 'tier' => $tier, 'active' => $featureActive, 'exp' => $featureExp, 'grace' => $featureGrace, 'icon' => 'cpu', 'vip' => true],
+          ['label' => 'แพ็กเกจบริการ', 'tier' => $serviceTier, 'active' => $serviceActive, 'exp' => $serviceExp, 'grace' => $serviceGrace, 'icon' => 'gift', 'vip' => false],
+        ];
+        foreach ($statusBlocks as $sb):
+          $st = $sb['tier'];
+          $ok = $sb['active'];
+      ?>
+      <div class="rounded-xl border border-slate-200 p-3 bg-slate-50/60">
+        <div class="text-xs font-semibold text-slate-500 flex items-center gap-1"><i data-lucide="<?= e($sb['icon']) ?>" class="w-3.5 h-3.5"></i> <?= e($sb['label']) ?></div>
+        <div class="mt-2 flex flex-wrap gap-2 items-center text-sm">
+          <?php if ($st === 'vip' && $ok): ?>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold text-xs"><i data-lucide="crown" class="w-3.5 h-3.5"></i> VIP</span>
+          <?php elseif ($st === 'standard' && $ok): ?>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-semibold text-xs">Standard</span>
+          <?php elseif ($st !== 'none' && !$ok): ?>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs">หมดอายุ</span>
+          <?php else: ?>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold text-xs">ยังไม่มี</span>
+          <?php endif; ?>
+        </div>
+        <?php if ($sb['exp'] && $ok): ?>
+          <p class="mt-1.5 text-xs text-slate-600">หมดอายุ: <strong><?= e(format_date_th($sb['exp'])) ?></strong></p>
+        <?php elseif ($st !== 'none' && $ok && !$sb['exp']): ?>
+          <p class="mt-1.5 text-xs text-emerald-700">ตลอดชีพ</p>
+        <?php endif; ?>
+        <?php if ($sb['grace'] && strtotime((string)$sb['grace']) > time()): ?>
+          <p class="text-xs text-amber-700 mt-0.5">Grace ถึง <?= e(format_date_th($sb['grace'])) ?></p>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php else: ?>
     <div class="mt-3 flex flex-wrap gap-2 items-center text-sm">
       <?php if ($tier === 'vip' && $benefitsOk): ?>
         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold text-xs"><i data-lucide="crown" class="w-3.5 h-3.5"></i> VIP ใช้งานได้</span>
@@ -24,13 +66,14 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs"><i data-lucide="user-round" class="w-3.5 h-3.5"></i>ยังไม่เป็นสมาชิก</span>
       <?php endif; ?>
     </div>
-    <?php if ($expRaw): ?>
-      <p class="mt-2 text-sm text-slate-600">หมดอายุสิทธิ์แพ็กเกจ: <strong><?= e(format_date_th($expRaw)) ?></strong></p>
+    <?php if ($featureExp): ?>
+      <p class="mt-2 text-sm text-slate-600">หมดอายุสิทธิ์แพ็กเกจ: <strong><?= e(format_date_th($featureExp)) ?></strong></p>
     <?php elseif ($tier !== 'none' && $benefitsOk): ?>
       <p class="mt-2 text-sm text-emerald-700 font-medium">แพ็กเกจตลอดชีพ — ไม่มีวันหมดอายุ</p>
     <?php endif; ?>
-    <?php if ($graceUntilRaw && strtotime((string)$graceUntilRaw) > time()): ?>
-      <p class="mt-1 text-xs text-amber-700">ช่วงพักสิทธิ์ (grace) ถึง <?= e(format_date_th($graceUntilRaw)) ?></p>
+    <?php if ($featureGrace && strtotime((string)$featureGrace) > time()): ?>
+      <p class="mt-1 text-xs text-amber-700">ช่วงพักสิทธิ์ (grace) ถึง <?= e(format_date_th($featureGrace)) ?></p>
+    <?php endif; ?>
     <?php endif; ?>
     <p class="mt-3 text-xs text-slate-500">สมาชิก <strong>VIP</strong> ที่เป็นพาร์ทเนอร์ที่ใช้งานได้ และมีที่พักเผยแพร่ จะได้รับการแจ้งเตือนเมื่อมีลูกค้ากรอกฟอร์ม &quot;ขอให้ช่วยหาที่พัก&quot; ที่ตรงโซน / ประเภท / งบของคุณ</p>
   </div>
@@ -102,11 +145,20 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
         $isVip = ($pl['tier'] ?? '') === 'vip';
         $life  = (int)($pl['is_lifetime'] ?? 0) === 1;
         $days  = $pl['duration_days'] ?? null;
+        $planKind = (string)($pl['plan_kind'] ?? 'bundle');
+        $kindLabel = match ($planKind) {
+            'service'  => 'บริการ',
+            'features' => 'ระบบ',
+            default    => 'ครบ',
+        };
       ?>
         <div class="rounded-xl border <?= $isVip ? 'border-amber-300 bg-amber-50/40 ring-1 ring-amber-200/60' : 'border-slate-200 bg-white' ?> p-4 flex flex-col">
-          <div class="flex items-start justify-between gap-2">
+          <div class="flex items-start justify-between gap-2 flex-wrap">
             <div class="font-bold text-primary-800"><?= e($pl['code']) ?></div>
-            <?php if ($isVip): ?><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">VIP</span><?php endif; ?>
+            <div class="flex gap-1">
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"><?= e($kindLabel) ?></span>
+              <?php if ($isVip): ?><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">VIP</span><?php endif; ?>
+            </div>
           </div>
           <div class="mt-2 text-2xl font-extrabold text-accent-700"><?= format_money($pl['price']) ?></div>
           <?php
@@ -124,6 +176,7 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
           <div class="text-xs text-slate-600 mt-1"><?= $durationLabel ?></div>
           <?php
             $planTier = (string)($pl['tier'] ?? 'standard');
+            if (in_array($planKind, ['features', 'bundle'], true)):
             $tierFeatures = OwnerTier::featuresForTier($planTier);
             $featureLabels = OwnerTier::featureLabels();
           ?>
@@ -133,9 +186,12 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
               <li class="flex items-start gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i><span><?= e($featureLabels[$feat] ?? $feat) ?></span></li>
             <?php endforeach; ?>
             <?php if (count($tierFeatures) > 6): ?>
-              <li class="text-slate-400">+ อีก <?= count($tierFeatures) - 6 ?> สิทธิ์ (ดูตารางด้านบน)</li>
+              <li class="text-slate-400">+ อีก <?= count($tierFeatures) - 6 ?> ฟีเจอร์ระบบ</li>
             <?php endif; ?>
           </ul>
+          <?php endif; ?>
+          <?php elseif ($planKind === 'service'): ?>
+          <p class="mt-3 text-xs text-amber-800 flex-1">รวมสิทธิ์บริการตาม tier — ดูรายละเอียดในตารางเปรียบเทียบ (แถวสิทธิ์บริการ)</p>
           <?php endif; ?>
           <a href="<?= url('/owner/membership/buy?plan=' . (int)$pl['id']) ?>" class="mt-auto pt-4 inline-flex justify-center items-center gap-2 py-2.5 rounded-xl font-semibold text-sm <?= $isVip ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white' ?>">
             <i data-lucide="shopping-cart" class="w-4 h-4"></i> สมัครแพ็กเกจนี้

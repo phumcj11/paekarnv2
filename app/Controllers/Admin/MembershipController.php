@@ -155,15 +155,16 @@ class MembershipController extends Controller
             back();
         }
 
-        $id = Database::insert('membership_plans', [
+        $id = Database::insert('membership_plans', array_filter([
             'code'          => $code,
             'tier'          => $data['tier'],
+            'plan_kind'     => self::normalizedPlanKind(),
             'duration_days' => $days,
             'price'         => (float)$data['price'],
             'is_lifetime'   => $life,
             'is_active'     => !empty($_POST['is_active']) ? 1 : 0,
             'sort_order'    => (int)($data['sort_order'] ?? 0),
-        ]);
+        ], static fn ($v, $k) => $k !== 'plan_kind' || Database::tableHasColumn('membership_plans', 'plan_kind'), ARRAY_FILTER_USE_BOTH));
 
         AuditLog::record('membership_plan_created', ['plan_id' => $id, 'code' => $code], 'membership_plan', $id);
         Session::flash('success', 'สร้างแพ็กเกจแล้ว');
@@ -210,14 +211,19 @@ class MembershipController extends Controller
             back();
         }
 
-        MembershipPlan::update($id, [
+        $update = [
             'tier'          => $data['tier'],
             'duration_days' => $days,
             'price'         => (float)$data['price'],
             'is_lifetime'   => $life,
             'is_active'     => !empty($_POST['is_active']) ? 1 : 0,
             'sort_order'    => (int)($data['sort_order'] ?? 0),
-        ]);
+        ];
+        if (Database::tableHasColumn('membership_plans', 'plan_kind')) {
+            $update['plan_kind'] = self::normalizedPlanKind();
+        }
+
+        MembershipPlan::update($id, $update);
 
         AuditLog::record(
             'membership_plan_updated',
@@ -253,5 +259,12 @@ class MembershipController extends Controller
         );
         Session::flash('success', 'ลบแพ็กเกจแล้ว');
         redirect(url('/admin/membership/plans'));
+    }
+
+    private static function normalizedPlanKind(): string
+    {
+        $kind = trim((string) ($_POST['plan_kind'] ?? 'bundle'));
+
+        return in_array($kind, ['service', 'features', 'bundle'], true) ? $kind : 'bundle';
     }
 }

@@ -14,6 +14,7 @@
       <thead class="bg-slate-50 text-xs uppercase text-slate-600">
         <tr>
           <th class="text-left px-5 py-3">รหัส</th>
+          <th class="text-left px-5 py-3">ประเภท</th>
           <th class="text-left px-5 py-3">Tier</th>
           <th class="text-left px-5 py-3">ระยะเวลา</th>
           <th class="text-left px-5 py-3">ราคา</th>
@@ -24,13 +25,20 @@
       </thead>
       <tbody class="divide-y divide-slate-100">
       <?php if (empty($rows)): ?>
-        <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">ยังไม่มีแพ็กเกจในระบบ</td></tr>
+        <tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">ยังไม่มีแพ็กเกจในระบบ</td></tr>
       <?php else: foreach ($rows as $p):
         $life = (int)($p['is_lifetime'] ?? 0) === 1;
         $dur = $p['duration_days'] ?? null;
+        $kind = (string)($p['plan_kind'] ?? 'bundle');
+        $kindLabel = match ($kind) {
+            'service'  => 'บริการ',
+            'features' => 'ระบบ',
+            default    => 'ครบ',
+        };
       ?>
         <tr class="hover:bg-slate-50">
           <td class="px-5 py-3 font-mono font-semibold text-primary-800"><?= e($p['code']) ?></td>
+          <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"><?= e($kindLabel) ?></span></td>
           <td class="px-5 py-3"><?= e($p['tier']) ?></td>
           <td class="px-5 py-3"><?= $life ? 'ตลอดชีพ' : ($dur ? (int)$dur . ' วัน' : '-') ?></td>
           <td class="px-5 py-3 font-semibold"><?= format_money($p['price']) ?></td>

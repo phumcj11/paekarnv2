@@ -1,5 +1,7 @@
 <?php
 /** @var array $owner @var array $properties */
+use App\Services\OwnerMembership;
+
 $partnerStatus = (string) ($owner['partner_status'] ?? 'pending');
 $partnerBadgeClass = match ($partnerStatus) {
     'pending'     => 'bg-amber-100 text-amber-800',
@@ -43,6 +45,30 @@ $placeholderCover = 'https://placehold.co/96x96?text=Paekan';
     <hr class="my-3">
     <div class="text-sm space-y-1">
       <div class="text-xs text-slate-500 mb-1">สมาชิกเจ้าของแพ</div>
+      <?php
+        $splitMem = OwnerMembership::splitTiersAvailable();
+        if ($splitMem):
+          $dims = [
+            ['key' => 'service', 'label' => 'บริการ', 'tier' => OwnerMembership::serviceTier($owner), 'active' => OwnerMembership::hasActiveServiceBenefits($owner), 'exp' => $owner['service_expires_at'] ?? null, 'grace' => $owner['service_grace_until'] ?? null],
+            ['key' => 'feature', 'label' => 'ระบบ', 'tier' => OwnerMembership::featureTier($owner), 'active' => OwnerMembership::hasActiveFeatureBenefits($owner), 'exp' => $owner['feature_expires_at'] ?? null, 'grace' => $owner['feature_grace_until'] ?? null],
+          ];
+          foreach ($dims as $d):
+      ?>
+      <div class="mb-2">
+        <span class="text-xs text-slate-500"><?= e($d['label']) ?>:</span>
+        <span class="font-semibold"><?= e($d['tier']) ?></span>
+        <?php if (!$d['active'] && $d['tier'] !== 'none'): ?>
+          <span class="text-rose-600 text-xs"> · หมดอายุ</span>
+        <?php elseif (!empty($d['exp'])): ?>
+          <span class="text-slate-600"> · หมด <?= e(format_date_th($d['exp'])) ?></span>
+        <?php elseif ($d['tier'] !== 'none' && $d['active']): ?>
+          <span class="text-emerald-700"> · ไม่มีวันหมด</span>
+        <?php endif; ?>
+        <?php if (!empty($d['grace'])): ?>
+          <div class="text-xs text-amber-700">Grace ถึง <?= e(format_date_th($d['grace'])) ?></div>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; else: ?>
       <div><span class="font-semibold"><?= e($owner['membership_tier'] ?? 'none') ?></span>
         <?php if (!empty($owner['membership_expires_at'])): ?>
           <span class="text-slate-600"> · หมด <?= e(format_date_th($owner['membership_expires_at'])) ?></span>
@@ -52,6 +78,7 @@ $placeholderCover = 'https://placehold.co/96x96?text=Paekan';
       </div>
       <?php if (!empty($owner['membership_grace_until'])): ?>
         <div class="text-xs text-amber-700">Grace ถึง <?= e(format_date_th($owner['membership_grace_until'])) ?></div>
+      <?php endif; ?>
       <?php endif; ?>
     </div>
     <?php

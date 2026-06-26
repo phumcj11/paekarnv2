@@ -1,5 +1,7 @@
 <?php
 /** @var ?array $record */
+use App\Services\OwnerMembership;
+
 $isEdit = !empty($record);
 $action = $isEdit ? url('/admin/owners/' . $record['id']) : url('/admin/owners');
 $rec = $record ?? [];
@@ -89,10 +91,38 @@ $memDtLocal = static function (?string $db): string {
       </div>
     </div>
 
-    <?php if ($isEdit): ?>
+    <?php if ($isEdit):
+      $splitMem = OwnerMembership::splitTiersAvailable();
+    ?>
     <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-3 border-amber-100 ring-1 ring-amber-100/80">
       <h3 class="font-bold flex items-center gap-2"><i data-lucide="crown" class="w-5 h-5 text-amber-600"></i> สมาชิกเจ้าของแพ (แก้ด้วยตนเอง)</h3>
-      <p class="text-xs text-slate-600">ใช้เมื่อต้องการปรับ tier / วันหมดโดยไม่ผ่านคำสั่งซื้อ · เลือก none จะล้างวันหมดและ grace</p>
+      <p class="text-xs text-slate-600">ใช้เมื่อต้องการปรับ tier / วันหมดโดยไม่ผ่านคำสั่งซื้อ<?= $splitMem ? ' · แยกแพ็กเกจบริการกับฟีเจอร์ในระบบ' : '' ?></p>
+      <?php if ($splitMem): ?>
+      <div class="grid md:grid-cols-2 gap-4">
+        <?php foreach (['service' => 'แพ็กเกจบริการ', 'feature' => 'แพ็กเกจระบบ (ฟีเจอร์)'] as $dim => $dimLabel): ?>
+        <div class="rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/50">
+          <div class="text-sm font-semibold text-slate-800"><?= e($dimLabel) ?></div>
+          <div>
+            <label class="text-xs font-medium mb-1 block">Tier</label>
+            <select name="<?= $dim ?>_tier" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm">
+              <?php $mt = old("{$dim}_tier", $rec["{$dim}_tier"] ?? 'none'); ?>
+              <?php foreach (['none', 'standard', 'vip'] as $mv): ?>
+                <option value="<?= $mv ?>" <?= $mt === $mv ? 'selected' : '' ?>><?= $mv ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1 block">หมดอายุ</label>
+            <input type="datetime-local" name="<?= $dim ?>_expires_at" value="<?= e(old("{$dim}_expires_at", $memDtLocal($rec["{$dim}_expires_at"] ?? null))) ?>" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1 block">Grace ถึง</label>
+            <input type="datetime-local" name="<?= $dim ?>_grace_until" value="<?= e(old("{$dim}_grace_until", $memDtLocal($rec["{$dim}_grace_until"] ?? null))) ?>" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php else: ?>
       <div>
         <label class="text-sm font-medium mb-1 block">Tier</label>
         <select name="membership_tier" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
@@ -113,6 +143,7 @@ $memDtLocal = static function (?string $db): string {
           <input type="datetime-local" name="membership_grace_until" value="<?= e(old('membership_grace_until', $memDtLocal($rec['membership_grace_until'] ?? null))) ?>" class="w-full px-3 py-2 rounded-lg border border-slate-300">
         </div>
       </div>
+      <?php endif; ?>
       <div>
         <label class="text-sm font-medium mb-1 block">เหตุผล (audit)</label>
         <input type="text" name="membership_adjust_reason" maxlength="255" value="<?= e(old('membership_adjust_reason')) ?>" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" placeholder="เช่น ชดเชยด้วยตนเอง / ต่ออายุให้ลูกค้า">

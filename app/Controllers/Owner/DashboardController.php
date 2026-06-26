@@ -156,7 +156,7 @@ class DashboardController extends Controller
             $membershipOwner = OwnerMembership::ownerRow($ownerId);
             if ($membershipOwner) {
                 $membershipBenefitsActive = OwnerMembership::hasActiveBenefits($membershipOwner);
-                $membershipIsVip        = ($membershipOwner['membership_tier'] ?? '') === 'vip';
+                $membershipIsVip        = OwnerMembership::isVipActive($ownerId);
                 $authUser                = Auth::user();
                 if ($authUser) {
                     $urow = Database::fetch('SELECT line_user_id FROM users WHERE id = :i', ['i' => (int)$authUser['id']]);

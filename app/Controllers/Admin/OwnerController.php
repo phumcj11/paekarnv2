@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Models\AuditLog;
 use App\Services\OwnerPropertyLimit;
 use App\Services\MembershipPerkService;
+use App\Services\OwnerMembership;
+use App\Services\MembershipListingBoostService;
 
 class OwnerController extends Controller
 {
@@ -171,31 +173,21 @@ class OwnerController extends Controller
         $discount   = max(0.0, min(100.0, (float)($_POST['discount_agreement'] ?? 0)));
         $commission = max(0.0, min(100.0, (float)($_POST['commission_rate'] ?? 0)));
 
-        $tier = trim((string)($_POST['membership_tier'] ?? 'none'));
-        if (!in_array($tier, ['none', 'standard', 'vip'], true)) {
-            $tier = 'none';
-        }
-
-        $expAt = null;
-        $graceAt = null;
-        if ($tier !== 'none') {
-            $expRaw = trim((string)($_POST['membership_expires_at'] ?? ''));
-            $graceRaw = trim((string)($_POST['membership_grace_until'] ?? ''));
-            if ($expRaw !== '') {
-                $ts = strtotime(str_replace('T', ' ', $expRaw));
-                $expAt = $ts ? date('Y-m-d H:i:s', $ts) : null;
-            }
-            if ($graceRaw !== '') {
-                $ts = strtotime(str_replace('T', ' ', $graceRaw));
-                $graceAt = $ts ? date('Y-m-d H:i:s', $ts) : null;
-            }
-        }
-
-        $beforeMem = [
-            'membership_tier'        => $record['membership_tier'] ?? 'none',
-            'membership_expires_at'  => $record['membership_expires_at'] ?? null,
-            'membership_grace_until' => $record['membership_grace_until'] ?? null,
-        ];
+        $splitTiers = OwnerMembership::splitTiersAvailable();
+        $beforeMem = $splitTiers
+            ? [
+                'service_tier'         => $record['service_tier'] ?? 'none',
+                'service_expires_at'   => $record['service_expires_at'] ?? null,
+                'service_grace_until'  => $record['service_grace_until'] ?? null,
+                'feature_tier'         => $record['feature_tier'] ?? 'none',
+                'feature_expires_at'   => $record['feature_expires_at'] ?? null,
+                'feature_grace_until'  => $record['feature_grace_until'] ?? null,
+            ]
+            : [
+                'membership_tier'        => $record['membership_tier'] ?? 'none',
+                'membership_expires_at'  => $record['membership_expires_at'] ?? null,
+                'membership_grace_until' => $record['membership_grace_until'] ?? null,
+            ];
 
         $userRow = [
             'name'  => $data['name'],
@@ -217,10 +209,29 @@ class OwnerController extends Controller
             'discount_agreement' => $discount,
             'commission_rate'    => $commission,
             'notes'              => trim((string)($_POST['notes'] ?? '')) ?: null,
-            'membership_tier'          => $tier,
-            'membership_expires_at'    => $tier === 'none' ? null : $expAt,
-            'membership_grace_until'   => $tier === 'none' ? null : $graceAt,
         ];
+
+        if ($splitTiers) {
+            foreach (['service', 'feature'] as $dim) {
+                $tier = trim((string) ($_POST["{$dim}_tier"] ?? 'none'));
+                if (!in_array($tier, ['none', 'standard', 'vip'], true)) {
+                    $tier = 'none';
+                }
+                OwnerMembership::applyDimensionUpdate($id, $dim, [
+                    'tier'        => $tier,
+                    'expires_at'  => $tier === 'none' ? null : self::parseMembershipDatetime("{$dim}_expires_at"),
+                    'grace_until' => $tier === 'none' ? null : self::parseMembershipDatetime("{$dim}_grace_until"),
+                ]);
+            }
+        } else {
+            $tier = trim((string) ($_POST['membership_tier'] ?? 'none'));
+            if (!in_array($tier, ['none', 'standard', 'vip'], true)) {
+                $tier = 'none';
+            }
+            $ownerUpdate['membership_tier'] = $tier;
+            $ownerUpdate['membership_expires_at'] = $tier === 'none' ? null : self::parseMembershipDatetime('membership_expires_at');
+            $ownerUpdate['membership_grace_until'] = $tier === 'none' ? null : self::parseMembershipDatetime('membership_grace_until');
+        }
 
         $newMaxProps = null;
         if (Database::tableHasColumn('owners', 'max_properties')) {
@@ -230,11 +241,20 @@ class OwnerController extends Controller
 
         Database::update('owners', $ownerUpdate, 'id = :id', ['id' => $id]);
 
-        $afterMem = [
-            'membership_tier'          => $tier,
-            'membership_expires_at'    => $tier === 'none' ? null : $expAt,
-            'membership_grace_until'   => $tier === 'none' ? null : $graceAt,
-        ];
+        $afterMem = $splitTiers
+            ? [
+                'service_tier'         => trim((string) ($_POST['service_tier'] ?? 'none')),
+                'service_expires_at'   => self::parseMembershipDatetime('service_expires_at'),
+                'service_grace_until'  => self::parseMembershipDatetime('service_grace_until'),
+                'feature_tier'         => trim((string) ($_POST['feature_tier'] ?? 'none')),
+                'feature_expires_at'   => self::parseMembershipDatetime('feature_expires_at'),
+                'feature_grace_until'  => self::parseMembershipDatetime('feature_grace_until'),
+            ]
+            : [
+                'membership_tier'          => $ownerUpdate['membership_tier'] ?? 'none',
+                'membership_expires_at'    => $ownerUpdate['membership_expires_at'] ?? null,
+                'membership_grace_until'   => $ownerUpdate['membership_grace_until'] ?? null,
+            ];
         if ($beforeMem !== $afterMem) {
             AuditLog::record(
                 'admin_owner_membership_adjust',
@@ -246,8 +266,12 @@ class OwnerController extends Controller
                 'owner',
                 $id
             );
-            if ($tier !== 'none') {
+            $updatedOwner = OwnerMembership::ownerRow($id);
+            if ($updatedOwner && OwnerMembership::hasActiveServiceBenefits($updatedOwner)) {
                 MembershipPerkService::syncPendingGrantsForOwner($id);
+            }
+            if ($updatedOwner && OwnerMembership::hasActiveFeatureBenefits($updatedOwner)) {
+                MembershipListingBoostService::syncOwnerBoost($id);
             }
         }
 
@@ -265,6 +289,17 @@ class OwnerController extends Controller
 
         Session::flash('success', 'บันทึกการเปลี่ยนแปลงเรียบร้อย');
         redirect(url('/admin/owners/' . $id));
+    }
+
+    private static function parseMembershipDatetime(string $field): ?string
+    {
+        $raw = trim((string) ($_POST[$field] ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $ts = strtotime(str_replace('T', ' ', $raw));
+
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
 
     public function markPerkGranted(int $id): void

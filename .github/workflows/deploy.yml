@@ -186,6 +186,9 @@ jobs:
             if [ -f "$APP/scripts/migrate_owner_membership_perks.sh" ]; then
               bash "$APP/scripts/migrate_owner_membership_perks.sh" || echo "WARN: migrate_owner_membership_perks failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_membership_split_tiers.sh" ]; then
+              bash "$APP/scripts/migrate_membership_split_tiers.sh" || echo "WARN: migrate_membership_split_tiers failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"

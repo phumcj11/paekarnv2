@@ -37,13 +37,16 @@ $ownerMembershipActive = false;
 $firstPropertyId = null;
 $ownerId = Auth::ownerId();
 if ($user && $user['role'] === 'owner') {
-  $row = Database::fetch(
-    "SELECT partner_status, membership_tier, membership_expires_at, membership_grace_until FROM owners WHERE user_id = :u",
-    ['u' => $user['id']]
-  );
+  $row = $ownerId ? OwnerMembership::ownerRow($ownerId) : null;
+  if (!$row && $user['id']) {
+    $row = Database::fetch(
+      "SELECT partner_status, membership_tier, membership_expires_at, membership_grace_until FROM owners WHERE user_id = :u",
+      ['u' => $user['id']]
+    );
+  }
   $ownerStatus = $row['partner_status'] ?? null;
-  $ownerTier = $row['membership_tier'] ?? 'none';
-  $ownerMembershipActive = $row ? OwnerMembership::hasActiveBenefits($row) : false;
+  $ownerTier = $row ? OwnerMembership::featureTier($row) : 'none';
+  $ownerMembershipActive = $row ? OwnerMembership::hasActiveFeatureBenefits($row) : false;
   if ($ownerId) {
     $fp = Database::fetch("SELECT id FROM properties WHERE owner_id = :o ORDER BY id ASC LIMIT 1", ['o' => $ownerId]);
     $firstPropertyId = $fp['id'] ?? null;

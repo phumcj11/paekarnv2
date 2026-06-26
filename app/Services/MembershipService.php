@@ -118,51 +118,122 @@ class MembershipService
      */
     private static function applyPaidPlan(int $ownerId, array $plan, int $orderId): void
     {
-        $owner = Database::fetch('SELECT membership_expires_at FROM owners WHERE id = :id', ['id' => $ownerId]);
+        $owner = OwnerMembership::ownerRow($ownerId);
         if (!$owner) {
             return;
         }
 
-        $baseTs = time();
-        if (!empty($owner['membership_expires_at']) && strtotime((string)$owner['membership_expires_at']) > $baseTs) {
-            $baseTs = strtotime((string)$owner['membership_expires_at']);
+        $kind = (string) ($plan['plan_kind'] ?? 'bundle');
+        if (!in_array($kind, ['service', 'features', 'bundle'], true)) {
+            $kind = 'bundle';
+        }
+        $tier = (string) ($plan['tier'] ?? 'standard');
+        if (!in_array($tier, ['standard', 'vip'], true)) {
+            return;
         }
 
-        if ((int)$plan['is_lifetime'] === 1) {
+        $isLife = (int) ($plan['is_lifetime'] ?? 0) === 1;
+        $days = (int) ($plan['duration_days'] ?? 0);
+
+        if (OwnerMembership::splitTiersAvailable()) {
+            if ($kind === 'service' || $kind === 'bundle') {
+                self::applyPlanToDimension($ownerId, $owner, 'service', $tier, $isLife, $days);
+            }
+            if ($kind === 'features' || $kind === 'bundle') {
+                self::applyPlanToDimension($ownerId, $owner, 'feature', $tier, $isLife, $days);
+            }
+            OwnerMembership::syncLegacyMembershipColumns($ownerId);
+        } else {
+            self::applyPlanLegacy($ownerId, $owner, $tier, $isLife, $days);
+        }
+
+        if ($kind === 'features' || $kind === 'bundle') {
+            MembershipListingBoostService::syncOwnerBoost($ownerId);
+        }
+        if ($kind === 'service' || $kind === 'bundle') {
+            MembershipPerkService::syncPendingGrantsForOwner($ownerId);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $owner
+     */
+    private static function applyPlanToDimension(
+        int $ownerId,
+        array $owner,
+        string $dimension,
+        string $tier,
+        bool $isLife,
+        int $days
+    ): void {
+        $prefix = $dimension === 'service' ? 'service' : 'feature';
+        $expKey = "{$prefix}_expires_at";
+
+        $baseTs = time();
+        if (!empty($owner[$expKey]) && strtotime((string) $owner[$expKey]) > $baseTs) {
+            $baseTs = strtotime((string) $owner[$expKey]);
+        }
+
+        if ($isLife) {
+            OwnerMembership::applyDimensionUpdate($ownerId, $dimension, [
+                'tier'        => $tier,
+                'expires_at'  => null,
+                'grace_until' => null,
+            ]);
+
+            return;
+        }
+
+        if ($days <= 0) {
+            return;
+        }
+
+        OwnerMembership::applyDimensionUpdate($ownerId, $dimension, [
+            'tier'        => $tier,
+            'expires_at'  => date('Y-m-d H:i:s', strtotime("+{$days} days", $baseTs)),
+            'grace_until' => null,
+        ]);
+    }
+
+    /** @param array<string,mixed> $owner */
+    private static function applyPlanLegacy(int $ownerId, array $owner, string $tier, bool $isLife, int $days): void
+    {
+        $baseTs = time();
+        if (!empty($owner['membership_expires_at']) && strtotime((string) $owner['membership_expires_at']) > $baseTs) {
+            $baseTs = strtotime((string) $owner['membership_expires_at']);
+        }
+
+        if ($isLife) {
             Database::update(
                 'owners',
                 [
-                    'membership_tier'         => $plan['tier'],
-                    'membership_expires_at'    => null,
-                    'membership_grace_until'   => null,
+                    'membership_tier'        => $tier,
+                    'membership_expires_at'  => null,
+                    'membership_grace_until' => null,
                 ],
                 'id = :id',
                 ['id' => $ownerId]
             );
-
             MembershipListingBoostService::syncOwnerBoost($ownerId);
             MembershipPerkService::syncPendingGrantsForOwner($ownerId);
 
             return;
         }
 
-        $days = (int)($plan['duration_days'] ?? 0);
         if ($days <= 0) {
             return;
         }
-        $expires = date('Y-m-d H:i:s', strtotime("+{$days} days", $baseTs));
 
         Database::update(
             'owners',
             [
-                'membership_tier'         => $plan['tier'],
-                'membership_expires_at'    => $expires,
-                'membership_grace_until'   => null,
+                'membership_tier'        => $tier,
+                'membership_expires_at'  => date('Y-m-d H:i:s', strtotime("+{$days} days", $baseTs)),
+                'membership_grace_until' => null,
             ],
             'id = :id',
             ['id' => $ownerId]
         );
-
         MembershipListingBoostService::syncOwnerBoost($ownerId);
         MembershipPerkService::syncPendingGrantsForOwner($ownerId);
     }

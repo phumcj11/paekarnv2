@@ -73,10 +73,10 @@ final class OwnerTier
         if (!$row) {
             return 'none';
         }
-        if (!OwnerMembership::hasActiveBenefits($row)) {
+        if (!OwnerMembership::hasActiveFeatureBenefits($row)) {
             return 'none';
         }
-        $t = (string) ($row['membership_tier'] ?? 'none');
+        $t = OwnerMembership::featureTier($row);
 
         return in_array($t, ['standard', 'vip'], true) ? $t : 'none';
     }

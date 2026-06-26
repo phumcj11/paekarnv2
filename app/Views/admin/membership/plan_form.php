@@ -22,6 +22,17 @@ $action = $isEdit ? url('/admin/membership/plans/' . (int)$plan['id']) : url('/a
   <?php endif; ?>
 
   <div>
+    <label class="text-sm font-medium text-slate-700 mb-1 block">ประเภทแพ็กเกจ</label>
+    <?php $pk = old('plan_kind', $plan['plan_kind'] ?? 'bundle'); ?>
+    <select name="plan_kind" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
+      <option value="bundle" <?= $pk === 'bundle' ? 'selected' : '' ?>>ครบ — บริการ + ฟีเจอร์ในระบบ</option>
+      <option value="service" <?= $pk === 'service' ? 'selected' : '' ?>>บริการอย่างเดียว (สิทธิ์ manual)</option>
+      <option value="features" <?= $pk === 'features' ? 'selected' : '' ?>>ระบบอย่างเดียว (ฟีเจอร์เว็บ)</option>
+    </select>
+    <p class="text-xs text-slate-500 mt-1">เลือกว่าแพ็กนี้เปิด tier ด้านไหน — tier ด้านล่างใช้กับมิติที่เลือก</p>
+  </div>
+
+  <div>
     <label class="text-sm font-medium text-slate-700 mb-1 block">Tier</label>
     <select name="tier" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
       <?php $t = old('tier', $plan['tier'] ?? 'standard'); ?>

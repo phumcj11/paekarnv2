@@ -31,8 +31,8 @@ class MembershipListingBoostService
         );
         $eligible = $owner
             && ($owner['partner_status'] ?? '') === 'active'
-            && OwnerMembership::hasActiveBenefits($owner);
-        $tier = $eligible ? (string) ($owner['membership_tier'] ?? 'none') : 'none';
+            && OwnerMembership::hasActiveFeatureBenefits($owner);
+        $tier = $eligible ? OwnerMembership::featureTier($owner) : 'none';
 
         $priStd = max(0, (int) Setting::get('membership_boost_priority_standard', 20));
         $priVip = max(0, (int) Setting::get('membership_boost_priority_vip', 60));

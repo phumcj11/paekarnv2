@@ -467,6 +467,27 @@ class CronService
             return ['affected' => 0, 'output' => 'Skipped membership_apply_grace (membership_grace_days <= 0)'];
         }
 
+        $n = 0;
+        if (OwnerMembership::splitTiersAvailable()) {
+            foreach (['service', 'feature'] as $dim) {
+                $rows = Database::fetchAll(
+                    "SELECT id, {$dim}_expires_at AS exp FROM owners
+                     WHERE {$dim}_tier IN ('standard','vip')
+                     AND {$dim}_expires_at IS NOT NULL AND {$dim}_expires_at < NOW()
+                     AND {$dim}_grace_until IS NULL
+                     LIMIT 500"
+                );
+                foreach ($rows as $r) {
+                    $graceEnd = date('Y-m-d H:i:s', strtotime("+{$days} days", strtotime((string) $r['exp'])));
+                    Database::update('owners', ["{$dim}_grace_until" => $graceEnd], 'id = :id', ['id' => $r['id']]);
+                    OwnerMembership::syncLegacyMembershipColumns((int) $r['id']);
+                    $n++;
+                }
+            }
+
+            return ['affected' => $n, 'output' => "Applied grace period to $n owner dimensions"];
+        }
+
         $rows = Database::fetchAll(
             "SELECT id, membership_expires_at FROM owners
              WHERE membership_tier IN ('standard','vip')
@@ -476,7 +497,6 @@ class CronService
              LIMIT 500"
         );
 
-        $n = 0;
         foreach ($rows as $r) {
             $expTs = strtotime((string)$r['membership_expires_at']);
             $graceEnd = date('Y-m-d H:i:s', strtotime("+{$days} days", $expTs));
@@ -492,6 +512,37 @@ class CronService
     {
         $graceDays = (int)Setting::get('membership_grace_days', 7);
         $n = 0;
+
+        if (OwnerMembership::splitTiersAvailable()) {
+            foreach (['service', 'feature'] as $dim) {
+                $rows = Database::fetchAll(
+                    "SELECT id, user_id FROM owners
+                     WHERE {$dim}_tier IN ('standard','vip')
+                     AND {$dim}_grace_until IS NOT NULL AND {$dim}_grace_until < NOW()
+                     LIMIT 500"
+                );
+                foreach ($rows as $r) {
+                    self::finalizeDimensionDowngrade((int) $r['id'], (int) $r['user_id'], $dim);
+                    $n++;
+                }
+
+                if ($graceDays <= 0) {
+                    $rows2 = Database::fetchAll(
+                        "SELECT id, user_id FROM owners
+                         WHERE {$dim}_tier IN ('standard','vip')
+                         AND {$dim}_expires_at IS NOT NULL AND {$dim}_expires_at < NOW()
+                         AND {$dim}_grace_until IS NULL
+                         LIMIT 500"
+                    );
+                    foreach ($rows2 as $r) {
+                        self::finalizeDimensionDowngrade((int) $r['id'], (int) $r['user_id'], $dim);
+                        $n++;
+                    }
+                }
+            }
+
+            return ['affected' => $n, 'output' => "Downgraded $n expired membership dimensions"];
+        }
 
         $rows = Database::fetchAll(
             "SELECT id, user_id FROM owners
@@ -533,59 +584,76 @@ class CronService
         $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
         $renewUrl = rtrim((string) \App\Core\Application::$publicUrl, '/') . '/owner/membership';
 
+        $dimensions = OwnerMembership::splitTiersAvailable()
+            ? [
+                ['key' => 'service', 'label' => 'แพ็กเกจบริการ', 'tierCol' => 'service_tier', 'expCol' => 'service_expires_at'],
+                ['key' => 'feature', 'label' => 'แพ็กเกจระบบ', 'tierCol' => 'feature_tier', 'expCol' => 'feature_expires_at'],
+            ]
+            : [
+                ['key' => 'legacy', 'label' => 'สมาชิก', 'tierCol' => 'membership_tier', 'expCol' => 'membership_expires_at'],
+            ];
+
         foreach ($intervals as $days) {
-            $rows = Database::fetchAll(
-                "SELECT o.id, o.user_id, o.membership_tier, o.membership_expires_at
-                 FROM owners o
-                 WHERE o.membership_tier IN ('standard','vip')
-                 AND o.membership_expires_at IS NOT NULL
-                 AND o.membership_expires_at > NOW()
-                 AND DATE(o.membership_expires_at) = DATE(DATE_ADD(CURDATE(), INTERVAL :d DAY))
-                 LIMIT 500",
-                ['d' => $days]
-            );
-
-            foreach ($rows as $r) {
-                $userId = (int) $r['user_id'];
-                $notifType = "membership_expiring_{$days}d";
-                if (self::membershipExpiryAlreadyNotified($userId, $notifType)) {
-                    $skipped++;
-                    continue;
-                }
-
-                $expTs    = strtotime((string)$r['membership_expires_at']);
-                $dayStr   = (int)date('j', $expTs);
-                $monStr   = $thaiMonths[(int)date('n', $expTs)];
-                $yearStr  = (int)date('Y', $expTs) + 543;
-                $expThai  = "{$dayStr} {$monStr} {$yearStr}";
-                $tierLabel = $r['membership_tier'] === 'vip' ? 'VIP' : 'Standard';
-                $typeLabel = $days === 1 ? 'พรุ่งนี้' : "อีก {$days} วัน";
-
-                NotificationService::send(
-                    $userId,
-                    $notifType,
-                    "สมาชิกจะหมดอายุใน {$days} วัน",
-                    "แพ็กเกจ {$tierLabel} จะหมดอายุวันที่ {$expThai} — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ",
-                    '/owner/membership'
+            foreach ($dimensions as $dim) {
+                $tierCol = $dim['tierCol'];
+                $expCol = $dim['expCol'];
+                $rows = Database::fetchAll(
+                    "SELECT o.id, o.user_id, o.{$tierCol} AS membership_tier, o.{$expCol} AS membership_expires_at
+                     FROM owners o
+                     WHERE o.{$tierCol} IN ('standard','vip')
+                     AND o.{$expCol} IS NOT NULL
+                     AND o.{$expCol} > NOW()
+                     AND DATE(o.{$expCol}) = DATE(DATE_ADD(CURDATE(), INTERVAL :d DAY))
+                     LIMIT 500",
+                    ['d' => $days]
                 );
-                $n++;
 
-                try {
-                    $uRow = Database::fetch(
-                        'SELECT line_user_id FROM users WHERE id = :uid LIMIT 1',
-                        ['uid' => $userId]
-                    );
-                    if (!empty($uRow['line_user_id'])) {
-                        $msg = "⚠️ แจ้งเตือนสมาชิกแพกาญ.com\n\n"
-                             . "แพ็กเกจ {$tierLabel} ของคุณจะหมดอายุ{$typeLabel}\n"
-                             . "📅 วันหมดอายุ: {$expThai}\n\n"
-                             . "ต่ออายุตอนนี้เพื่อคงสิทธิ์โปรโมตที่พัก\n"
-                             . "👉 {$renewUrl}";
-                        if (LineService::push((string)$uRow['line_user_id'], $msg)) {
-                            $lineN++;
-                        }
+                foreach ($rows as $r) {
+                    $userId = (int) $r['user_id'];
+                    $dimKey = $dim['key'];
+                    $notifType = $dimKey === 'legacy'
+                        ? "membership_expiring_{$days}d"
+                        : "membership_{$dimKey}_expiring_{$days}d";
+                    if (self::membershipExpiryAlreadyNotified($userId, $notifType)) {
+                        $skipped++;
+                        continue;
                     }
-                } catch (\Throwable) {
+
+                    $expTs    = strtotime((string)$r['membership_expires_at']);
+                    $dayStr   = (int)date('j', $expTs);
+                    $monStr   = $thaiMonths[(int)date('n', $expTs)];
+                    $yearStr  = (int)date('Y', $expTs) + 543;
+                    $expThai  = "{$dayStr} {$monStr} {$yearStr}";
+                    $tierLabel = $r['membership_tier'] === 'vip' ? 'VIP' : 'Standard';
+                    $typeLabel = $days === 1 ? 'พรุ่งนี้' : "อีก {$days} วัน";
+                    $packLabel = $dim['label'];
+
+                    NotificationService::send(
+                        $userId,
+                        $notifType,
+                        "{$packLabel}จะหมดอายุใน {$days} วัน",
+                        "แพ็กเกจ {$tierLabel} ({$packLabel}) จะหมดอายุวันที่ {$expThai} — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ",
+                        '/owner/membership'
+                    );
+                    $n++;
+
+                    try {
+                        $uRow = Database::fetch(
+                            'SELECT line_user_id FROM users WHERE id = :uid LIMIT 1',
+                            ['uid' => $userId]
+                        );
+                        if (!empty($uRow['line_user_id'])) {
+                            $msg = "⚠️ แจ้งเตือนสมาชิกแพกาญ.com\n\n"
+                                 . "{$packLabel} {$tierLabel} จะหมดอายุ{$typeLabel}\n"
+                                 . "📅 วันหมดอายุ: {$expThai}\n\n"
+                                 . "ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ\n"
+                                 . "👉 {$renewUrl}";
+                            if (LineService::push((string)$uRow['line_user_id'], $msg)) {
+                                $lineN++;
+                            }
+                        }
+                    } catch (\Throwable) {
+                    }
                 }
             }
         }
@@ -635,6 +703,28 @@ class CronService
         }
     }
 
+    private static function finalizeDimensionDowngrade(int $ownerId, int $userId, string $dimension): void
+    {
+        if ($dimension === 'feature') {
+            MembershipListingBoostService::stripBoostForOwner($ownerId);
+        }
+
+        OwnerMembership::applyDimensionUpdate($ownerId, $dimension, [
+            'tier'        => 'none',
+            'expires_at'  => null,
+            'grace_until' => null,
+        ]);
+
+        $label = $dimension === 'service' ? 'แพ็กเกจบริการ' : 'แพ็กเกจระบบ';
+        NotificationService::send(
+            $userId,
+            "membership_{$dimension}_expired",
+            "{$label}หมดอายุแล้ว",
+            "{$label}ของคุณสิ้นสุดแล้ว — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ",
+            '/owner/membership'
+        );
+    }
+
     private static function finalizeMembershipDowngrade(int $ownerId, int $userId): void
     {
         MembershipListingBoostService::stripBoostForOwner($ownerId);
@@ -667,7 +757,10 @@ class CronService
         }
 
         $ids = [];
-        foreach (Database::fetchAll("SELECT id FROM owners WHERE membership_tier IN ('standard','vip')") as $r) {
+        $tierSql = OwnerMembership::splitTiersAvailable()
+            ? "feature_tier IN ('standard','vip')"
+            : "membership_tier IN ('standard','vip')";
+        foreach (Database::fetchAll("SELECT id FROM owners WHERE {$tierSql}") as $r) {
             $ids[(int) $r['id']] = true;
         }
         foreach (Database::fetchAll(

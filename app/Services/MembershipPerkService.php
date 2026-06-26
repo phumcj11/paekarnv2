@@ -32,11 +32,11 @@ class MembershipPerkService
         }
 
         $owner = OwnerMembership::ownerRow($ownerId);
-        if (!$owner || !OwnerMembership::hasActiveBenefits($owner)) {
+        if (!$owner || !OwnerMembership::hasActiveServiceBenefits($owner)) {
             return;
         }
 
-        $tier = (string) ($owner['membership_tier'] ?? 'none');
+        $tier = OwnerMembership::serviceTier($owner);
         foreach (OwnerTier::servicePerksForTier($tier) as $perk) {
             $existing = Database::fetch(
                 'SELECT id FROM owner_membership_perk_grants WHERE owner_id = :o AND perk_key = :k LIMIT 1',
@@ -92,7 +92,7 @@ class MembershipPerkService
     public static function displayGrantsForOwner(int $ownerId): array
     {
         $owner = OwnerMembership::ownerRow($ownerId);
-        if (!$owner || !OwnerMembership::hasActiveBenefits($owner)) {
+        if (!$owner || !OwnerMembership::hasActiveServiceBenefits($owner)) {
             return [];
         }
 
@@ -102,7 +102,7 @@ class MembershipPerkService
             $byKey[(string) $g['perk_key']] = $g;
         }
 
-        $tier = (string) ($owner['membership_tier'] ?? 'none');
+        $tier = OwnerMembership::serviceTier($owner);
         $out = [];
         foreach (OwnerTier::servicePerksForTier($tier) as $perk) {
             $g = $byKey[$perk['key']] ?? null;
