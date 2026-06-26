@@ -8,8 +8,11 @@
  *
  * @var array<string,string> $bank      bank_name, bank_account, bank_holder, promptpay
  * @var string $amountVar               Alpine key on parent form (e.g. "totalSale", "total")
+ * @var float  $initialAmount            Server-side QR amount for first paint (optional)
  * @var bool   $showGatewaySlot         show disabled "Credit Card — เร็วๆ นี้"
  */
+use App\Support\PromptPayQr;
+
 $bank = $bank ?? [
     'bank_name'    => \App\Models\Setting::get('bank_name', ''),
     'bank_account' => \App\Models\Setting::get('bank_account', ''),
@@ -17,12 +20,17 @@ $bank = $bank ?? [
     'promptpay'    => \App\Models\Setting::get('promptpay_id', ''),
 ];
 $amountVar = $amountVar ?? 'total';
+$initialAmount = (float) ($initialAmount ?? 0);
 $showGatewaySlot = $showGatewaySlot ?? true;
 $gatewayEnabled = (string) \App\Models\Setting::get('payment_gateway_enabled', '0') === '1';
 $qrEndpoint = url('/api-promptpay-qr');
+$serverQrB64 = ($bank['promptpay'] ?? '') !== ''
+    ? PromptPayQr::pngBase64((string) $bank['promptpay'], $initialAmount)
+    : null;
+$serverQrSrc = $serverQrB64 ? 'data:image/png;base64,' . $serverQrB64 : '';
 ?>
 <div class="bg-white border border-slate-200 rounded-2xl p-5"
-     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>)"
+     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>, <?= json_encode($serverQrSrc, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>)"
      x-init="
        $watch('method', () => refreshQr());
        $watch(() => (<?= $amountVar ?>), () => refreshQr());
@@ -77,15 +85,22 @@ $qrEndpoint = url('/api-promptpay-qr');
 
       <div class="p-4 sm:p-5 space-y-4">
         <div class="pp-qr-frame relative mx-auto w-full max-w-[260px] min-h-[220px] aspect-square rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <img x-show="qrSrc && !qrLoading"
-               :src="qrSrc"
+          <?php if ($serverQrSrc !== ''): ?>
+          <img src="<?= e($serverQrSrc) ?>"
+               :src="qrSrc || serverQrSrc"
                alt="Thai QR Payment"
-               class="h-full w-full object-contain">
+               class="block h-full w-full object-contain">
+          <?php else: ?>
+          <img :src="qrSrc"
+               alt="Thai QR Payment"
+               class="block h-full w-full object-contain"
+               x-show="!!qrSrc">
+          <?php endif; ?>
           <div x-show="qrLoading" x-cloak class="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-white/90">
             <div class="h-9 w-9 rounded-full border-[3px] border-slate-200 border-t-accent-500 animate-spin" aria-hidden="true"></div>
             <span class="text-xs text-slate-500">กำลังสร้าง QR...</span>
           </div>
-          <div x-show="!qrLoading && !qrSrc" x-cloak class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-50 px-4 text-center text-xs text-slate-500">
+          <div x-show="!qrLoading && !qrSrc && !serverQrSrc" x-cloak class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-50 px-4 text-center text-xs text-slate-500">
             <span x-text="qrError || 'กำลังโหลด QR...'"></span>
           </div>
         </div>

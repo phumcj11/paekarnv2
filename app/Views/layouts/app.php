@@ -410,15 +410,17 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
-  Alpine.data('paymentBlock', (endpoint, amountKey) => ({
+  Alpine.data('paymentBlock', (endpoint, amountKey, serverQrSrc = '') => ({
     paymentAmount: 0,
-    qrSrc: '',
+    qrSrc: serverQrSrc || '',
+    serverQrSrc: serverQrSrc || '',
     qrLoading: false,
     qrError: '',
     copied: '',
     slipName: '',
     slipPreview: '',
     slipSize: '',
+    _qrTimer: null,
 
     parentFormData() {
       const form = this.$el.closest('form');
@@ -483,24 +485,26 @@ document.addEventListener('alpine:init', () => {
     refreshQr() {
       if (this.resolveMethod() !== 'promptpay') return;
       this.syncAmountFromParent();
-      this.qrLoading = true;
-      this.qrError = '';
-      this.qrSrc = '';
-      const url = endpoint + '?amount=' + encodeURIComponent(this.paymentAmount || 0);
-      fetch(url)
-        .then((r) => r.json())
-        .then((d) => {
-          this.qrLoading = false;
-          if (d.ok) {
-            this.qrSrc = d.image;
-          } else {
-            this.qrError = d.msg || 'ไม่สามารถสร้าง QR ได้';
-          }
-        })
-        .catch(() => {
-          this.qrLoading = false;
-          this.qrError = 'เกิดข้อผิดพลาด';
-        });
+      clearTimeout(this._qrTimer);
+      this._qrTimer = setTimeout(() => {
+        this.qrLoading = true;
+        this.qrError = '';
+        const url = endpoint + '?amount=' + encodeURIComponent(this.paymentAmount || 0);
+        fetch(url)
+          .then((r) => r.json())
+          .then((d) => {
+            this.qrLoading = false;
+            if (d.ok && d.image) {
+              this.qrSrc = d.image;
+            } else {
+              this.qrError = d.msg || 'ไม่สามารถสร้าง QR ได้';
+            }
+          })
+          .catch(() => {
+            this.qrLoading = false;
+            this.qrError = 'เกิดข้อผิดพลาด';
+          });
+      }, 120);
     },
 
     init() {

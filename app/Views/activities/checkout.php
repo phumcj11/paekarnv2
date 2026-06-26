@@ -117,6 +117,7 @@ $cancellation = trim((string)($product['cancellation_policy'] ?? ''));
       <?php \App\Core\View::partial('partials/payment-block', [
         'bank' => $bank,
         'amountVar' => 'total',
+        'initialAmount' => $basePrice,
         'showGatewaySlot' => true,
       ]); ?>
     </div>

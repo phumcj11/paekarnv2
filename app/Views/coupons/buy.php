@@ -96,6 +96,7 @@ $campaignJson = htmlspecialchars(json_encode(array_map(static fn ($c) => [
       <?php \App\Core\View::partial('partials/payment-block', [
         'bank' => $bank,
         'amountVar' => 'totalSale',
+        'initialAmount' => (float) $sale,
         'showGatewaySlot' => true,
       ]); ?>
     </div>

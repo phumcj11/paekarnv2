@@ -203,6 +203,7 @@ $pageIcon = 'calendar-plus';
         <?php \App\Core\View::partial('partials/payment-block', [
           'bank' => $bank,
           'amountVar' => 'total',
+          'initialAmount' => (float) ($unit['price'] ?? 0),
           'showGatewaySlot' => true,
         ]); ?>
       <?php endif; ?>
