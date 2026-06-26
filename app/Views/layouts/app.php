@@ -410,6 +410,108 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
+  Alpine.data('paymentBlock', (endpoint, amountKey) => ({
+    paymentAmount: 0,
+    qrSrc: '',
+    qrLoading: false,
+    qrError: '',
+    copied: '',
+    slipName: '',
+    slipPreview: '',
+    slipSize: '',
+
+    parentFormData() {
+      const form = this.$el.closest('form');
+      if (form && form._x_dataStack && form._x_dataStack[0]) {
+        return form._x_dataStack[0];
+      }
+      return null;
+    },
+
+    get checkoutMethod() {
+      return this.parentFormData()?.method ?? 'promptpay';
+    },
+
+    set checkoutMethod(value) {
+      const parent = this.parentFormData();
+      if (parent) parent.method = value;
+    },
+
+    parentAmount() {
+      const parent = this.parentFormData();
+      if (!parent) return 0;
+      const value = parent[amountKey];
+      const num = typeof value === 'number' ? value : Number(value);
+      return Number.isFinite(num) ? num : 0;
+    },
+
+    formatAmount() {
+      return (this.paymentAmount || 0).toLocaleString('th-TH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    },
+
+    copy(text, key) {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        this.copied = key;
+        setTimeout(() => { this.copied = ''; }, 1500);
+      }).catch(() => { this.copied = ''; });
+    },
+
+    previewSlip(ev) {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) {
+        this.slipName = '';
+        this.slipPreview = '';
+        this.slipSize = '';
+        return;
+      }
+      this.slipName = f.name;
+      this.slipSize = (f.size / 1024).toFixed(0) + ' KB';
+      if (f.type.startsWith('image/')) {
+        const r = new FileReader();
+        r.onload = (e) => { this.slipPreview = e.target.result; };
+        r.readAsDataURL(f);
+      } else {
+        this.slipPreview = '';
+      }
+    },
+
+    refreshQr() {
+      if (this.checkoutMethod !== 'promptpay') return;
+      this.qrLoading = true;
+      this.qrError = '';
+      this.qrSrc = '';
+      const url = endpoint + '?amount=' + encodeURIComponent(this.paymentAmount || 0);
+      fetch(url)
+        .then((r) => r.json())
+        .then((d) => {
+          this.qrLoading = false;
+          if (d.ok) {
+            this.qrSrc = d.image;
+          } else {
+            this.qrError = d.msg || 'ไม่สามารถสร้าง QR ได้';
+          }
+        })
+        .catch(() => {
+          this.qrLoading = false;
+          this.qrError = 'เกิดข้อผิดพลาด';
+        });
+    },
+
+    init() {
+      this.paymentAmount = this.parentAmount();
+      this.$watch(() => this.checkoutMethod, () => this.refreshQr());
+      this.$watch(() => this.parentAmount(), (value) => {
+        this.paymentAmount = value || 0;
+        this.refreshQr();
+      });
+      this.refreshQr();
+    },
+  }));
+
   // Favourite toggle — works on any card across the site
   Alpine.data('favBtn', (propertyId) => ({
     pid: parseInt(propertyId, 10),
