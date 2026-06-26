@@ -54,7 +54,7 @@ ErrorDocument 500 /500.html
 
 AddDefaultCharset UTF-8
 
-Options -Indexes
+Options +FollowSymLinks -Indexes
 ServerSignature Off
 
 # Security headers

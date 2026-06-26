@@ -60,6 +60,18 @@ if [ ! -d "$NEW_APP/app" ]; then
   exit 1
 fi
 
+echo "=== consolidate uploads into app ==="
+UP="$NEW_APP/public/uploads"
+mkdir -p "$UP"
+for src in "$OLD_APP/public/uploads" "$OLD_PUBLIC/uploads" "$NEW_PUBLIC/uploads"; do
+  if [ -d "$src" ] && [ ! -L "$src" ]; then
+    rsync -av "$src/" "$UP/" || true
+    echo "  ✓ merged uploads from $src"
+  fi
+done
+UPLOAD_COUNT="$(find "$UP" -type f 2>/dev/null | wc -l | tr -d ' ')"
+echo "  upload files in app: $UPLOAD_COUNT"
+
 echo "=== clean paekan public_html (remove copied uploads, use symlink via deploy) ==="
 if [ -d "$NEW_PUBLIC/uploads" ] && [ ! -L "$NEW_PUBLIC/uploads" ]; then
   rm -rf "$NEW_PUBLIC/uploads"

@@ -1,8 +1,19 @@
 <?php
 /** @var array $reviews @var array<int,array<string,mixed>> $reviewVideos @var array $blogs @var array $zones @var array $amenities @var array $heroSlides @var array $heroCopy @var array $bannersBySlot @var array<int,array<string,mixed>> $homeSectionPlan */
 $heroFirst = $heroSlides[0] ?? [];
+if (!empty($heroFirst['img_path'])) {
+    $heroFirst['img'] = upload_img((string) $heroFirst['img_path'], 'md');
+}
 $heroCopy = $heroCopy ?? [];
-$heroJson = json_encode($heroSlides ?? [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+$heroSlidesJs = array_map(static function (array $slide): array {
+    $out = $slide;
+    if (!empty($slide['img_path'])) {
+        $out['img'] = upload_img((string) $slide['img_path'], 'md');
+    }
+    unset($out['img_path']);
+    return $out;
+}, $heroSlides ?? []);
+$heroJson = json_encode($heroSlidesJs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
 if ($heroJson === false) {
     $heroJson = '[]';
 }

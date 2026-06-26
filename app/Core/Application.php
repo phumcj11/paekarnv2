@@ -196,7 +196,13 @@ class Application
     private static function detectPublicUrl(): string
     {
         $scheme = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
-        $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $host   = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        // DirectAdmin/nginx บาง config ส่ง HTTP_HOST เป็น paekan.com:443 — ตัด port default ออก
+        if ($scheme === 'https') {
+            $host = (string) preg_replace('/:443$/', '', $host);
+        } else {
+            $host = (string) preg_replace('/:80$/', '', $host);
+        }
 
         $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/index.php');
         // /paekan_v1/public/index.php  →  /paekan_v1/   (เอา /public/index.php ออก)

@@ -20,9 +20,12 @@ class HomeController extends Controller
     public function index(): void
     {
         $cacheKey = 'home_index_v2';
-        $cached   = PageCache::get($cacheKey);
+        $cached = PageCache::get($cacheKey);
 
         if ($cached !== null) {
+            if (!empty($cached['hero_lcp_path'])) {
+                $cached['preload_lcp_image'] = upload_img((string) $cached['hero_lcp_path'], 'md');
+            }
             $this->view('home/index', $cached);
             return;
         }
@@ -74,7 +77,7 @@ class HomeController extends Controller
         $heroSlides = [];
         foreach (array_slice($bannersBySlot['hero'] ?? [], 0, 3) as $b) {
             $heroSlides[] = [
-                'img'      => upload_img((string) ($b['image_path'] ?? ''), 'md'),
+                'img_path' => (string) ($b['image_path'] ?? ''),
                 'title'    => $b['title'],
                 'subtitle' => (string) ($b['subtitle'] ?? ''),
                 'link'     => self::bannerResolvedUrl($b['link_url'] ?? null),
@@ -83,6 +86,7 @@ class HomeController extends Controller
         }
         if (empty($heroSlides)) {
             $heroSlides[] = [
+                'img_path' => '',
                 'img'      => 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=900&q=70',
                 'title'    => __('hero_title'),
                 'subtitle' => (string) __('hero_subtitle'),
@@ -228,9 +232,9 @@ class HomeController extends Controller
             'meta_title'        => $homeTitle !== '' ? $homeTitle : 'แพกาญ.com — ที่พักกาญจนบุรีตรวจสอบจริง รีวิวจริง คูปองสมาชิก',
             'meta_description'  => $homeDesc !== '' ? $homeDesc : 'จองที่พักกาญจนบุรีที่ตรวจสอบแล้ว แพ รีสอร์ท โรงแรม พูลวิลล่า โฮมสเตย์ รีวิวจริง ใช้คูปองเงินสดลดค่าที่พักได้จริง',
             'meta_canonical'    => url('/'),
-            'preload_lcp_image' => !empty($bannersBySlot['hero'][0]['image_path'])
-                ? upload_img((string) $bannersBySlot['hero'][0]['image_path'], 'md')
-                : ($heroSlides[0]['img'] ?? ''),
+            'hero_lcp_path'     => !empty($bannersBySlot['hero'][0]['image_path'])
+                ? (string) $bannersBySlot['hero'][0]['image_path']
+                : '',
             'reviews'           => $reviews,
             'reviewVideos'      => $reviewVideos,
             'activities'        => $activities,
@@ -244,6 +248,9 @@ class HomeController extends Controller
             'heroCopy'          => self::homeHeroCopy(),
         ];
         PageCache::set($cacheKey, $viewData, 600);
+        $viewData['preload_lcp_image'] = !empty($viewData['hero_lcp_path'])
+            ? upload_img((string) $viewData['hero_lcp_path'], 'md')
+            : '';
         $this->view('home/index', $viewData);
     }
 
