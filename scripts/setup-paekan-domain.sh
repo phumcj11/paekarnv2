@@ -4,8 +4,7 @@
 #
 # สิ่งที่ script นี้ทำ:
 #   1. สร้าง public_html/index.php สำหรับ paekan.com ชี้ APP_BASE เดิม
-#   2. สร้าง symlink uploads
-#   3. ออก SSL ด้วย certbot (ถ้ามี)
+#   2. copy (rsync) uploads มา public_html/uploads ของ paekan.com โดยตรง
 #
 # วิธีใช้:
 #   export APP_BASE='/home/pcj/domains/paekarn.com/paekarnv2'
@@ -47,27 +46,21 @@ if [ -f "$DEFAULT_INDEX" ]; then
   echo "  ✓ ย้าย index.html → index.html.bak"
 fi
 
-echo "=== ลิงก์ uploads ==="
-UPLOADS_TARGET="$APP_BASE/public/uploads"
-UPLOADS_LINK="$PAEKAN_PUBLIC_HTML/uploads"
-mkdir -p "$UPLOADS_TARGET"
+echo "=== copy uploads (rsync) ==="
+UPLOADS_SRC="$APP_BASE/public/uploads"
+UPLOADS_DEST="$PAEKAN_PUBLIC_HTML/uploads"
+mkdir -p "$UPLOADS_SRC"
 
-if [ -L "$UPLOADS_LINK" ]; then
-  LINK_TARGET="$(readlink "$UPLOADS_LINK" 2>/dev/null || true)"
-  if [ "$LINK_TARGET" = "$UPLOADS_TARGET" ]; then
-    echo "  = uploads symlink ถูกต้องแล้ว"
-  else
-    rm -f "$UPLOADS_LINK"
-    ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
-    echo "  ✓ แก้ uploads symlink → $UPLOADS_TARGET"
-  fi
-elif [ -e "$UPLOADS_LINK" ]; then
-  rm -rf "$UPLOADS_LINK"
-  ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
-  echo "  ✓ แทนที่ uploads ด้วย symlink → $UPLOADS_TARGET"
+if [ -L "$UPLOADS_DEST" ]; then
+  rm -f "$UPLOADS_DEST"
+fi
+mkdir -p "$UPLOADS_DEST"
+
+if [ -d "$UPLOADS_SRC" ]; then
+  rsync -av "$UPLOADS_SRC/" "$UPLOADS_DEST/"
+  echo "  ✓ uploads copied → $UPLOADS_DEST"
 else
-  ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
-  echo "  ✓ สร้าง symlink uploads"
+  echo "  WARN: uploads source not found: $UPLOADS_SRC"
 fi
 
 echo "=== copy .htaccess (routing + static files) ==="
@@ -86,24 +79,8 @@ if [ -d "$PAGE_CACHE_DIR" ]; then
   echo "  ✓ page cache cleared"
 fi
 
-echo "=== ลิงก์ assets (css/js) ==="
-for subdir in css js images; do
-  SRC="$APP_BASE/public/assets/$subdir"
-  LINK="$PAEKAN_PUBLIC_HTML/assets/$subdir"
-  mkdir -p "$PAEKAN_PUBLIC_HTML/assets"
-  if [ -d "$SRC" ] && [ ! -e "$LINK" ]; then
-    ln -s "$SRC" "$LINK"
-    echo "  ✓ symlink assets/$subdir"
-  fi
-done
-
-echo "=== ลิงก์ site-logo.png ==="
-LOGO_SRC="$APP_BASE/public/site-logo.png"
-LOGO_LINK="$PAEKAN_PUBLIC_HTML/site-logo.png"
-if [ -f "$LOGO_SRC" ] && [ ! -e "$LOGO_LINK" ]; then
-  ln -s "$LOGO_SRC" "$LOGO_LINK"
-  echo "  ✓ symlink site-logo.png"
-fi
+echo "=== ลิงก์ assets (css/js/images) — rsync จาก migrate script ==="
+# assets ถูก rsync ใน migrate-domain-paekan.sh แล้ว ไม่ใช้ symlink
 
 echo ""
 echo "============================================"

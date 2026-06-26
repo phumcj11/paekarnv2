@@ -166,6 +166,9 @@ jobs:
                 export ENABLE_PAEKARN_REDIRECT
                 bash "$APP/scripts/migrate-domain-paekan.sh" || echo "WARN: migrate-domain-paekan failed"
               fi
+              if [ -d "$PAEKAN_PUBLIC_HTML/uploads" ]; then
+                chown -R "$FILE_OWNER:$FILE_OWNER" "$PAEKAN_PUBLIC_HTML/uploads" 2>/dev/null || true
+              fi
             else
               echo "WARN: paekan.com public_html not found ($PAEKAN_PUBLIC_HTML) — add domain in hosting panel first"
             fi

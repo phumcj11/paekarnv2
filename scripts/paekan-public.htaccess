@@ -1,6 +1,6 @@
 # =============================================================================
 # .htaccess สำหรับ paekan.com public_html
-# ใช้แทน public/.htaccess ปกติ — เพิ่ม FollowSymLinks + fallback uploads
+# ใช้แทน public/.htaccess ปกติ — uploads เป็นไฟล์ copy ใน public_html โดยตรง
 # =============================================================================
 
 Options +FollowSymLinks -Indexes
@@ -12,11 +12,6 @@ ErrorDocument 500 /500.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-
-    # uploads: ถ้าไฟล์ local ไม่เจอ (symlink ยังไม่พร้อม) ใช้ paekarn.com ชั่วคราว
-    RewriteCond %{REQUEST_URI} ^/uploads/ [NC]
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^uploads/(.*)$ https://paekarn.com/uploads/$1 [R=302,L]
 
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
