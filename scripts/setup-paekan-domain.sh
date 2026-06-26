@@ -14,6 +14,7 @@
 # =============================================================================
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_BASE="${APP_BASE:-/home/pcj/domains/paekarn.com/paekarnv2}"
 PAEKAN_PUBLIC_HTML="${PAEKAN_PUBLIC_HTML:-/home/pcj/domains/paekan.com/public_html}"
 DOMAIN="paekan.com"
@@ -70,9 +71,19 @@ else
 fi
 
 echo "=== copy .htaccess (routing + static files) ==="
-if [ -f "$APP_BASE/public/.htaccess" ]; then
+if [ -f "$SCRIPT_DIR/paekan-public.htaccess" ]; then
+  cp "$SCRIPT_DIR/paekan-public.htaccess" "$PAEKAN_PUBLIC_HTML/.htaccess"
+  echo "  ✓ paekan-public.htaccess installed"
+elif [ -f "$APP_BASE/public/.htaccess" ]; then
   cp "$APP_BASE/public/.htaccess" "$PAEKAN_PUBLIC_HTML/.htaccess"
   echo "  ✓ .htaccess copied"
+fi
+
+echo "=== flush homepage page cache ==="
+PAGE_CACHE_DIR="$APP_BASE/storage/cache/pages"
+if [ -d "$PAGE_CACHE_DIR" ]; then
+  rm -f "$PAGE_CACHE_DIR"/*.cache 2>/dev/null || true
+  echo "  ✓ page cache cleared"
 fi
 
 echo "=== ลิงก์ assets (css/js) ==="
