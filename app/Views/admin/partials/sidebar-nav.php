@@ -6,6 +6,7 @@ use App\Support\AdminNav;
 /** @var int $sidebarProductPending */
 
 $initialGroup = AdminNav::groupForPath($cur) ?? '';
+$navAlpineData = json_encode(['openGroup' => $initialGroup], JSON_UNESCAPED_UNICODE);
 
 if (!function_exists('ad_link_class')) {
     function ad_link_class(string $path, string $href, bool $compact = false): string
@@ -20,7 +21,7 @@ if (!function_exists('ad_link_class')) {
 }
 ?>
 <nav class="flex-1 overflow-y-auto p-3 space-y-1 text-sm"
-     x-data="{ openGroup: <?= json_encode($initialGroup, JSON_UNESCAPED_UNICODE) ?> }">
+     x-data='<?= $navAlpineData ?>'>
 
   <div class="ad-sidebar-section">เมนูหลัก</div>
   <?php foreach (AdminNav::pinned() as $item): ?>
