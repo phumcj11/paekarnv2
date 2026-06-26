@@ -39,6 +39,13 @@ require_once APP_BASE . '/app/Core/Application.php';
 PHP
 echo "  ✓ index.php เขียนแล้ว"
 
+echo "=== ลบ default index.html ของ hosting (ถ้ามี) ==="
+DEFAULT_INDEX="$PAEKAN_PUBLIC_HTML/index.html"
+if [ -f "$DEFAULT_INDEX" ]; then
+  mv "$DEFAULT_INDEX" "$DEFAULT_INDEX.bak.$(date +%Y%m%d)"
+  echo "  ✓ ย้าย index.html → index.html.bak"
+fi
+
 echo "=== ลิงก์ uploads ==="
 UPLOADS_TARGET="$APP_BASE/public/uploads"
 UPLOADS_LINK="$PAEKAN_PUBLIC_HTML/uploads"

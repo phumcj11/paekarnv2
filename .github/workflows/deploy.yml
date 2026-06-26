@@ -157,6 +157,7 @@ jobs:
               PAEKAN_PUBLIC_HTML="/home/pcj/domains/paekan.com/public_html"
             fi
             if [ -d "$(dirname "$PAEKAN_PUBLIC_HTML")" ] || [ -d "$PAEKAN_PUBLIC_HTML" ]; then
+              mkdir -p "$PAEKAN_PUBLIC_HTML"
               export APP_BASE="$APP"
               export PAEKAN_PUBLIC_HTML
               export PAEKARN_PUBLIC_HTML="$PUBLIC_HTML"
