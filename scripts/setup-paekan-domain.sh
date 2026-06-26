@@ -49,17 +49,30 @@ fi
 echo "=== ลิงก์ uploads ==="
 UPLOADS_TARGET="$APP_BASE/public/uploads"
 UPLOADS_LINK="$PAEKAN_PUBLIC_HTML/uploads"
+mkdir -p "$UPLOADS_TARGET"
+
 if [ -L "$UPLOADS_LINK" ]; then
-  echo "  = uploads symlink มีอยู่แล้ว"
-elif [ -d "$UPLOADS_LINK" ] && [ -z "$(ls -A "$UPLOADS_LINK" 2>/dev/null)" ]; then
-  rmdir "$UPLOADS_LINK"
+  LINK_TARGET="$(readlink "$UPLOADS_LINK" 2>/dev/null || true)"
+  if [ "$LINK_TARGET" = "$UPLOADS_TARGET" ]; then
+    echo "  = uploads symlink ถูกต้องแล้ว"
+  else
+    rm -f "$UPLOADS_LINK"
+    ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
+    echo "  ✓ แก้ uploads symlink → $UPLOADS_TARGET"
+  fi
+elif [ -e "$UPLOADS_LINK" ]; then
+  rm -rf "$UPLOADS_LINK"
   ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
-  echo "  ✓ สร้าง symlink uploads"
-elif [ ! -e "$UPLOADS_LINK" ]; then
-  ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
-  echo "  ✓ สร้าง symlink uploads"
+  echo "  ✓ แทนที่ uploads ด้วย symlink → $UPLOADS_TARGET"
 else
-  echo "  ! uploads มีข้อมูลอยู่แล้ว — ข้าม (ตรวจสอบเอง)"
+  ln -s "$UPLOADS_TARGET" "$UPLOADS_LINK"
+  echo "  ✓ สร้าง symlink uploads"
+fi
+
+echo "=== copy .htaccess (routing + static files) ==="
+if [ -f "$APP_BASE/public/.htaccess" ]; then
+  cp "$APP_BASE/public/.htaccess" "$PAEKAN_PUBLIC_HTML/.htaccess"
+  echo "  ✓ .htaccess copied"
 fi
 
 echo "=== ลิงก์ assets (css/js) ==="

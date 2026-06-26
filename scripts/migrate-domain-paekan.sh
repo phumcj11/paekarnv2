@@ -36,12 +36,14 @@ echo "=== Step 2: sync static assets to paekan public_html ==="
 if [ -d "$PAEKAN_PUBLIC_HTML" ]; then
   rsync -av \
     --exclude='uploads/' \
-    --exclude='.htaccess' \
     --exclude='index.php' \
     --exclude='install.php' \
     --exclude='cron.php' \
     "$APP_BASE/public/" "$PAEKAN_PUBLIC_HTML/" || echo "WARN: rsync to paekan public_html failed"
 fi
+
+echo "=== Step 2b: ensure uploads symlink + .htaccess after rsync ==="
+bash "$SCRIPT_DIR/setup-paekan-domain.sh"
 
 echo "=== Step 3: DB settings (app_url, email_from) ==="
 if [ -n "$DB_NAME" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASS" ]; then
