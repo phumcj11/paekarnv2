@@ -141,6 +141,7 @@ class MembershipService
             );
 
             MembershipListingBoostService::syncOwnerBoost($ownerId);
+            MembershipPerkService::syncPendingGrantsForOwner($ownerId);
 
             return;
         }
@@ -163,6 +164,7 @@ class MembershipService
         );
 
         MembershipListingBoostService::syncOwnerBoost($ownerId);
+        MembershipPerkService::syncPendingGrantsForOwner($ownerId);
     }
 
     /** เปิดรับสมัครแพ็กเกจแล้วหรือยัง (false = แสดง "เปิดให้บริการเร็วๆนี้") */

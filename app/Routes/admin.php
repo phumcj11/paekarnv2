@@ -138,6 +138,7 @@ return function (Router $r): void {
         $r->post('/owners/{id:[0-9]+}',              [AdminOwner::class, 'update'])->middleware('csrf');
         $r->post('/owners/{id:[0-9]+}/delete',       [AdminOwner::class, 'destroy'])->middleware('csrf');
         $r->post('/owners/{id:[0-9]+}/status',       [AdminOwner::class, 'status'])->middleware('csrf');
+        $r->post('/owners/{id:[0-9]+}/perk-grant',  [AdminOwner::class, 'markPerkGranted'])->middleware('csrf');
         $r->get('/owners/{id:[0-9]+}',               [AdminOwner::class, 'show']);
 
         // Customers

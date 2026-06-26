@@ -9,6 +9,7 @@ use App\Core\View;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Services\OwnerPropertyLimit;
+use App\Services\MembershipPerkService;
 
 class OwnerController extends Controller
 {
@@ -108,6 +109,7 @@ class OwnerController extends Controller
             'page_title' => 'เจ้าของแพ — ' . $owner['name'],
             'owner'      => $owner,
             'properties' => $properties,
+            'servicePerks' => MembershipPerkService::displayGrantsForOwner($id),
         ], 'layouts/admin');
     }
 
@@ -244,6 +246,9 @@ class OwnerController extends Controller
                 'owner',
                 $id
             );
+            if ($tier !== 'none') {
+                MembershipPerkService::syncPendingGrantsForOwner($id);
+            }
         }
 
         if ($newMaxProps !== null && (int)($record['max_properties'] ?? 1) !== $newMaxProps) {
@@ -259,6 +264,30 @@ class OwnerController extends Controller
         }
 
         Session::flash('success', 'บันทึกการเปลี่ยนแปลงเรียบร้อย');
+        redirect(url('/admin/owners/' . $id));
+    }
+
+    public function markPerkGranted(int $id): void
+    {
+        $owner = Database::fetch('SELECT id FROM owners WHERE id = :id', ['id' => $id]);
+        if (!$owner) {
+            Session::flash('error', 'ไม่พบเจ้าของแพ');
+            back();
+        }
+
+        $perkKey = trim((string) ($_POST['perk_key'] ?? ''));
+        $note = trim((string) ($_POST['note'] ?? '')) ?: null;
+        if ($perkKey === '') {
+            Session::flash('error', 'ไม่พบสิทธิ์ที่เลือก');
+            back();
+        }
+
+        if (!MembershipPerkService::markGranted($id, $perkKey, (int) Auth::id(), $note)) {
+            Session::flash('error', 'บันทึกไม่สำเร็จ — ตรวจสอบว่ารัน migration แล้ว');
+            back();
+        }
+
+        Session::flash('success', 'บันทึกว่ามอบสิทธิ์บริการแล้ว');
         redirect(url('/admin/owners/' . $id));
     }
 

@@ -50,6 +50,17 @@ ob_start();
 <?php
 ob_start();
 ?>
+<input type="text" name="membership_warn_days" value="<?= e($values['membership_warn_days'] ?? '30,7,3,1') ?>" class="<?= $ic ?>" placeholder="30,7,3,1">
+<?php
+settings_field(
+    'แจ้งเตือนก่อนหมดอายุสมาชิก (วัน)',
+    ob_get_clean(),
+    'cron membership_warn_expiring — คั่นด้วย comma · ส่ง in-app + LINE OA แพกาญ.com',
+    'เช่น 30,7,3,1'
+);
+
+ob_start();
+?>
 <input type="number" name="membership_grace_days" min="0" max="90" value="<?= e($values['membership_grace_days'] ?? '7') ?>" class="<?= $ic ?>">
 <?php
 settings_field(

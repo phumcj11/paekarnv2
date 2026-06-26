@@ -183,6 +183,9 @@ jobs:
             if [ -f "$APP/scripts/migrate_stripe_coupon_orders.sh" ]; then
               bash "$APP/scripts/migrate_stripe_coupon_orders.sh" || echo "WARN: migrate_stripe_coupon_orders failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_owner_membership_perks.sh" ]; then
+              bash "$APP/scripts/migrate_owner_membership_perks.sh" || echo "WARN: migrate_owner_membership_perks failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"

@@ -54,6 +54,54 @@ $placeholderCover = 'https://placehold.co/96x96?text=Paekan';
         <div class="text-xs text-amber-700">Grace ถึง <?= e(format_date_th($owner['membership_grace_until'])) ?></div>
       <?php endif; ?>
     </div>
+    <?php
+      $servicePerks = $servicePerks ?? [];
+      $perkStatusClass = [
+        'pending' => 'bg-amber-100 text-amber-800',
+        'granted' => 'bg-emerald-100 text-emerald-800',
+        'waived'  => 'bg-slate-100 text-slate-600',
+      ];
+      $perkStatusLabel = [
+        'pending' => 'รอดำเนินการ',
+        'granted' => 'ให้แล้ว',
+        'waived'  => 'ยกเว้น',
+      ];
+    ?>
+    <div class="mt-3 text-sm">
+      <div class="text-xs text-slate-500 mb-2 flex items-center gap-1"><i data-lucide="gift" class="w-3.5 h-3.5"></i> สิทธิ์บริการสมาชิก</div>
+      <?php if (empty($servicePerks)): ?>
+        <p class="text-xs text-slate-500">ไม่มีสิทธิ์บริการสำหรับ tier ปัจจุบัน</p>
+      <?php else: ?>
+        <ul class="space-y-3">
+          <?php foreach ($servicePerks as $perk):
+            $st = (string) ($perk['status'] ?? 'pending');
+            $badge = $perkStatusClass[$st] ?? 'bg-slate-100 text-slate-600';
+            $stLabel = $perkStatusLabel[$st] ?? $st;
+          ?>
+          <li class="rounded-lg border border-slate-100 p-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <span class="font-medium text-slate-800"><?= e($perk['label']) ?></span>
+              <span class="shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full <?= e($badge) ?>"><?= e($stLabel) ?></span>
+            </div>
+            <?php if (!empty($perk['granted_at'])): ?>
+              <p class="text-xs text-slate-500 mt-1">มอบเมื่อ <?= e(format_date_th($perk['granted_at'])) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($perk['note'])): ?>
+              <p class="text-xs text-slate-600 mt-1"><?= e($perk['note']) ?></p>
+            <?php endif; ?>
+            <?php if ($st !== 'granted'): ?>
+            <form method="post" action="<?= url('/admin/owners/' . (int) $owner['id'] . '/perk-grant') ?>" class="mt-2 space-y-1.5">
+              <?= csrf() ?>
+              <input type="hidden" name="perk_key" value="<?= e($perk['key']) ?>">
+              <input type="text" name="note" placeholder="หมายเหตุ (ถ้ามี)" class="w-full px-2 py-1.5 rounded border border-slate-200 text-xs">
+              <button type="submit" class="w-full py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">ให้แล้ว</button>
+            </form>
+            <?php endif; ?>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+    </div>
     <hr class="my-3">
     <?php
       $propCount = count($properties);

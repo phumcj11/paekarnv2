@@ -66,6 +66,7 @@
 <div class="mt-6">
   <?php
   $config = $tierFeatures ?? \App\Services\OwnerTier::featuresConfig();
+  $servicePerks = $servicePerks ?? \App\Services\OwnerTier::servicePerksConfig();
   require __DIR__ . '/tier_features_form.php';
   ?>
 </div>

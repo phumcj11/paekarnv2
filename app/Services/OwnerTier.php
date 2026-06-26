@@ -19,6 +19,7 @@ use App\Models\Setting;
 final class OwnerTier
 {
     private const SETTING_FEATURES = 'owner_tier_features_json';
+    private const SETTING_SERVICE_PERKS = 'owner_tier_service_perks_json';
 
     // ---- ฟีเจอร์ทั้งหมด ----
     public const FEATURE_GUEST_SEEK_LEADS  = 'guest_seek_leads';
@@ -231,6 +232,12 @@ final class OwnerTier
         return in_array($feature, $cfg['features'][$tier] ?? [], true);
     }
 
+    /** @return list<array{key: string, label: string, none: bool, standard: bool, vip: bool}> */
+    public static function comparisonServiceRows(): array
+    {
+        return self::servicePerksConfig()['perks'];
+    }
+
     /** @param self::FEATURE_* $feature */
     private static function tierCanDefault(string $tier, string $feature): bool
     {
@@ -255,5 +262,103 @@ final class OwnerTier
 
             default => false,
         };
+    }
+
+    /** @return array{perks: list<array{key: string, label: string, none: bool, standard: bool, vip: bool}>} */
+    public static function defaultServicePerksConfig(): array
+    {
+        return ['perks' => []];
+    }
+
+    /** @return array{perks: list<array{key: string, label: string, none: bool, standard: bool, vip: bool}>} */
+    public static function servicePerksConfig(): array
+    {
+        $raw = Setting::get(self::SETTING_SERVICE_PERKS, '');
+        if ($raw === '' || $raw === null) {
+            return self::defaultServicePerksConfig();
+        }
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return self::defaultServicePerksConfig();
+        }
+
+        return self::normalizeServicePerksConfig($decoded);
+    }
+
+    /** @param array<string,mixed> $input */
+    public static function saveServicePerksConfig(array $input): void
+    {
+        Setting::set(self::SETTING_SERVICE_PERKS, json_encode(
+            self::normalizeServicePerksConfig($input),
+            JSON_UNESCAPED_UNICODE
+        ));
+    }
+
+    /**
+     * @param array<string,mixed> $config
+     * @return array{perks: list<array{key: string, label: string, none: bool, standard: bool, vip: bool}>}
+     */
+    public static function normalizeServicePerksConfig(array $config): array
+    {
+        $perks = [];
+        $seen = [];
+        foreach ($config['perks'] ?? [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $label = trim((string) ($row['label'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $key = trim((string) ($row['key'] ?? ''));
+            if ($key === '') {
+                $key = self::slugPerkKey($label);
+            }
+            $base = $key;
+            $n = 2;
+            while (isset($seen[$key])) {
+                $key = $base . '_' . $n;
+                $n++;
+            }
+            $seen[$key] = true;
+            $perks[] = [
+                'key'      => $key,
+                'label'    => $label,
+                'none'     => !empty($row['none']),
+                'standard' => !empty($row['standard']),
+                'vip'      => !empty($row['vip']),
+            ];
+        }
+
+        return ['perks' => $perks];
+    }
+
+    /** @return list<array{key: string, label: string}> */
+    public static function servicePerksForTier(string $tier): array
+    {
+        if (!in_array($tier, ['none', 'standard', 'vip'], true)) {
+            return [];
+        }
+        $out = [];
+        foreach (self::servicePerksConfig()['perks'] as $p) {
+            if (!empty($p[$tier])) {
+                $out[] = ['key' => $p['key'], 'label' => $p['label']];
+            }
+        }
+
+        return $out;
+    }
+
+    public static function servicePerkTierEnabled(array $perk, string $tier): bool
+    {
+        return !empty($perk[$tier]);
+    }
+
+    private static function slugPerkKey(string $label): string
+    {
+        $key = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $label) ?? '');
+        $key = trim($key, '_');
+
+        return $key !== '' ? substr($key, 0, 60) : 'perk_' . substr(md5($label), 0, 8);
     }
 }

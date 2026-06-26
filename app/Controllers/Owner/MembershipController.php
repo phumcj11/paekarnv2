@@ -10,6 +10,7 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Models\MembershipPlan;
 use App\Services\MembershipService;
+use App\Services\MembershipPerkService;
 use App\Services\OwnerMembership;
 
 class MembershipController extends Controller
@@ -33,11 +34,12 @@ class MembershipController extends Controller
             ['o' => $ownerId]
         );
         View::render('owner/membership/index', [
-            'page_title' => 'สมาชิกเจ้าของแพ',
-            'owner'      => $owner,
-            'plans'      => $plans,
-            'orders'     => $orders,
-            'salesOpen'  => MembershipService::salesOpen(),
+            'page_title'   => 'สมาชิกเจ้าของแพ',
+            'owner'        => $owner,
+            'plans'        => $plans,
+            'orders'       => $orders,
+            'salesOpen'    => MembershipService::salesOpen(),
+            'servicePerks' => MembershipPerkService::displayGrantsForOwner($ownerId),
         ], 'layouts/owner');
     }
 

@@ -46,6 +46,25 @@ $tierCols = [
           <?php endforeach; ?>
         </tr>
         <?php endforeach; ?>
+        <?php
+          $serviceRows = OwnerTier::comparisonServiceRows();
+          if (!empty($serviceRows)):
+        ?>
+        <tr><td colspan="4" class="px-3 py-2 bg-amber-50/80 text-xs font-bold text-amber-900 uppercase tracking-wide">สิทธิ์บริการ (ทีมงานดำเนินการ)</td></tr>
+        <?php foreach ($serviceRows as $row): ?>
+        <tr class="hover:bg-slate-50/80">
+          <td class="px-3 py-2.5 text-slate-700"><?= e($row['label']) ?></td>
+          <?php foreach (array_keys($tierCols) as $tierKey): ?>
+          <td class="px-3 py-2.5 text-center">
+            <?php if (OwnerTier::servicePerkTierEnabled($row, $tierKey)): ?>
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700" title="มีสิทธิ์"><i data-lucide="check" class="w-3.5 h-3.5"></i></span>
+            <?php else: ?>
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400" title="ไม่มีสิทธิ์"><i data-lucide="minus" class="w-3.5 h-3.5"></i></span>
+            <?php endif; ?>
+          </td>
+          <?php endforeach; ?>
+        </tr>
+        <?php endforeach; endif; ?>
       </tbody>
     </table>
   </div>

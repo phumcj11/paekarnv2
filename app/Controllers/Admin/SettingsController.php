@@ -33,7 +33,7 @@ class SettingsController extends Controller
         'facebook_url','line_oa','line_friend_url','facebook_plugins_app_id',
         'fb_app_id','fb_app_secret',
         'instagram_url','youtube_url','tiktok_url','wechat_url','xiaohongshu_url','social_whatsapp',
-        'lead_seek_line_notify_token','lead_broadcast_max','membership_grace_days',
+        'lead_seek_line_notify_token','lead_broadcast_max','membership_grace_days','membership_warn_days',
         'membership_boost_priority_standard','membership_boost_priority_vip','membership_vip_auto_featured',
         'email_enabled','email_from',
         'admin_orders_email','line_admin_group_id','coupon_qr_secret',

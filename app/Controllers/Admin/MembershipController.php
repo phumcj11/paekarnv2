@@ -60,6 +60,7 @@ class MembershipController extends Controller
             'page_title'     => 'แพ็กเกจสมาชิกเจ้าของแพ',
             'rows'           => $rows,
             'tierFeatures'   => OwnerTier::featuresConfig(),
+            'servicePerks'   => OwnerTier::servicePerksConfig(),
         ], 'layouts/admin');
     }
 
@@ -79,6 +80,10 @@ class MembershipController extends Controller
             'features'      => $body['features'] ?? [],
             'boost'         => $body['boost'] ?? [],
         ]);
+
+        if (isset($body['service_perks']) && is_array($body['service_perks'])) {
+            OwnerTier::saveServicePerksConfig(['perks' => $body['service_perks']]);
+        }
 
         AuditLog::record('owner_tier_features_updated', [], 'settings', 0);
         $this->json(['ok' => true, 'msg' => 'บันทึกสิทธิ์แต่ละระดับแล้ว']);

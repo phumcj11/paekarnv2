@@ -126,7 +126,7 @@
 | `cleanup_drafts` | ลบ property draft เก่า 60+ วัน |
 | `membership_apply_grace` | ตั้ง grace period เมื่อแพ็กเกจหมด |
 | `membership_downgrade` | ปรับ tier เป็น none เมื่อเกิน grace |
-| `membership_warn_expiring` | แจ้งเตือนก่อนหมดอายุ 30/14/7/3 วัน |
+| `membership_warn_expiring` | แจ้งเตือนก่อนหมดอายุ (ค่าเริ่มต้น 30/7/3/1 วัน — ตั้งใน Admin Settings) |
 | `membership_sync_listing_boost` | sync priority/is_featured จากแพ็กสมาชิก |
 | `activity_featured_expire` | หมดอายุ featured activity |
 

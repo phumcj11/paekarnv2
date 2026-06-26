@@ -523,13 +523,15 @@ class CronService
         return ['affected' => $n, 'output' => "Downgraded $n expired memberships"];
     }
 
-    /** แจ้งเตือนก่อนหมดอายุ 30/14/7/3 วัน — in-app + LINE push ผ่าน OA แพกาญ.com */
+    /** แจ้งเตือนก่อนหมดอายุ — in-app + LINE push ผ่าน OA แพกาญ.com (วันกำหนดใน membership_warn_days) */
     public static function membershipWarnExpiring(): array
     {
-        $intervals = [30, 14, 7, 3];
+        $intervals = self::membershipWarnDayIntervals();
         $n = 0;
         $lineN = 0;
+        $skipped = 0;
         $thaiMonths = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        $renewUrl = rtrim((string) \App\Core\Application::$publicUrl, '/') . '/owner/membership';
 
         foreach ($intervals as $days) {
             $rows = Database::fetchAll(
@@ -544,6 +546,13 @@ class CronService
             );
 
             foreach ($rows as $r) {
+                $userId = (int) $r['user_id'];
+                $notifType = "membership_expiring_{$days}d";
+                if (self::membershipExpiryAlreadyNotified($userId, $notifType)) {
+                    $skipped++;
+                    continue;
+                }
+
                 $expTs    = strtotime((string)$r['membership_expires_at']);
                 $dayStr   = (int)date('j', $expTs);
                 $monStr   = $thaiMonths[(int)date('n', $expTs)];
@@ -552,24 +561,21 @@ class CronService
                 $tierLabel = $r['membership_tier'] === 'vip' ? 'VIP' : 'Standard';
                 $typeLabel = $days === 1 ? 'พรุ่งนี้' : "อีก {$days} วัน";
 
-                // In-app notification
                 NotificationService::send(
-                    (int)$r['user_id'],
-                    "membership_expiring_{$days}d",
+                    $userId,
+                    $notifType,
                     "สมาชิกจะหมดอายุใน {$days} วัน",
                     "แพ็กเกจ {$tierLabel} จะหมดอายุวันที่ {$expThai} — ต่ออายุได้ที่หน้าสมาชิกเจ้าของแพ",
                     '/owner/membership'
                 );
                 $n++;
 
-                // LINE push ผ่าน OA แพกาญ.com (ใช้ line_user_id จาก users)
                 try {
                     $uRow = Database::fetch(
                         'SELECT line_user_id FROM users WHERE id = :uid LIMIT 1',
-                        ['uid' => $r['user_id']]
+                        ['uid' => $userId]
                     );
                     if (!empty($uRow['line_user_id'])) {
-                        $renewUrl = (string)Setting::get('app_url', 'https://paekan.com') . '/owner/membership';
                         $msg = "⚠️ แจ้งเตือนสมาชิกแพกาญ.com\n\n"
                              . "แพ็กเกจ {$tierLabel} ของคุณจะหมดอายุ{$typeLabel}\n"
                              . "📅 วันหมดอายุ: {$expThai}\n\n"
@@ -579,14 +585,54 @@ class CronService
                             $lineN++;
                         }
                     }
-                } catch (\Throwable) { /* never block cron */ }
+                } catch (\Throwable) {
+                }
             }
         }
 
         return [
             'affected' => $n + $lineN,
-            'output'   => "Sent {$n} in-app + {$lineN} LINE membership expiry warnings",
+            'output'   => "Sent {$n} in-app + {$lineN} LINE warnings (skipped {$skipped} duplicates)",
         ];
+    }
+
+    /** @return list<int> */
+    private static function membershipWarnDayIntervals(): array
+    {
+        $raw = trim((string) Setting::get('membership_warn_days', '30,7,3,1'));
+        if ($raw === '') {
+            return [30, 7, 3, 1];
+        }
+        $days = [];
+        foreach (preg_split('/[\s,;]+/', $raw) ?: [] as $part) {
+            $d = (int) $part;
+            if ($d >= 1 && $d <= 365 && !in_array($d, $days, true)) {
+                $days[] = $d;
+            }
+        }
+        rsort($days);
+
+        return $days !== [] ? $days : [30, 7, 3, 1];
+    }
+
+    private static function membershipExpiryAlreadyNotified(int $userId, string $type): bool
+    {
+        if ($userId <= 0) {
+            return true;
+        }
+        try {
+            $row = Database::fetch(
+                "SELECT id FROM notifications
+                 WHERE user_id = :u AND type = :t AND channel = 'in_app'
+                   AND DATE(created_at) = CURDATE()
+                 LIMIT 1",
+                ['u' => $userId, 't' => $type]
+            );
+
+            return !empty($row);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private static function finalizeMembershipDowngrade(int $ownerId, int $userId): void
