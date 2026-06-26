@@ -33,7 +33,7 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
     <p class="mt-3 text-xs text-slate-500">สมาชิก <strong>VIP</strong> ที่เป็นพาร์ทเนอร์ที่ใช้งานได้ และมีที่พักเผยแพร่ จะได้รับการแจ้งเตือนเมื่อมีลูกค้ากรอกฟอร์ม &quot;ขอให้ช่วยหาที่พัก&quot; ที่ตรงโซน / ประเภท / งบของคุณ</p>
   </div>
 
-  <?php require __DIR__ . '/../partials/membership_tier_comparison.php'; ?>
+  <?php \App\Core\View::partial('partials/membership_tier_comparison'); ?>
 
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
     <div class="p-5 border-b border-slate-100">
