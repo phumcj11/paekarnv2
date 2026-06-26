@@ -78,9 +78,9 @@ $serverQrSrc = $serverQrB64 ? 'data:image/png;base64,' . $serverQrB64 : '';
   <!-- PromptPay panel — Thai QR Payment card -->
   <div x-show="method==='promptpay'" x-transition class="mt-4">
     <div class="pp-qr-card rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-soft">
-      <div class="pp-qr-header bg-[#003366] px-4 py-3 text-center text-white">
+      <div class="pp-qr-header px-4 py-3 text-center text-white" style="background-color:#003366">
         <div class="text-sm font-bold tracking-wide uppercase">Thai QR Payment</div>
-        <div class="text-[11px] text-white/80 mt-0.5">สแกนด้วยแอปธนาคาร / PromptPay</div>
+        <div class="text-[11px] mt-0.5" style="color:rgba(255,255,255,.8)">สแกนด้วยแอปธนาคาร / PromptPay</div>
       </div>
 
       <div class="p-4 sm:p-5 space-y-4">
