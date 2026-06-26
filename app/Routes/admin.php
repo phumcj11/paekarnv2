@@ -125,6 +125,8 @@ return function (Router $r): void {
         $r->get('/membership/plans/{id:[0-9]+}/edit',       [AdminMembership::class, 'planEdit']);
         $r->post('/membership/plans/{id:[0-9]+}',          [AdminMembership::class, 'planUpdate'])->middleware('csrf');
         $r->post('/membership/plans/{id:[0-9]+}/delete',   [AdminMembership::class, 'planDelete'])->middleware('csrf');
+        $r->post('/membership/plans/{id:[0-9]+}/toggle-active', [AdminMembership::class, 'planToggleActive'])->middleware('csrf');
+        $r->post('/membership/tier-features',             [AdminMembership::class, 'saveTierFeatures']);
         $r->get('/membership/orders',                      [AdminMembership::class, 'orders']);
         $r->post('/membership/orders/{id:[0-9]+}/approve', [AdminMembership::class, 'approve'])->middleware('csrf');
         $r->post('/membership/orders/{id:[0-9]+}/cancel',  [AdminMembership::class, 'cancel'])->middleware('csrf');

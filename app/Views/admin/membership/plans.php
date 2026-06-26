@@ -7,7 +7,7 @@
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
   <div class="p-5 border-b border-slate-100">
     <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="package" class="w-5 h-5 text-accent-600"></i> แพ็กเกจสมาชิกเจ้าของแพ</h2>
-    <p class="text-xs text-slate-500 mt-1">ใช้เปิด/ปิดการขาย (active), ราคา และระยะเวลา — เจ้าของแพเห็นเฉพาะแพ็กเกจที่ active</p>
+    <p class="text-xs text-slate-500 mt-1">ติ๊กคอลัมน์ «ขาย» เพื่อเปิด/ปิดการขายทันที · แก้ราคา/ระยะเวลาได้จากปุ่มแก้ไข</p>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
@@ -35,7 +35,21 @@
           <td class="px-5 py-3"><?= $life ? 'ตลอดชีพ' : ($dur ? (int)$dur . ' วัน' : '-') ?></td>
           <td class="px-5 py-3 font-semibold"><?= format_money($p['price']) ?></td>
           <td class="px-5 py-3"><?= (int)($p['sort_order'] ?? 0) ?></td>
-          <td class="px-5 py-3"><?= (int)($p['is_active'] ?? 0) === 1 ? '<span class="text-emerald-700 font-medium">เปิด</span>' : '<span class="text-slate-400">ปิด</span>' ?></td>
+          <td class="px-5 py-3">
+            <form method="post" action="<?= url('/admin/membership/plans/' . (int)$p['id'] . '/toggle-active') ?>" class="inline">
+              <?= csrf() ?>
+              <input type="hidden" name="is_active" value="0">
+              <label class="inline-flex items-center gap-2 cursor-pointer" title="เปิด/ปิดการขาย">
+                <input type="checkbox" name="is_active" value="1"
+                       <?= (int)($p['is_active'] ?? 0) === 1 ? 'checked' : '' ?>
+                       onchange="this.form.submit()"
+                       class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                <span class="text-xs font-medium <?= (int)($p['is_active'] ?? 0) === 1 ? 'text-emerald-700' : 'text-slate-400' ?>">
+                  <?= (int)($p['is_active'] ?? 0) === 1 ? 'เปิด' : 'ปิด' ?>
+                </span>
+              </label>
+            </form>
+          </td>
           <td class="px-5 py-3 text-right whitespace-nowrap">
             <a href="<?= url('/admin/membership/plans/' . (int)$p['id'] . '/edit') ?>" class="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg inline-flex items-center gap-1">แก้ไข</a>
             <form method="post" action="<?= url('/admin/membership/plans/' . (int)$p['id'] . '/delete') ?>" class="inline ml-1" onsubmit="return confirm('ลบแพ็กเกจนี้? (ได้เมื่อไม่มีออเดอร์อ้างอิง)');"><?= csrf() ?>
@@ -50,5 +64,8 @@
 </div>
 
 <div class="mt-6">
-  <?php $compact = false; require __DIR__ . '/../../partials/membership_tier_comparison.php'; ?>
+  <?php
+  $config = $tierFeatures ?? \App\Services\OwnerTier::featuresConfig();
+  require __DIR__ . '/tier_features_form.php';
+  ?>
 </div>

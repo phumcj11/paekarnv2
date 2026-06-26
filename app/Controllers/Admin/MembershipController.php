@@ -9,6 +9,8 @@ use App\Core\View;
 use App\Models\AuditLog;
 use App\Models\MembershipPlan;
 use App\Services\MembershipService;
+use App\Services\OwnerTier;
+use App\Core\Csrf;
 
 class MembershipController extends Controller
 {
@@ -55,9 +57,64 @@ class MembershipController extends Controller
     {
         $rows = MembershipPlan::all('sort_order', 'ASC');
         View::render('admin/membership/plans', [
-            'page_title' => 'แพ็กเกจสมาชิกเจ้าของแพ',
-            'rows'       => $rows,
+            'page_title'     => 'แพ็กเกจสมาชิกเจ้าของแพ',
+            'rows'           => $rows,
+            'tierFeatures'   => OwnerTier::featuresConfig(),
         ], 'layouts/admin');
+    }
+
+    public function saveTierFeatures(): void
+    {
+        $raw = file_get_contents('php://input');
+        $body = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($body)) {
+            $this->json(['ok' => false, 'msg' => 'ข้อมูลไม่ถูกต้อง'], 400);
+        }
+        if (!Csrf::verify((string) ($body['_csrf'] ?? ''))) {
+            $this->json(['ok' => false, 'msg' => 'เซสชันหมดอายุ — รีเฟรชหน้าแล้วลองใหม่'], 403);
+        }
+
+        OwnerTier::saveFeaturesConfig([
+            'base_property' => $body['base_property'] ?? [],
+            'features'      => $body['features'] ?? [],
+            'boost'         => $body['boost'] ?? [],
+        ]);
+
+        AuditLog::record('owner_tier_features_updated', [], 'settings', 0);
+        $this->json(['ok' => true, 'msg' => 'บันทึกสิทธิ์แต่ละระดับแล้ว']);
+    }
+
+    public function planToggleActive(int $id): void
+    {
+        $plan = MembershipPlan::find($id);
+        if (!$plan) {
+            Session::flash('error', 'ไม่พบแพ็กเกจ');
+            back();
+        }
+
+        $active = !empty($_POST['is_active']) ? 1 : 0;
+        MembershipPlan::update($id, ['is_active' => $active]);
+        AuditLog::record(
+            'membership_plan_toggled',
+            ['plan_id' => $id, 'code' => $plan['code'], 'is_active' => $active],
+            'membership_plan',
+            $id
+        );
+
+        if ($this->wantsJson()) {
+            $this->json(['ok' => true, 'is_active' => $active]);
+        }
+
+        Session::flash('success', $active ? 'เปิดการขายแล้ว' : 'ปิดการขายแล้ว');
+        redirect(url('/admin/membership/plans'));
+    }
+
+    private function wantsJson(): bool
+    {
+        $accept = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
+        $xhr = (string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
+
+        return str_contains($accept, 'application/json') || strtolower($xhr) === 'xmlhttprequest';
     }
 
     public function planCreate(): void

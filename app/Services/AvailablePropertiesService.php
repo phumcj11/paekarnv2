@@ -49,6 +49,10 @@ class AvailablePropertiesService
                               AND lc.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), 0), 10)"
             : "0";
 
+        $boostCfg = OwnerTier::featuresConfig()['boost'] ?? [];
+        $vipBoost = max(0, (int) ($boostCfg['vip'] ?? 30));
+        $stdBoost = max(0, (int) ($boostCfg['standard'] ?? 20));
+
         // ยูนิตที่ว่าง = ยูนิตที่ active + ไม่ถูก block ในวันนั้น + การจองที่ทับซ้อน < total_units
         $sql = "
             SELECT p.id, p.name, p.slug, p.type, p.zone, p.district, p.province,
@@ -63,8 +67,8 @@ class AvailablePropertiesService
                    {$calendarFreshSelect} AS calendar_updated_at,
                    (
                      CASE
-                       WHEN (SELECT o2.membership_tier FROM owners o2 WHERE o2.id = p.owner_id LIMIT 1) = 'vip'      THEN 30
-                       WHEN (SELECT o2.membership_tier FROM owners o2 WHERE o2.id = p.owner_id LIMIT 1) = 'standard' THEN 20
+                       WHEN (SELECT o2.membership_tier FROM owners o2 WHERE o2.id = p.owner_id LIMIT 1) = 'vip'      THEN {$vipBoost}
+                       WHEN (SELECT o2.membership_tier FROM owners o2 WHERE o2.id = p.owner_id LIMIT 1) = 'standard' THEN {$stdBoost}
                        ELSE 0
                      END
                      + IF(p.is_featured = 1, 10, 0)
