@@ -410,7 +410,7 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
-  Alpine.data('paymentBlock', (endpoint) => ({
+  Alpine.data('paymentBlock', (endpoint, amountKey) => ({
     paymentAmount: 0,
     qrSrc: '',
     qrLoading: false,
@@ -426,6 +426,24 @@ document.addEventListener('alpine:init', () => {
         return null;
       }
       return form._x_dataStack[form._x_dataStack.length - 1];
+    },
+
+    resolveMethod() {
+      const stack = this.$el._x_dataStack || [];
+      for (let i = 0; i < stack.length; i++) {
+        if (stack[i] && typeof stack[i].method === 'string') {
+          return stack[i].method;
+        }
+      }
+      return 'promptpay';
+    },
+
+    syncAmountFromParent() {
+      const parent = this.parentFormData();
+      if (!parent) return;
+      const value = parent[amountKey];
+      const num = typeof value === 'number' ? value : Number(value);
+      this.paymentAmount = Number.isFinite(num) ? num : 0;
     },
 
     formatAmount() {
@@ -463,8 +481,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     refreshQr() {
-      const parent = this.parentFormData();
-      if (!parent || parent.method !== 'promptpay') return;
+      if (this.resolveMethod() !== 'promptpay') return;
+      this.syncAmountFromParent();
       this.qrLoading = true;
       this.qrError = '';
       this.qrSrc = '';
@@ -483,6 +501,13 @@ document.addEventListener('alpine:init', () => {
           this.qrLoading = false;
           this.qrError = 'เกิดข้อผิดพลาด';
         });
+    },
+
+    init() {
+      this.$nextTick(() => {
+        this.syncAmountFromParent();
+        this.refreshQr();
+      });
     },
   }));
 

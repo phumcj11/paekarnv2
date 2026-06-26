@@ -85,6 +85,16 @@ module.exports = {
       pattern:
         /^(bg|text)-(amber|emerald|rose|slate|blue|indigo|purple|teal|yellow|orange|sky|cyan|violet|red|lime|green|neutral|pink|fuchsia)-(50|100|200|600|700|800|900)$/,
     },
+    'pp-qr-card',
+    'pp-qr-header',
+    'pp-qr-frame',
+    'pp-qr-body',
+    'pp-qr-details',
+    'pp-qr-row',
+    'pp-qr-label',
+    'pp-qr-value',
+    'pp-qr-copy',
+    'pp-qr-badge',
   ],
   plugins: [],
 };

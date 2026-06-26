@@ -22,12 +22,10 @@ $gatewayEnabled = (string) \App\Models\Setting::get('payment_gateway_enabled', '
 $qrEndpoint = url('/api-promptpay-qr');
 ?>
 <div class="bg-white border border-slate-200 rounded-2xl p-5"
-     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>)"
+     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>)"
      x-init="
-       paymentAmount = (<?= $amountVar ?>) || 0;
        $watch('method', () => refreshQr());
-       refreshQr();
-       $watch(() => (<?= $amountVar ?>), v => { paymentAmount = v || 0; refreshQr(); });
+       $watch(() => (<?= $amountVar ?>), () => refreshQr());
      ">
   <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="credit-card" class="w-5 h-5 text-primary-600"></i> วิธีการชำระเงิน</h2>
 
@@ -71,49 +69,49 @@ $qrEndpoint = url('/api-promptpay-qr');
 
   <!-- PromptPay panel — Thai QR Payment card -->
   <div x-show="method==='promptpay'" x-transition class="mt-4">
-    <div class="pp-qr-card">
-      <div class="pp-qr-header">
-        <div class="pp-qr-header-title">Thai QR Payment</div>
-        <div class="pp-qr-header-sub">สแกนด้วยแอปธนาคาร / PromptPay</div>
+    <div class="pp-qr-card rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-soft">
+      <div class="pp-qr-header bg-[#003366] px-4 py-3 text-center text-white">
+        <div class="text-sm font-bold tracking-wide uppercase">Thai QR Payment</div>
+        <div class="text-[11px] text-white/80 mt-0.5">สแกนด้วยแอปธนาคาร / PromptPay</div>
       </div>
 
-      <div class="pp-qr-body">
-        <div class="pp-qr-frame">
+      <div class="p-4 sm:p-5 space-y-4">
+        <div class="pp-qr-frame relative mx-auto w-full max-w-[260px] min-h-[220px] aspect-square rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <img x-show="qrSrc && !qrLoading"
                :src="qrSrc"
                alt="Thai QR Payment"
-               class="pp-qr-image">
-          <div x-show="qrLoading" x-cloak class="pp-qr-spinner-wrap">
-            <div class="pp-qr-spinner" aria-hidden="true"></div>
-            <span class="pp-qr-spinner-text">กำลังสร้าง QR...</span>
+               class="h-full w-full object-contain">
+          <div x-show="qrLoading" x-cloak class="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-white/90">
+            <div class="h-9 w-9 rounded-full border-[3px] border-slate-200 border-t-accent-500 animate-spin" aria-hidden="true"></div>
+            <span class="text-xs text-slate-500">กำลังสร้าง QR...</span>
           </div>
-          <div x-show="!qrLoading && !qrSrc" x-cloak class="pp-qr-error">
+          <div x-show="!qrLoading && !qrSrc" x-cloak class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-50 px-4 text-center text-xs text-slate-500">
             <span x-text="qrError || 'กำลังโหลด QR...'"></span>
           </div>
         </div>
 
-        <div class="pp-qr-details">
-          <div class="pp-qr-row pp-qr-row--amount">
-            <span class="pp-qr-label">จำนวนเงิน</span>
-            <span class="pp-qr-value pp-qr-value--amount">฿<span x-text="formatAmount()"></span></span>
+        <div class="space-y-2 border-t border-slate-100 pt-4">
+          <div class="grid grid-cols-[5.5rem_1fr] items-center gap-2 text-sm pb-2 mb-1 border-b border-slate-100">
+            <span class="text-xs text-slate-500">จำนวนเงิน</span>
+            <span class="text-xl font-bold text-primary-700 text-right">฿<span x-text="Number(<?= $amountVar ?> || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></span>
           </div>
-          <div class="pp-qr-row">
-            <span class="pp-qr-label">PromptPay</span>
-            <span class="pp-qr-value">
+          <div class="grid grid-cols-[5.5rem_1fr] items-center gap-2 text-sm">
+            <span class="text-xs text-slate-500">PromptPay</span>
+            <span class="font-semibold text-slate-800 text-right flex items-center justify-end gap-2 flex-wrap">
               <span class="font-mono"><?= e($bank['promptpay']) ?></span>
               <button type="button"
                       @click="copy('<?= e($bank['promptpay']) ?>', 'pp')"
-                      class="pp-qr-copy">
+                      class="text-[11px] px-2 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 shrink-0">
                 <span x-show="copied!=='pp'">คัดลอก</span>
                 <span x-show="copied==='pp'" class="text-emerald-600">คัดลอกแล้ว</span>
               </button>
             </span>
           </div>
-          <div class="pp-qr-row">
-            <span class="pp-qr-label">ชื่อบัญชี</span>
-            <span class="pp-qr-value"><?= e($bank['bank_holder']) ?></span>
+          <div class="grid grid-cols-[5.5rem_1fr] items-center gap-2 text-sm">
+            <span class="text-xs text-slate-500">ชื่อบัญชี</span>
+            <span class="font-semibold text-slate-800 text-right"><?= e($bank['bank_holder']) ?></span>
           </div>
-          <div class="pp-qr-badge">
+          <div class="mt-3 inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
             <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
             ระบุยอดอัตโนมัติ ไม่ต้องพิมพ์เอง
           </div>
@@ -144,7 +142,7 @@ $qrEndpoint = url('/api-promptpay-qr');
       </div>
       <div>
         <div class="text-xs text-slate-500">จำนวนเงิน</div>
-        <div class="font-bold text-lg text-primary-700">฿<span x-text="formatAmount()"></span></div>
+        <div class="font-bold text-lg text-primary-700">฿<span x-text="Number(<?= $amountVar ?> || 0).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></div>
       </div>
     </div>
   </div>
