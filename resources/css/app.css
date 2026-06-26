@@ -465,6 +465,50 @@
     @apply bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-20;
   }
 
+  .ad-sidebar-section {
+    @apply px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/40;
+  }
+
+  .ad-sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 transition;
+  }
+
+  .ad-sidebar-link--compact {
+    @apply py-2 text-[13px];
+  }
+
+  .ad-sidebar-link--active {
+    @apply bg-primary-700 text-white shadow-soft;
+  }
+
+  .ad-sidebar-group {
+    @apply rounded-lg;
+  }
+
+  .ad-sidebar-group-toggle {
+    @apply flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/5 transition;
+  }
+
+  .ad-sidebar-group-toggle--active {
+    @apply text-white/90;
+  }
+
+  .ad-sidebar-group-items {
+    @apply mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5;
+  }
+
+  .ad-sidebar-badge {
+    @apply min-w-[1.25rem] h-5 px-1.5 rounded-full text-white text-[10px] font-bold grid place-items-center;
+  }
+
+  .ad-sidebar-badge--amber {
+    @apply bg-amber-500;
+  }
+
+  .ad-sidebar-badge--sky {
+    @apply bg-sky-500;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

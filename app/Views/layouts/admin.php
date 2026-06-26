@@ -10,12 +10,6 @@ $sidebarProviderPending = class_exists(\App\Models\ActivityProvider::class)
     ? \App\Models\ActivityProvider::pendingCount() : 0;
 $sidebarProductPending = class_exists(\App\Models\ActivityProduct::class)
     ? \App\Models\ActivityProduct::pendingReviewCount() : 0;
-if (!function_exists('ad_active')) {
-  function ad_active(string $needle, string $cls = 'bg-primary-700 text-white shadow-soft'): string {
-    $cur = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-    return str_contains($cur, $needle) ? $cls : 'text-slate-300 hover:bg-white/5';
-  }
-}
 ?><!DOCTYPE html>
 <html lang="th">
 <head>
@@ -40,64 +34,11 @@ if (!function_exists('ad_active')) {
       <div class="text-[10px] text-white/50">Backoffice v1.0</div>
     </div>
   </div>
-  <nav class="flex-1 overflow-y-auto p-3 space-y-1 text-sm">
-    <?php
-    $items = [
-      ['/admin/dashboard',  'gauge',           'Dashboard'],
-      ['/admin/analytics',    'bar-chart-3',    'Analytics'],
-      ['/admin/properties', 'hotel',           'ที่พัก'],
-      ['/admin/bookings',   'calendar-check',  'การจอง'],
-      ['/admin/coupons',    'ticket',          'คูปอง'],
-      ['/admin/coupon-campaigns', 'tags',      'แคมเปญคูปอง'],
-      ['/admin/zone-ads',   'signpost',        'โฆษณาโซน'],
-      ['/admin/audit-logs', 'scroll-text',     'Audit log'],
-      ['/admin/membership/orders', 'crown',    'คำสั่งซื้อสมาชิก'],
-      ['/admin/membership/plans', 'package',   'แพ็กเกจสมาชิก'],
-      ['/admin/owners',     'briefcase',       'เจ้าของแพ'],
-      ['/admin/customers',  'users',           'ลูกค้า'],
-      ['/admin/reviews',    'message-circle',  'รีวิว'],
-      ['/admin/review-videos', 'video',      'วิดีโอแนะนำ'],
-      ['/admin/review-facebook-posts', 'share-2', 'โพสต์ Facebook'],
-      ['/admin/visitor-places', 'map-pin',   'ที่เที่ยว / POI'],
-      ['/admin/activity-providers', 'handshake', 'ผู้ให้บริการกิจกรรม'],
-      ['/admin/activity-products', 'map', 'กิจกรรม / บริการ'],
-      ['/admin/activity-featured', 'star', 'Featured กิจกรรม'],
-      ['/admin/activity-orders', 'ticket-check', 'คำสั่งซื้อกิจกรรม'],
-      ['/admin/zones', 'layers',       'โซนที่พัก'],
-      ['/admin/leads',      'sparkles',        'CRM / Leads'],
-      ['/admin/blog',       'newspaper',       'บล็อก'],
-      ['/admin/banners',    'layout-grid',     'Banner หน้าเว็บ'],
-      ['/admin/promotions', 'megaphone',       'การตลาด & โปร'],
-      ['__divider__', '', 'Phase 3'],
-      ['/admin/automation', 'workflow',        'Automation'],
-      ['/admin/ai',         'bot',             'AI Settings'],
-      ['/admin/ai/kb',      'book-open',       'AI Knowledge Base'],
-      ['/admin/ai/chats',   'message-square',  'AI Chat History'],
-      ['/admin/line',       'message-circle',  'LINE OA'],
-      ['__divider__', '', ''],
-      ['/admin/settings',   'settings',        'การตั้งค่า'],
-      ['/admin/tools/images', 'image-down',    'Optimize รูป WebP'],
-    ];
-    foreach ($items as $it):
-      if ($it[0] === '__divider__'):
-        if ($it[2] !== ''): ?>
-          <div class="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-white/40"><?= e($it[2]) ?></div>
-        <?php else: ?>
-          <hr class="my-1 border-white/10">
-        <?php endif;
-        continue;
-      endif; ?>
-      <a href="<?= url($it[0]) ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg <?= ad_active($it[0]) ?>">
-        <i data-lucide="<?= $it[1] ?>" class="w-4 h-4"></i>
-        <span class="flex-1"><?= $it[2] ?></span>
-        <?php if ($it[0] === '/admin/activity-providers' && $sidebarProviderPending > 0): ?>
-          <span class="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold grid place-items-center"><?= $sidebarProviderPending ?></span>
-        <?php elseif ($it[0] === '/admin/activity-products' && $sidebarProductPending > 0): ?>
-          <span class="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-sky-500 text-white text-[10px] font-bold grid place-items-center"><?= $sidebarProductPending ?></span>
-        <?php endif; ?>
-      </a>
-    <?php endforeach; ?>
-  </nav>
+  <?php \App\Core\View::partial('admin/partials/sidebar-nav', [
+    'cur' => $cur,
+    'sidebarProviderPending' => $sidebarProviderPending,
+    'sidebarProductPending' => $sidebarProductPending,
+  ]); ?>
   <div class="p-3 border-t border-white/10">
     <a href="<?= url('/') ?>" class="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white">
       <i data-lucide="external-link" class="w-3.5 h-3.5"></i> เปิดหน้าเว็บ
