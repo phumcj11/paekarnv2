@@ -14,7 +14,24 @@ class SeoController extends Controller
     {
         header('Content-Type: text/plain; charset=UTF-8');
         $base = Application::$publicUrl;
-        echo "User-agent: *\nAllow: /\n\nSitemap: {$base}/sitemap.xml\n";
+
+        $lines = [
+            'User-agent: *',
+            'Allow: /',
+            'Disallow: /admin/',
+            'Disallow: /owner/',
+            'Disallow: /provider/',
+            'Disallow: /login',
+            'Disallow: /register',
+            'Disallow: /account/',
+            'Disallow: /booking/create/',
+            'Disallow: /activity/checkout/',
+            'Disallow: /api/',
+            '',
+            "Sitemap: {$base}/sitemap.xml",
+        ];
+
+        echo implode("\n", $lines) . "\n";
         exit;
     }
 
@@ -38,6 +55,8 @@ class SeoController extends Controller
         $urls[] = ['loc' => $base . '/reviews', 'changefreq' => 'weekly'];
         $urls[] = ['loc' => $base . '/places', 'changefreq' => 'weekly'];
         $urls[] = ['loc' => $base . '/coupons', 'changefreq' => 'weekly'];
+        $urls[] = ['loc' => $base . '/about', 'changefreq' => 'monthly'];
+        $urls[] = ['loc' => $base . '/contact', 'changefreq' => 'monthly'];
 
         $props = Database::fetchAll("SELECT slug, updated_at FROM properties WHERE status='published'");
         foreach ($props as $p) {
@@ -46,6 +65,19 @@ class SeoController extends Controller
                 'loc'     => $base . '/property/' . $slug,
                 'lastmod' => substr((string)($p['updated_at'] ?? ''), 0, 10),
             ];
+        }
+
+        if (Database::tableHasColumn('activity_products', 'slug')) {
+            $activities = Database::fetchAll(
+                "SELECT slug, updated_at FROM activity_products WHERE status='published'"
+            );
+            foreach ($activities as $a) {
+                $slug = rawurlencode((string)$a['slug']);
+                $urls[] = [
+                    'loc'     => $base . '/activities/' . $slug,
+                    'lastmod' => substr((string)($a['updated_at'] ?? ''), 0, 10),
+                ];
+            }
         }
 
         $posts = Database::fetchAll("SELECT slug, updated_at FROM blog_posts WHERE status='published'");
@@ -57,13 +89,17 @@ class SeoController extends Controller
             ];
         }
 
-        $visitorPlaces = Database::fetchAll("SELECT slug, updated_at FROM visitor_places WHERE is_active = 1");
-        foreach ($visitorPlaces as $vp) {
-            $slug = rawurlencode((string)$vp['slug']);
-            $urls[] = [
-                'loc'     => $base . '/places/' . $slug,
-                'lastmod' => substr((string)($vp['updated_at'] ?? ''), 0, 10),
-            ];
+        if (Database::tableHasColumn('visitor_places', 'slug')) {
+            $visitorPlaces = Database::fetchAll(
+                "SELECT slug, updated_at FROM visitor_places WHERE is_active = 1"
+            );
+            foreach ($visitorPlaces as $vp) {
+                $slug = rawurlencode((string)$vp['slug']);
+                $urls[] = [
+                    'loc'     => $base . '/places/' . $slug,
+                    'lastmod' => substr((string)($vp['updated_at'] ?? ''), 0, 10),
+                ];
+            }
         }
 
         echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
