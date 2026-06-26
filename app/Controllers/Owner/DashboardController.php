@@ -25,6 +25,10 @@ class DashboardController extends Controller
         $stats = [
             'properties'          => (int)Database::fetch("SELECT COUNT(*) c FROM properties p WHERE 1=1 $whereOwner", $params)['c'],
             'published'           => (int)Database::fetch("SELECT COUNT(*) c FROM properties p WHERE p.status='published' $whereOwner", $params)['c'],
+            'units_total'         => (int)Database::fetch(
+                "SELECT COUNT(*) c FROM property_units u JOIN properties p ON p.id=u.property_id WHERE u.is_active=1 $whereOwner",
+                $params
+            )['c'],
             'bookings_total'      => (int)Database::fetch("SELECT COUNT(*) c FROM bookings b JOIN properties p ON p.id=b.property_id WHERE 1=1 $whereOwner", $params)['c'],
             'bookings_pending'    => (int)Database::fetch("SELECT COUNT(*) c FROM bookings b JOIN properties p ON p.id=b.property_id WHERE b.status='pending' $whereOwner", $params)['c'],
             'bookings_confirmed'  => (int)Database::fetch("SELECT COUNT(*) c FROM bookings b JOIN properties p ON p.id=b.property_id WHERE b.status='confirmed' $whereOwner", $params)['c'],

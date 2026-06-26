@@ -26,6 +26,7 @@ final class OwnerTier
     public const FEATURE_LISTING_BOOST     = 'listing_boost';       // Boost ลำดับในหน้าค้นหา
     public const FEATURE_AVAILABLE_BOOST   = 'available_boost';     // ขึ้นหน้าแพว่าง
     public const FEATURE_COUPON            = 'coupon';              // ออกคูปองส่วนลด
+    public const FEATURE_BOOKING           = 'booking';             // รายการจอง / สร้างจอง / รายได้
     public const FEATURE_AVAILABILITY      = 'availability';        // ปฏิทินวันว่าง
     public const FEATURE_CONTENT_PLAN      = 'content_plan';        // Content Plan / การตลาด
     public const FEATURE_ANALYTICS         = 'analytics';           // Analytics พื้นฐาน
@@ -51,8 +52,9 @@ final class OwnerTier
     public static function tierCan(string $tier, string $feature): bool
     {
         return match ($feature) {
-            // ฟรี: จัดการที่พัก / ยูนิต + แสดงบนเว็บ (+ การจอง) เท่านั้น
+            // ฟรี: จัดการที่พัก / ยูนิต + แสดงบนเว็บ เท่านั้น
             // ต้องสมัครแพ็ก (standard หรือ vip):
+            self::FEATURE_BOOKING        => $tier !== 'none',
             self::FEATURE_AVAILABILITY   => $tier !== 'none',
             self::FEATURE_CONTENT_PLAN   => $tier !== 'none',
             self::FEATURE_ANALYTICS      => $tier !== 'none',
@@ -103,6 +105,7 @@ final class OwnerTier
     public static function featureLabels(): array
     {
         return [
+            self::FEATURE_BOOKING            => 'การจอง (รายการ / สร้างจอง / รายได้)',
             self::FEATURE_AVAILABILITY     => 'ปฏิทินวันว่าง + จองจากปฏิทิน',
             self::FEATURE_LINE_HUB           => 'LINE Hub — ตั้งค่า OA / Chatbot',
             self::FEATURE_CONTENT_PLAN       => 'Content Plan + โพสต์ FB / LINE / IG',
@@ -128,7 +131,6 @@ final class OwnerTier
     {
         $rows = [
             ['label' => 'จัดการที่พัก / ยูนิต + แสดงบนเว็บ', 'none' => true, 'standard' => true, 'vip' => true],
-            ['label' => 'การจอง (รายการ / สร้างจอง)', 'none' => true, 'standard' => true, 'vip' => true],
         ];
 
         foreach (self::featureLabels() as $feature => $label) {

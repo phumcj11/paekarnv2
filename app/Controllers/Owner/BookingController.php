@@ -12,9 +12,21 @@ use App\Models\PropertyUnit;
 use App\Services\BookingService;
 use App\Services\MessageTemplateService;
 use App\Services\OwnerBookingService;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 
 class BookingController extends Controller
 {
+    private const BOOKING_MSG = 'การจอง — ต้องสมัครแพ็กเกจ Starter ขึ้นไป';
+
+    private function ensureBooking(bool $json = false): bool
+    {
+        if ($json) {
+            return OwnerFeatureGate::denyJson($this, OwnerTier::FEATURE_BOOKING, self::BOOKING_MSG);
+        }
+        return OwnerFeatureGate::denyPage(OwnerTier::FEATURE_BOOKING, self::BOOKING_MSG);
+    }
+
     private function whereOwner(): array
     {
         if (Auth::isAdmin()) return ['', []];
@@ -24,6 +36,7 @@ class BookingController extends Controller
 
     public function index(): void
     {
+        if (!$this->ensureBooking()) return;
         [$ownerWhere, $ownerParams] = $this->whereOwner();
 
         $status = $_GET['status'] ?? '';
@@ -64,6 +77,7 @@ class BookingController extends Controller
 
     public function show(int $id): void
     {
+        if (!$this->ensureBooking()) return;
         $row = $this->fetchOwnedBooking($id);
         if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -79,6 +93,7 @@ class BookingController extends Controller
     /** POST /owner/bookings/{id}/delete — ลบถาวร (เก็บ audit log ให้แอดมินติดตาม) */
     public function destroy(int $id): void
     {
+        if (!$this->ensureBooking()) return;
         $row = $this->fetchOwnedBooking($id);
         if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -123,6 +138,7 @@ class BookingController extends Controller
 
     public function updateStatus(int $id): void
     {
+        if (!$this->ensureBooking()) return;
         $row = $this->fetchOwnedBooking($id);
         if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
         $status = $_POST['status'] ?? '';
@@ -143,6 +159,7 @@ class BookingController extends Controller
 
     public function verifyPayment(int $id): void
     {
+        if (!$this->ensureBooking()) return;
         $row = $this->fetchOwnedBooking($id);
         if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -173,6 +190,7 @@ class BookingController extends Controller
     /** GET /owner/api/booking-quote?unit_id=&check_in=&check_out=&guest_count= */
     public function quote(): void
     {
+        if (!$this->ensureBooking(true)) return;
         $unitId     = (int)($_GET['unit_id'] ?? 0);
         $checkIn    = trim((string)($_GET['check_in'] ?? ''));
         $checkOut   = trim((string)($_GET['check_out'] ?? ''));
@@ -209,6 +227,7 @@ class BookingController extends Controller
     /** GET /owner/api/line-contacts?property_id=N — ลูกค้า LINE ที่รู้จักจาก property OA */
     public function lineContacts(): void
     {
+        if (!$this->ensureBooking(true)) return;
         $propertyId = (int)($_GET['property_id'] ?? 0);
         if (!$propertyId) { $this->json([]); }
 
@@ -251,6 +270,7 @@ class BookingController extends Controller
     /** POST /owner/api/line-contacts/sync?property_id=N — ดึง follower IDs จาก LINE แล้ว upsert */
     public function syncLineContacts(): void
     {
+        if (!$this->ensureBooking(true)) return;
         $propertyId = (int)($_GET['property_id'] ?? 0);
         if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ไม่ระบุ property_id']); return; }
 
@@ -274,6 +294,7 @@ class BookingController extends Controller
     /** GET /owner/bookings/create */
     public function create(): void
     {
+        if (!$this->ensureBooking()) return;
         $ownerId = Auth::ownerId();
         $properties = $ownerId
             ? Database::fetchAll(
@@ -308,6 +329,7 @@ class BookingController extends Controller
     /** POST /owner/bookings */
     public function store(): void
     {
+        if (!$this->ensureBooking()) return;
         $ownerId = Auth::ownerId();
         $input   = $this->input();
 
@@ -384,6 +406,7 @@ class BookingController extends Controller
     /** POST /owner/bookings/{id} — แก้ไขการจอง */
     public function update(int $id): void
     {
+        if (!$this->ensureBooking()) return;
         $row = $this->fetchOwnedBooking($id);
         if (!$row) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 

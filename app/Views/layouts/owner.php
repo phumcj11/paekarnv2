@@ -55,6 +55,7 @@ $calendarUrl = $firstPropertyId
   : url('/owner/properties');
 $membershipUrl = url('/owner/membership');
 $navFeatureMap = [
+  '/owner/bookings'       => OwnerTier::FEATURE_BOOKING,
   '/owner/analytics'      => OwnerTier::FEATURE_ANALYTICS,
   '/owner/line-contacts'  => OwnerTier::FEATURE_LINE_CRM,
   '/owner/automation'     => OwnerTier::FEATURE_AUTOMATION,
@@ -63,6 +64,7 @@ $navFeatureMap = [
   '/owner/coupons/scan'   => OwnerTier::FEATURE_COUPON,
 ];
 $canAvailabilityNav = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
+$canBookingNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_BOOKING);
 $canLineCrmNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_CRM);
 ?><!DOCTYPE html>
 <html lang="th">
@@ -202,11 +204,11 @@ $canLineCrmNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_CRM);
     <a href="<?= url('/owner/dashboard') ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/dashboard') ?>">
       <i data-lucide="home" class="w-5 h-5"></i><span>หน้าแรก</span>
     </a>
-    <a href="<?= url('/owner/bookings') ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/bookings') ?>">
-      <i data-lucide="calendar-check" class="w-5 h-5"></i><span>การจอง</span>
+    <a href="<?= $canBookingNav ? url('/owner/bookings') : e($membershipUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/bookings') ?>"<?= $canBookingNav ? '' : ' title="ต้องสมัครแพ็กเกจ"' ?>>
+      <i data-lucide="<?= $canBookingNav ? 'calendar-check' : 'lock' ?>" class="w-5 h-5"></i><span>การจอง</span>
     </a>
     <a href="<?= $canAvailabilityNav ? e($calendarUrl) : e($membershipUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/availability') ?>"<?= $canAvailabilityNav ? '' : ' title="ต้องสมัครแพ็กเกจ"' ?>>
-      <i data-lucide="calendar-days" class="w-5 h-5"></i><span>ปฏิทิน</span>
+      <i data-lucide="<?= $canAvailabilityNav ? 'calendar-days' : 'lock' ?>" class="w-5 h-5"></i><span>ปฏิทิน</span>
     </a>
     <a href="<?= $canLineCrmNav ? url('/owner/line-contacts' . ($firstPropertyId ? '?property_id=' . $firstPropertyId : '')) : e($membershipUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/line-contacts') ?>">
       <i data-lucide="message-circle" class="w-5 h-5"></i><span>LINE CRM</span>

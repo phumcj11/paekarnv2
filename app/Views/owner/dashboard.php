@@ -8,6 +8,8 @@ use App\Services\OwnerTier;
 
 $canAvailability = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
 $canAnalytics    = OwnerFeatureGate::allowed(OwnerTier::FEATURE_ANALYTICS);
+$canBooking      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_BOOKING);
+$canCoupon       = OwnerFeatureGate::allowed(OwnerTier::FEATURE_COUPON);
 $membershipUrl   = url('/owner/membership');
 
 $propStatusLabels = [
@@ -47,15 +49,23 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   </div>
   <?php endif; ?>
 
+  <?php if (!$canBooking): ?>
+  <div class="ow-card p-4 mb-5 border border-dashed border-amber-200 bg-amber-50/50">
+    <p class="text-sm font-semibold text-amber-800">การจอง — ต้องสมัครแพ็กเกจ</p>
+    <p class="text-xs text-amber-700 mt-1">บันทึกการจอง ดูรายการจอง และติดตามรายได้ได้เมื่ออัปเกรดเป็น Starter ขึ้นไป</p>
+    <a href="<?= e($membershipUrl) ?>" class="inline-block mt-2 text-xs font-semibold text-amber-700 hover:underline">ดูแพ็กเกจ →</a>
+  </div>
+  <?php else: ?>
   <?php \App\Core\View::partial('owner/partials/home_bookings_mobile', [
     'todayBookings'    => $todayBookings ?? [],
     'upcomingBookings' => $upcomingBookings ?? [],
   ]); ?>
+  <?php endif; ?>
 
   <?php if ($stats['properties'] === 0): ?>
   <div class="ow-card p-5 mb-5 bg-gradient-to-br from-core-600 to-core-800 text-white border-0">
     <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="rocket" class="w-5 h-5"></i> เริ่มต้นใช้งาน</h2>
-    <p class="text-white/85 mt-1 text-sm">เพิ่มที่พักแรกของคุณ เพื่อเริ่มรับการจอง</p>
+    <p class="text-white/85 mt-1 text-sm"><?= $canBooking ? 'เพิ่มที่พักแรกของคุณ เพื่อเริ่มรับการจอง' : 'เพิ่มที่พักแรกของคุณ เพื่อเริ่มแสดงบนเว็บ' ?></p>
     <a href="<?= url('/owner/properties/create') ?>" class="inline-flex items-center gap-2 bg-white text-core-700 px-5 py-2.5 rounded-xl font-semibold mt-4">
       <i data-lucide="plus-circle" class="w-4 h-4"></i> เพิ่มที่พัก
     </a>
@@ -63,6 +73,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   <?php endif; ?>
 
   <div class="grid grid-cols-2 gap-3 mb-5">
+    <?php if ($canBooking): ?>
     <a href="<?= url('/owner/bookings/create') ?>" class="ow-quick-btn group">
       <div class="ow-quick-btn__icon bg-blue-50 text-blue-600"><i data-lucide="plus" class="w-6 h-6"></i></div>
       <span class="text-sm font-semibold text-slate-700">เพิ่มการจอง</span>
@@ -71,24 +82,48 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
       <div class="ow-quick-btn__icon bg-emerald-50 text-emerald-600"><i data-lucide="clipboard-list" class="w-6 h-6"></i></div>
       <span class="text-sm font-semibold text-slate-700">รายการจอง</span>
     </a>
-    <a href="<?= e($scheduleUrl) ?>" class="ow-quick-btn group">
-      <div class="ow-quick-btn__icon bg-sky-50 text-sky-600"><i data-lucide="calendar-range" class="w-6 h-6"></i></div>
+    <?php else: ?>
+    <a href="<?= url('/owner/properties') ?>" class="ow-quick-btn group">
+      <div class="ow-quick-btn__icon bg-blue-50 text-blue-600"><i data-lucide="hotel" class="w-6 h-6"></i></div>
+      <span class="text-sm font-semibold text-slate-700">ที่พักของฉัน</span>
+    </a>
+    <a href="<?= url('/owner/units') ?>" class="ow-quick-btn group">
+      <div class="ow-quick-btn__icon bg-violet-50 text-violet-600"><i data-lucide="bed-double" class="w-6 h-6"></i></div>
+      <span class="text-sm font-semibold text-slate-700">ห้อง / ยูนิต</span>
+    </a>
+    <?php endif; ?>
+    <a href="<?= e($scheduleUrl) ?>" class="ow-quick-btn group<?= $canAvailability ? '' : ' opacity-70' ?>">
+      <div class="ow-quick-btn__icon bg-sky-50 text-sky-600"><i data-lucide="<?= $canAvailability ? 'calendar-range' : 'lock' ?>" class="w-6 h-6"></i></div>
       <span class="text-sm font-semibold text-slate-700">ตารางที่พัก</span>
     </a>
+    <?php if ($canCoupon): ?>
     <a href="<?= url('/owner/coupons/verify') ?>" class="ow-quick-btn group">
       <div class="ow-quick-btn__icon bg-rose-50 text-rose-600"><i data-lucide="ticket" class="w-6 h-6"></i></div>
       <span class="text-sm font-semibold text-slate-700">ตรวจคูปอง</span>
     </a>
+    <?php else: ?>
+    <a href="<?= e($membershipUrl) ?>" class="ow-quick-btn group opacity-70">
+      <div class="ow-quick-btn__icon bg-amber-50 text-amber-600"><i data-lucide="award" class="w-6 h-6"></i></div>
+      <span class="text-sm font-semibold text-slate-700">สมัครแพ็กเกจ</span>
+    </a>
+    <?php endif; ?>
   </div>
 
   <div class="grid grid-cols-2 gap-3 mb-5">
     <?php
-    $mobileMetrics = [
-      ['hotel', 'ที่พัก', $stats['properties'], 'bg-blue-50 text-blue-600'],
-      ['calendar-check', 'จอง', $stats['bookings_total'], 'bg-amber-50 text-amber-600'],
-      ['banknote', 'รายได้', '฿' . number_format($stats['revenue']), 'bg-emerald-50 text-emerald-600'],
-      ['star', 'คะแนน', number_format($stats['rating_avg'], 1), 'bg-violet-50 text-violet-600'],
-    ];
+    $mobileMetrics = $canBooking
+      ? [
+          ['hotel', 'ที่พัก', $stats['properties'], 'bg-blue-50 text-blue-600'],
+          ['calendar-check', 'จอง', $stats['bookings_total'], 'bg-amber-50 text-amber-600'],
+          ['banknote', 'รายได้', '฿' . number_format($stats['revenue']), 'bg-emerald-50 text-emerald-600'],
+          ['star', 'คะแนน', number_format($stats['rating_avg'], 1), 'bg-violet-50 text-violet-600'],
+        ]
+      : [
+          ['hotel', 'ที่พัก', $stats['properties'], 'bg-blue-50 text-blue-600'],
+          ['check-circle', 'เผยแพร่', $stats['published'], 'bg-emerald-50 text-emerald-600'],
+          ['bed-double', 'ห้อง/แพ', $stats['units_total'] ?? 0, 'bg-violet-50 text-violet-600'],
+          ['star', 'คะแนน', number_format($stats['rating_avg'], 1), 'bg-amber-50 text-amber-600'],
+        ];
     foreach ($mobileMetrics as $m): ?>
     <div class="ow-card p-4">
       <div class="flex items-center gap-2">
@@ -110,6 +145,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   </div>
   <?php endif; ?>
 
+  <?php if ($canBooking): ?>
   <section class="mb-5">
     <div class="ow-section-head">
       <h3 class="ow-section-title"><i data-lucide="clock" class="w-5 h-5 text-core-600"></i> การจองล่าสุด</h3>
@@ -138,6 +174,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
     </div>
     <?php endif; ?>
   </section>
+  <?php endif; ?>
 
   <div class="text-center text-xs text-slate-500 pt-2 pb-1 space-y-2">
     <p>© <?= date('Y') ?> paekarn.com — Owner Portal</p>
@@ -154,7 +191,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
     <div class="flex items-center justify-between gap-4">
       <div>
         <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="rocket" class="w-6 h-6"></i> เริ่มต้นใช้งาน</h2>
-        <p class="text-white/90 mt-1 text-sm">เพิ่มที่พักแรกของคุณ เพื่อเริ่มรับการจอง</p>
+        <p class="text-white/90 mt-1 text-sm"><?= $canBooking ? 'เพิ่มที่พักแรกของคุณ เพื่อเริ่มรับการจอง' : 'เพิ่มที่พักแรกของคุณ เพื่อเริ่มแสดงบนเว็บ' ?></p>
       </div>
       <a href="<?= url('/owner/properties/create') ?>" class="inline-flex items-center gap-2 bg-white text-core-700 px-5 py-2.5 rounded-xl font-semibold hover:bg-core-50">
         <i data-lucide="plus-circle" class="w-4 h-4"></i> เพิ่มที่พัก
@@ -164,6 +201,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   <?php endif; ?>
 
   <div class="grid grid-cols-4 gap-3 mb-5">
+    <?php if ($canBooking): ?>
     <a href="<?= url('/owner/bookings/create') ?>" class="ow-quick-btn group !flex-row !text-left !p-4">
       <div class="ow-quick-btn__icon bg-blue-50 text-blue-600 !w-10 !h-10"><i data-lucide="plus" class="w-5 h-5"></i></div>
       <span class="text-sm font-semibold">เพิ่มการจอง</span>
@@ -172,21 +210,40 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
       <div class="ow-quick-btn__icon bg-emerald-50 text-emerald-600 !w-10 !h-10"><i data-lucide="clipboard-list" class="w-5 h-5"></i></div>
       <span class="text-sm font-semibold">รายการจอง</span>
     </a>
-    <a href="<?= e($scheduleUrl) ?>" class="ow-quick-btn group !flex-row !text-left !p-4">
-      <div class="ow-quick-btn__icon bg-sky-50 text-sky-600 !w-10 !h-10"><i data-lucide="calendar-range" class="w-5 h-5"></i></div>
+    <?php else: ?>
+    <a href="<?= url('/owner/properties') ?>" class="ow-quick-btn group !flex-row !text-left !p-4">
+      <div class="ow-quick-btn__icon bg-blue-50 text-blue-600 !w-10 !h-10"><i data-lucide="hotel" class="w-5 h-5"></i></div>
+      <span class="text-sm font-semibold">ที่พักของฉัน</span>
+    </a>
+    <a href="<?= url('/owner/units') ?>" class="ow-quick-btn group !flex-row !text-left !p-4">
+      <div class="ow-quick-btn__icon bg-violet-50 text-violet-600 !w-10 !h-10"><i data-lucide="bed-double" class="w-5 h-5"></i></div>
+      <span class="text-sm font-semibold">ห้อง / ยูนิต</span>
+    </a>
+    <?php endif; ?>
+    <a href="<?= e($scheduleUrl) ?>" class="ow-quick-btn group !flex-row !text-left !p-4<?= $canAvailability ? '' : ' opacity-70' ?>">
+      <div class="ow-quick-btn__icon bg-sky-50 text-sky-600 !w-10 !h-10"><i data-lucide="<?= $canAvailability ? 'calendar-range' : 'lock' ?>" class="w-5 h-5"></i></div>
       <span class="text-sm font-semibold">ตารางที่พัก</span>
     </a>
+    <?php if ($canCoupon): ?>
     <a href="<?= url('/owner/coupons/verify') ?>" class="ow-quick-btn group !flex-row !text-left !p-4">
       <div class="ow-quick-btn__icon bg-rose-50 text-rose-600 !w-10 !h-10"><i data-lucide="ticket" class="w-5 h-5"></i></div>
       <span class="text-sm font-semibold">ตรวจคูปอง</span>
     </a>
+    <?php else: ?>
+    <a href="<?= e($membershipUrl) ?>" class="ow-quick-btn group !flex-row !text-left !p-4 opacity-70">
+      <div class="ow-quick-btn__icon bg-amber-50 text-amber-600 !w-10 !h-10"><i data-lucide="award" class="w-5 h-5"></i></div>
+      <span class="text-sm font-semibold">สมัครแพ็กเกจ</span>
+    </a>
+    <?php endif; ?>
   </div>
 
+  <?php if ($canBooking): ?>
   <div class="grid grid-cols-3 gap-4 mb-5">
     <div class="ow-card p-4"><div class="text-xs text-slate-500">ยอดจองเดือนนี้</div><div class="text-2xl font-bold text-emerald-700 mt-1"><?= format_money($stats['revenue_month']) ?></div></div>
     <div class="ow-card p-4"><div class="text-xs text-slate-500">คูปองที่ใช้เดือนนี้</div><div class="text-2xl font-bold text-rose-700 mt-1"><?= format_money($stats['coupon_face_month']) ?></div></div>
     <div class="ow-card p-4"><div class="text-xs text-slate-500">Lead จากเว็บเดือนนี้</div><div class="text-2xl font-bold text-core-700 mt-1"><?= number_format($stats['leads_month']) ?></div></div>
   </div>
+  <?php endif; ?>
 
   <?php
   $apv = $analyticsPreview ?? [];
@@ -212,12 +269,19 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
 
   <div class="grid grid-cols-4 gap-4 mb-6">
     <?php
-    $metrics = [
-      ['hotel', 'ที่พักทั้งหมด', $stats['properties'], 'เผยแพร่ ' . $stats['published'] . ' แห่ง', 'bg-blue-50 text-blue-600'],
-      ['calendar-check', 'การจองทั้งหมด', $stats['bookings_total'], 'รอเช็คอิน ' . $stats['bookings_pending'], 'bg-amber-50 text-amber-600'],
-      ['banknote', 'รายได้รวม', '฿' . number_format($stats['revenue']), 'จากยอดชำระแล้ว', 'bg-emerald-50 text-emerald-600'],
-      ['star', 'คะแนนเฉลี่ย', number_format($stats['rating_avg'], 2), 'จากรีวิวทั้งหมด', 'bg-violet-50 text-violet-600'],
-    ];
+    $metrics = $canBooking
+      ? [
+          ['hotel', 'ที่พักทั้งหมด', $stats['properties'], 'เผยแพร่ ' . $stats['published'] . ' แห่ง', 'bg-blue-50 text-blue-600'],
+          ['calendar-check', 'การจองทั้งหมด', $stats['bookings_total'], 'รอเช็คอิน ' . $stats['bookings_pending'], 'bg-amber-50 text-amber-600'],
+          ['banknote', 'รายได้รวม', '฿' . number_format($stats['revenue']), 'จากยอดชำระแล้ว', 'bg-emerald-50 text-emerald-600'],
+          ['star', 'คะแนนเฉลี่ย', number_format($stats['rating_avg'], 2), 'จากรีวิวทั้งหมด', 'bg-violet-50 text-violet-600'],
+        ]
+      : [
+          ['hotel', 'ที่พักทั้งหมด', $stats['properties'], 'เผยแพร่ ' . $stats['published'] . ' แห่ง', 'bg-blue-50 text-blue-600'],
+          ['bed-double', 'ห้อง / ยูนิต', $stats['units_total'] ?? 0, 'เปิดขายทั้งหมด', 'bg-violet-50 text-violet-600'],
+          ['check-circle', 'สถานะ', $stats['published'] > 0 ? 'เผยแพร่แล้ว' : 'รอเผยแพร่', $stats['published'] > 0 ? 'แสดงบนเว็บได้' : 'รอ Admin อนุมัติ', 'bg-emerald-50 text-emerald-600'],
+          ['star', 'คะแนนเฉลี่ย', number_format($stats['rating_avg'], 2), 'จากรีวิวทั้งหมด', 'bg-amber-50 text-amber-600'],
+        ];
     foreach ($metrics as $m): ?>
     <div class="ow-card p-5 relative overflow-hidden">
       <div class="ow-metric__icon <?= $m[4] ?> mb-3"><i data-lucide="<?= $m[0] ?>" class="w-5 h-5"></i></div>
@@ -241,6 +305,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   <?php endif; ?>
 
   <div class="grid grid-cols-3 gap-5 mb-6">
+    <?php if ($canBooking): ?>
     <section class="col-span-2 ow-card p-5">
       <h3 class="ow-section-title mb-4"><i data-lucide="bar-chart-3" class="w-5 h-5 text-core-600"></i> การจองใน 14 วันล่าสุด</h3>
       <?php $maxC = max(1, max(array_column($chart, 'count'))); ?>
@@ -259,6 +324,13 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
         <?php foreach ($chart as $pt): ?><div><?= $pt['date'] ?></div><?php endforeach; ?>
       </div>
     </section>
+    <?php else: ?>
+    <section class="col-span-2 ow-card p-5 border border-dashed border-amber-200 bg-amber-50/30">
+      <h3 class="ow-section-title mb-2"><i data-lucide="calendar-check" class="w-5 h-5 text-amber-600"></i> การจอง & รายได้</h3>
+      <p class="text-sm text-amber-800">ฟีเจอร์การจอง รายได้ และกราฟสถิติ เปิดใช้ได้เมื่อสมัครแพ็กเกจ Starter ขึ้นไป</p>
+      <a href="<?= e($membershipUrl) ?>" class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-amber-700 hover:underline"><i data-lucide="award" class="w-4 h-4"></i> ดูแพ็กเกจ</a>
+    </section>
+    <?php endif; ?>
 
     <section>
       <div class="ow-section-head">
@@ -282,6 +354,7 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
     </section>
   </div>
 
+  <?php if ($canBooking): ?>
   <section>
     <div class="ow-section-head">
       <h3 class="ow-section-title"><i data-lucide="clock" class="w-5 h-5 text-core-600"></i> การจองล่าสุด</h3>
@@ -323,4 +396,5 @@ $scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
     </div>
     <?php endif; ?>
   </section>
+  <?php endif; ?>
 </div>
