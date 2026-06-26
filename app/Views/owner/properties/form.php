@@ -28,10 +28,18 @@ $bookingCaps = $property
 ?>
 <div class="flex items-center justify-between mb-4">
   <a href="<?= $propUrl() ?>" class="text-sm text-slate-500 hover:text-accent-700 inline-flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> ทั้งหมด</a>
-  <?php if ($route_prefix === 'owner' && $isEdit): ?>
+  <?php if ($route_prefix === 'owner' && $isEdit):
+    $canLineHub = \App\Services\OwnerFeatureGate::allowed(\App\Services\OwnerTier::FEATURE_LINE_HUB);
+    $canAvailability = \App\Services\OwnerFeatureGate::allowed(\App\Services\OwnerTier::FEATURE_AVAILABILITY);
+    $membershipUrl = url('/owner/membership');
+  ?>
   <div class="flex items-center gap-2 flex-wrap justify-end">
     <a href="<?= url('/owner/properties/' . $property['id'] . '/units') ?>" class="px-3 py-1.5 text-xs bg-accent-500 text-white rounded-lg inline-flex items-center gap-1 font-semibold"><i data-lucide="bed-double" class="w-3.5 h-3.5"></i> จัดการห้อง/แพ (<?= $ownerUnitCount ?>)</a>
+    <?php if ($canAvailability): ?>
     <a href="<?= url('/owner/properties/' . $property['id'] . '/availability') ?>" class="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg inline-flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> ปฏิทินวันว่าง</a>
+    <?php else: ?>
+    <a href="<?= e($membershipUrl) ?>" class="px-3 py-1.5 text-xs border border-sky-200 text-sky-700 bg-sky-50 rounded-lg inline-flex items-center gap-1" title="ต้องสมัครแพ็กเกจ"><i data-lucide="lock" class="w-3.5 h-3.5"></i> ปฏิทิน (สมาชิก)</a>
+    <?php endif; ?>
     <?php if ($property['status'] === 'published'): ?>
     <a target="_blank" href="<?= url('/property/' . $property['slug']) ?>" class="px-3 py-1.5 text-xs border border-slate-300 hover:bg-slate-50 rounded-lg inline-flex items-center gap-1"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> ดูบนเว็บ</a>
     <?php endif; ?>
@@ -559,6 +567,17 @@ $bookingCaps = $property
   </aside>
 
   <?php if (\App\Core\Database::tableHasColumn('properties', 'line_messaging_enabled') && $isEdit): ?>
+  <?php
+    $showLineHubBlock = $route_prefix !== 'owner'
+      || \App\Services\OwnerFeatureGate::allowed(\App\Services\OwnerTier::FEATURE_LINE_HUB);
+  ?>
+  <?php if (!$showLineHubBlock): ?>
+  <div class="lg:col-span-3 bg-sky-50 rounded-2xl border border-sky-200 shadow-soft p-5">
+    <p class="font-bold text-sky-900">LINE Hub — ต้องสมัครแพ็กเกจ Starter ขึ้นไป</p>
+    <p class="text-sm text-sky-800 mt-1">ตั้งค่า LINE OA, Chatbot และปฏิทินที่ลูกค้าเห็นใน LINE ได้เมื่ออัปเกรด</p>
+    <a href="<?= url('/owner/membership') ?>" class="inline-block mt-3 text-sm font-semibold text-sky-700 hover:underline">ดูแพ็กเกจ →</a>
+  </div>
+  <?php else: ?>
   <div class="lg:col-span-3 bg-gradient-to-br from-[#06C755]/5 to-accent-50 rounded-2xl border border-[#06C755]/20 shadow-soft p-5">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -578,13 +597,16 @@ $bookingCaps = $property
            class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#06C755] hover:bg-[#05a847] text-white text-sm font-semibold rounded-xl transition">
           <i data-lucide="settings" class="w-4 h-4"></i> ตั้งค่า LINE
         </a>
+        <?php if ($route_prefix !== 'owner' || ($canAvailability ?? \App\Services\OwnerFeatureGate::allowed(\App\Services\OwnerTier::FEATURE_AVAILABILITY))): ?>
         <a href="<?= url('/owner/properties/' . (int)$property['id'] . '/availability') ?>"
            class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition">
           <i data-lucide="calendar" class="w-4 h-4"></i> ปฏิทินวันว่าง
         </a>
+        <?php endif; ?>
       </div>
     </div>
   </div>
+  <?php endif; ?>
   <?php endif; ?>
 
 </form>

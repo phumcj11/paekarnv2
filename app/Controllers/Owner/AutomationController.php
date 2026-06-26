@@ -220,6 +220,11 @@ PROMPT;
             $this->json(['ok' => false, 'error' => 'ไม่มีสิทธิ์']); return;
         }
 
+        $oid = Auth::ownerId();
+        if ($oid && !OwnerTier::can($oid, OwnerTier::FEATURE_AI_DRAFT)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์นี้ต้องใช้แพ็กเกจ Starter ขึ้นไป']); return;
+        }
+
         $property = Database::fetch("SELECT name, type, zone FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
         if (!$property) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
 

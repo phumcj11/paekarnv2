@@ -1,4 +1,11 @@
-<?php /** @var array $rows */ ?>
+<?php /** @var array $rows */
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
+
+$canLineHub = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_HUB);
+$canAvailability = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
+$membershipUrl = url('/owner/membership');
+?>
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft">
   <div class="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
     <div>
@@ -39,8 +46,8 @@
         <div class="mt-auto pt-3 flex gap-2">
           <a href="<?= url('/owner/properties/' . $p['id'] . '/edit') ?>" class="flex-1 px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="edit" class="w-3.5 h-3.5"></i> แก้ไข</a>
           <a href="<?= url('/owner/properties/' . $p['id'] . '/units') ?>" class="flex-1 px-3 py-1.5 text-xs bg-accent-500 text-white rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="bed-double" class="w-3.5 h-3.5"></i> ห้อง/แพ</a>
-          <a href="<?= url('/owner/properties/' . $p['id'] . '/line') ?>" title="LINE & ปฏิทิน" class="px-3 py-1.5 text-xs border border-[#06C755]/40 text-[#06C755] hover:bg-[#06C755]/5 rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></a>
-          <a href="<?= url('/owner/properties/' . $p['id'] . '/availability') ?>" title="ปฏิทินวันว่าง" class="px-3 py-1.5 text-xs border border-slate-300 hover:bg-slate-50 rounded-lg inline-flex items-center justify-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i></a>
+          <a href="<?= $canLineHub ? url('/owner/properties/' . $p['id'] . '/line') : e($membershipUrl) ?>" title="<?= $canLineHub ? 'LINE Hub' : 'ต้องสมัครแพ็กเกจ' ?>" class="px-3 py-1.5 text-xs border border-[#06C755]/40 text-[#06C755] hover:bg-[#06C755]/5 rounded-lg inline-flex items-center justify-center gap-1<?= $canLineHub ? '' : ' opacity-60' ?>"><i data-lucide="<?= $canLineHub ? 'message-circle' : 'lock' ?>" class="w-3.5 h-3.5"></i></a>
+          <a href="<?= $canAvailability ? url('/owner/properties/' . $p['id'] . '/availability') : e($membershipUrl) ?>" title="<?= $canAvailability ? 'ปฏิทินวันว่าง' : 'ต้องสมัครแพ็กเกจ' ?>" class="px-3 py-1.5 text-xs border border-slate-300 hover:bg-slate-50 rounded-lg inline-flex items-center justify-center gap-1<?= $canAvailability ? '' : ' opacity-60' ?>"><i data-lucide="<?= $canAvailability ? 'calendar' : 'lock' ?>" class="w-3.5 h-3.5"></i></a>
         </div>
       </div>
     </div>

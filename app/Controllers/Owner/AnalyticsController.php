@@ -7,6 +7,7 @@ use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
 use App\Services\AIService;
+use App\Services\OwnerFeatureGate;
 use App\Services\OwnerTier;
 
 class AnalyticsController extends Controller
@@ -94,6 +95,9 @@ class AnalyticsController extends Controller
     /** GET /owner/analytics?property_id=N&range=30 */
     public function index(): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_ANALYTICS, 'Analytics ต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $ownerId    = Auth::ownerId();
         $properties = $ownerId
             ? Database::fetchAll(
@@ -113,6 +117,8 @@ class AnalyticsController extends Controller
             }
             if (!$owns) $propertyId = (int)($properties[0]['id'] ?? 0);
         }
+
+        $canDeep = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP));
 
         $hasLeadTable = Database::tableHasColumn('property_lead_clicks', 'id');
         $hasViewTable = Database::tableHasColumn('analytics_page_views', 'id');
@@ -231,16 +237,18 @@ class AnalyticsController extends Controller
                     ];
                 }
 
-                // Top referrers — แหล่งที่มาของผู้เข้าชม
-                $topReferrers = Database::fetchAll(
-                    "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
-                     FROM analytics_page_views
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
-                     GROUP BY referrer_host
-                     ORDER BY cnt DESC
-                     LIMIT 10",
-                    ['p' => $propertyId, 'r' => $range]
-                );
+                // Top referrers — แหล่งที่มาของผู้เข้าชม (Standard+ เท่านั้น)
+                if ($canDeep) {
+                    $topReferrers = Database::fetchAll(
+                        "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
+                         FROM analytics_page_views
+                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                         GROUP BY referrer_host
+                         ORDER BY cnt DESC
+                         LIMIT 10",
+                        ['p' => $propertyId, 'r' => $range]
+                    );
+                }
             }
         }
 
@@ -268,8 +276,6 @@ class AnalyticsController extends Controller
         $contactClicks  = $clicks['phone'] + $clicks['line'] + $clicks['book'];
         $viewToContact  = $views > 0 ? round($contactClicks / $views * 100, 1) : 0;
         $contactToBook  = $contactClicks > 0 ? round($bookingsInRange['confirmed'] / $contactClicks * 100, 1) : 0;
-
-        $canDeep = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP));
 
         View::render('owner/analytics/index', [
             'aiSummaryUrl' => ($canDeep && $propertyId) ? url('/owner/analytics/ai-summary?property_id=' . $propertyId . '&range=' . $range) : null,

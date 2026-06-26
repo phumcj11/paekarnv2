@@ -4,6 +4,7 @@ namespace App\Controllers\Owner;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
+use App\Core\Session;
 use App\Core\View;
 use App\Services\AIService;
 use App\Services\OwnerTier;
@@ -11,9 +12,30 @@ use App\Services\PropertyLineService;
 
 class LineContactController extends Controller
 {
+    private function requireLineCrmFeature(bool $json = false): bool
+    {
+        if (Auth::isAdmin()) {
+            return true;
+        }
+        $oid = Auth::ownerId();
+        if (!$oid || !OwnerTier::can($oid, OwnerTier::FEATURE_LINE_CRM)) {
+            if ($json) {
+                $this->json(['ok' => false, 'error' => 'ฟีเจอร์ LINE CRM ต้องใช้แพ็กเกจ Starter ขึ้นไป']);
+                return false;
+            }
+            Session::flash('error', 'ฟีเจอร์ LINE CRM ต้องใช้แพ็กเกจ Starter ขึ้นไป');
+            redirect(url('/owner/membership'));
+            return false;
+        }
+        return true;
+    }
+
     /** GET /owner/line-contacts?property_id=N&q=&page= */
     public function index(): void
     {
+        if (!$this->requireLineCrmFeature()) {
+            return;
+        }
         $ownerId    = Auth::ownerId();
         $hasLineCol = Database::tableHasColumn('properties', 'line_messaging_enabled');
         $properties = $ownerId
@@ -219,6 +241,9 @@ class LineContactController extends Controller
     /** POST /owner/line-contacts/{id}/phone — อัปเดตเบอร์ */
     public function updatePhone(int $id): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         if (!Database::tableHasColumn('property_line_contacts', 'phone')) {
             $this->json(['ok' => false, 'error' => 'ฐานข้อมูลยังไม่มีคอลัมน์ phone']); return;
         }
@@ -236,6 +261,9 @@ class LineContactController extends Controller
     /** POST /owner/line-contacts/{id}/message — push ข้อความให้ 1 คน */
     public function sendMessage(int $id): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         $contact = $this->ownedContact($id);
         if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
 
@@ -255,6 +283,9 @@ class LineContactController extends Controller
     /** POST /owner/line-contacts/{id}/tags — เพิ่ม/ลบ tag บน contact */
     public function updateTags(int $id): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         $contact = $this->ownedContact($id);
         if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
 
@@ -282,6 +313,9 @@ class LineContactController extends Controller
     /** POST /owner/line-contacts/{id}/notes — บันทึกโน้ต */
     public function updateNotes(int $id): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         $contact = $this->ownedContact($id);
         if (!$contact) { $this->json(['ok' => false, 'error' => 'ไม่พบข้อมูล']); return; }
 
@@ -298,6 +332,9 @@ class LineContactController extends Controller
      */
     public function aiReply(): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         $id      = (int)($this->params['id'] ?? 0);
         $context = mb_substr(trim((string)($_GET['context'] ?? '')), 0, 300);
 
@@ -355,6 +392,9 @@ PROMPT;
     /** POST /owner/line-contacts/broadcast?property_id=N — push ให้ทุกคน (หรือ filtered) */
     public function broadcast(): void
     {
+        if (!$this->requireLineCrmFeature(true)) {
+            return;
+        }
         $propertyId = (int)($_POST['property_id'] ?? 0);
         if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ไม่ระบุ property_id']); return; }
 

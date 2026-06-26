@@ -10,6 +10,8 @@ use App\Models\Property;
 use App\Models\PropertyUnit;
 use App\Services\OwnerAvailabilityCalendar;
 use App\Services\OwnerBookingService;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 
 class AvailabilityController extends Controller
 {
@@ -24,6 +26,9 @@ class AvailabilityController extends Controller
 
     public function index(int $id): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_AVAILABILITY, 'ปฏิทินวันว่างต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -59,6 +64,9 @@ class AvailabilityController extends Controller
 
     public function save(int $id): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_AVAILABILITY, 'ปฏิทินวันว่างต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -108,6 +116,9 @@ class AvailabilityController extends Controller
     /** POST — บันทึกการจองจากปฏิทิน (มีลูกค้าจอง) */
     public function storeBooking(int $id): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_AVAILABILITY, 'ปฏิทินวันว่างต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 

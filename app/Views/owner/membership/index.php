@@ -1,6 +1,7 @@
 <?php
 /** @var array|null $owner @var array $plans @var array<int,array<string,mixed>> $orders */
 use App\Services\OwnerMembership;
+use App\Services\OwnerTier;
 
 $tier          = $owner ? ($owner['membership_tier'] ?? 'none') : 'none';
 $benefitsOk    = $owner ? OwnerMembership::hasActiveBenefits($owner) : false;
@@ -32,6 +33,8 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
     <p class="mt-3 text-xs text-slate-500">สมาชิก <strong>VIP</strong> ที่เป็นพาร์ทเนอร์ที่ใช้งานได้ และมีที่พักเผยแพร่ จะได้รับการแจ้งเตือนเมื่อมีลูกค้ากรอกฟอร์ม &quot;ขอให้ช่วยหาที่พัก&quot; ที่ตรงโซน / ประเภท / งบของคุณ</p>
   </div>
 
+  <?php require __DIR__ . '/../partials/membership_tier_comparison.php'; ?>
+
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
     <div class="p-5 border-b border-slate-100">
       <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="package" class="w-5 h-5 text-accent-600"></i> เลือกแพ็กเกจ</h2>
@@ -62,6 +65,21 @@ $graceUntilRaw = $owner ? ($owner['membership_grace_until'] ?? null) : null;
             }
           ?>
           <div class="text-xs text-slate-600 mt-1"><?= $durationLabel ?></div>
+          <?php
+            $planTier = (string)($pl['tier'] ?? 'standard');
+            $tierFeatures = OwnerTier::featuresForTier($planTier);
+            $featureLabels = OwnerTier::featureLabels();
+          ?>
+          <?php if (!empty($tierFeatures)): ?>
+          <ul class="mt-3 space-y-1 text-xs text-slate-600 flex-1">
+            <?php foreach (array_slice($tierFeatures, 0, 6) as $feat): ?>
+              <li class="flex items-start gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i><span><?= e($featureLabels[$feat] ?? $feat) ?></span></li>
+            <?php endforeach; ?>
+            <?php if (count($tierFeatures) > 6): ?>
+              <li class="text-slate-400">+ อีก <?= count($tierFeatures) - 6 ?> สิทธิ์ (ดูตารางด้านบน)</li>
+            <?php endif; ?>
+          </ul>
+          <?php endif; ?>
           <a href="<?= url('/owner/membership/buy?plan=' . (int)$pl['id']) ?>" class="mt-auto pt-4 inline-flex justify-center items-center gap-2 py-2.5 rounded-xl font-semibold text-sm <?= $isVip ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white' ?>">
             <i data-lucide="shopping-cart" class="w-4 h-4"></i> สมัครแพ็กเกจนี้
           </a>

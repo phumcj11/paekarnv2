@@ -9,9 +9,21 @@ use App\Core\View;
 use App\Models\ContentPlan;
 use App\Services\AIService;
 use App\Services\ContentPlanPublishService;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 
 class ContentPlanController extends Controller
 {
+    private const MSG_CONTENT = 'ฟีเจอร์การตลาดต้องสมัครแพ็กเกจ Starter ขึ้นไป';
+
+    private function ensureContentPlan(bool $json = false): bool
+    {
+        if ($json) {
+            return OwnerFeatureGate::denyJson($this, OwnerTier::FEATURE_CONTENT_PLAN, self::MSG_CONTENT);
+        }
+        return OwnerFeatureGate::denyPage(OwnerTier::FEATURE_CONTENT_PLAN, self::MSG_CONTENT);
+    }
+
     private function ownerId(): int
     {
         $id = Auth::ownerId();
@@ -61,9 +73,24 @@ class ContentPlanController extends Controller
         );
     }
 
+    private function requireAiDraft(int $ownerId): bool
+    {
+        if (Auth::isAdmin()) {
+            return true;
+        }
+        if (!$ownerId || !OwnerTier::can($ownerId, OwnerTier::FEATURE_AI_DRAFT)) {
+            $this->json(['ok' => false, 'error' => 'ฟีเจอร์ AI ต้องใช้แพ็กเกจ Starter ขึ้นไป']);
+            return false;
+        }
+        return true;
+    }
+
     /** GET /owner/content-plans?month=Y-m&tab=calendar|groups|leads */
     public function index(): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         $isAdmin = Auth::isAdmin();
         $tab     = in_array($_GET['tab'] ?? '', ['calendar', 'groups', 'leads', 'settings']) ? $_GET['tab'] : 'calendar';
@@ -142,6 +169,7 @@ class ContentPlanController extends Controller
             'page_title'   => 'Marketing Center',
             'tab'          => $tab,
             'hasMarketingTables' => $hasMarketingTables,
+            'canAiDraft'   => $isAdmin || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_AI_DRAFT)),
             // calendar
             'year'         => $year,
             'month'        => $month,
@@ -166,6 +194,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans */
     public function store(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $data       = $this->input();
         $propertyId = (int)($data['property_id'] ?? 0);
         $ownerId    = $this->resolveOwnerId($propertyId ?: null);
@@ -184,6 +215,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/update */
     public function update(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         $data = $this->input();
@@ -194,6 +228,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/delete */
     public function destroy(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบรายการ']); return; }
         ContentPlan::delete($id);
@@ -203,10 +240,16 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/ai-generate */
     public function aiGenerate(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $data       = $this->input();
         $propertyId = (int)($data['property_id'] ?? 0);
         $ownerId    = $this->resolveOwnerId($propertyId ?: null);
         if (!$ownerId) { $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return; }
+        if (!$this->requireAiDraft($ownerId)) {
+            return;
+        }
         $platform    = $data['platform'] ?? 'facebook';
         $postType    = $data['post_type'] ?? 'page';    // page | group | line_broadcast
         $propName    = trim((string)($data['property_name'] ?? ''));
@@ -271,6 +314,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/groups/save — create or update a group */
     public function groupSave(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
@@ -304,6 +350,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/groups/{id}/delete */
     public function groupDelete(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $row = Auth::isAdmin()
             ? Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i", ['i' => $id])
             : Database::fetch("SELECT id FROM marketing_fb_groups WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => Auth::ownerId()]);
@@ -315,6 +364,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/{id}/log-post — log that a content plan was posted to a group */
     public function logPost(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 
@@ -337,6 +389,9 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/{id}/post-logs — get posting history for a plan */
     public function postLogs(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 
@@ -357,6 +412,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/leads/save — create or update a lead */
     public function leadSave(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         if (!self::hasMarketingTables()) { $this->json(['ok' => false, 'error' => 'ระบบยังไม่ได้อัปเดตฐานข้อมูล — รอ deploy สักครู่']); return; }
 
         $data = $this->input();
@@ -406,6 +464,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/leads/{id}/delete */
     public function leadDelete(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $row = Auth::isAdmin()
             ? Database::fetch("SELECT id FROM marketing_leads WHERE id = :i", ['i' => $id])
             : Database::fetch("SELECT id FROM marketing_leads WHERE id = :i AND owner_id = :o", ['i' => $id, 'o' => Auth::ownerId()]);
@@ -417,6 +478,9 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/leads/{id}/ai-comment — AI draft comment */
     public function leadAiComment(int $id): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $lead = Auth::isAdmin()
             ? Database::fetch(
                 "SELECT l.*, p.name AS property_name, p.type AS property_type, p.zone AS property_zone
@@ -433,6 +497,11 @@ class ContentPlanController extends Controller
                 ['i' => $id, 'o' => Auth::ownerId()]
             );
         if (!$lead) { $this->json(['ok' => false, 'error' => 'ไม่พบ lead']); return; }
+
+        $ownerId = (int)($lead['owner_id'] ?? 0);
+        if (!$this->requireAiDraft($ownerId)) {
+            return;
+        }
 
         $pax      = $lead['pax'] ? "{$lead['pax']} คน" : 'ไม่ระบุจำนวน';
         $dates    = $lead['checkin_date']
@@ -478,6 +547,9 @@ class ContentPlanController extends Controller
     /** GET /owner/content-plans/property-images?property_id=N — returns images for picker */
     public function propertyImages(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $propertyId = (int)($_GET['property_id'] ?? 0);
         if (!$propertyId) { $this->json(['ok' => false, 'images' => []]); return; }
 
@@ -497,6 +569,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/upload-image — upload image file, return public URL */
     public function uploadImage(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         if (!Auth::ownerId() && !Auth::isAdmin()) {
             $this->json(['ok' => false, 'error' => 'ไม่พบ owner']); return;
         }
@@ -512,6 +587,9 @@ class ContentPlanController extends Controller
     /** POST /owner/content-plans/social-save — update social links for a property */
     public function socialSave(): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $data       = $this->input();
         $propertyId = (int)($data['property_id'] ?? 0);
         if (!$propertyId) { $this->json(['ok' => false, 'error' => 'ระบุที่พัก']); return; }
@@ -567,6 +645,9 @@ class ContentPlanController extends Controller
 
     private function publishPlan(int $id, string $platform): void
     {
+        if (!$this->ensureContentPlan(true)) {
+            return;
+        }
         $plan = $this->findOwnedPlan($id);
         if (!$plan) { $this->json(['ok' => false, 'error' => 'ไม่พบโพสต์']); return; }
 

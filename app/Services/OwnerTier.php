@@ -26,6 +26,10 @@ final class OwnerTier
     public const FEATURE_LISTING_BOOST     = 'listing_boost';       // Boost ลำดับในหน้าค้นหา
     public const FEATURE_AVAILABLE_BOOST   = 'available_boost';     // ขึ้นหน้าแพว่าง
     public const FEATURE_COUPON            = 'coupon';              // ออกคูปองส่วนลด
+    public const FEATURE_AVAILABILITY      = 'availability';        // ปฏิทินวันว่าง
+    public const FEATURE_CONTENT_PLAN      = 'content_plan';        // Content Plan / การตลาด
+    public const FEATURE_ANALYTICS         = 'analytics';           // Analytics พื้นฐาน
+    public const FEATURE_LINE_HUB          = 'line_hub';            // LINE Hub / ตั้งค่า OA
 
     /**
      * ตรวจว่า owner มีสิทธิ์ใช้ฟีเจอร์นี้หรือไม่
@@ -47,7 +51,12 @@ final class OwnerTier
     public static function tierCan(string $tier, string $feature): bool
     {
         return match ($feature) {
-            // Free tier: ฟีเจอร์ขั้นพื้นฐาน
+            // ฟรี: จัดการที่พัก / ยูนิต + แสดงบนเว็บ (+ การจอง) เท่านั้น
+            // ต้องสมัครแพ็ก (standard หรือ vip):
+            self::FEATURE_AVAILABILITY   => $tier !== 'none',
+            self::FEATURE_CONTENT_PLAN   => $tier !== 'none',
+            self::FEATURE_ANALYTICS      => $tier !== 'none',
+            self::FEATURE_LINE_HUB       => $tier !== 'none',
             self::FEATURE_AUTOMATION     => $tier !== 'none',
             self::FEATURE_LINE_CRM       => $tier !== 'none',
             self::FEATURE_AI_DRAFT       => $tier !== 'none',
@@ -86,17 +95,72 @@ final class OwnerTier
      */
     public static function featuresForTier(string $tier): array
     {
-        $all = [
-            self::FEATURE_AUTOMATION,
-            self::FEATURE_LINE_CRM,
-            self::FEATURE_AI_DRAFT,
-            self::FEATURE_BROADCAST,
-            self::FEATURE_ANALYTICS_DEEP,
-            self::FEATURE_COUPON,
-            self::FEATURE_GUEST_SEEK_LEADS,
-            self::FEATURE_LISTING_BOOST,
-            self::FEATURE_AVAILABLE_BOOST,
-        ];
+        $all = array_keys(self::featureLabels());
         return array_values(array_filter($all, fn($f) => self::tierCan($tier, $f)));
+    }
+
+    /** @return array<string, string> feature constant => ชื่อภาษาไทย */
+    public static function featureLabels(): array
+    {
+        return [
+            self::FEATURE_AVAILABILITY     => 'ปฏิทินวันว่าง + จองจากปฏิทิน',
+            self::FEATURE_LINE_HUB           => 'LINE Hub — ตั้งค่า OA / Chatbot',
+            self::FEATURE_CONTENT_PLAN       => 'Content Plan + โพสต์ FB / LINE / IG',
+            self::FEATURE_ANALYTICS          => 'Analytics พื้นฐาน + Funnel',
+            self::FEATURE_LINE_CRM         => 'LINE CRM (รายชื่อแชท, tag, ส่งทีละคน)',
+            self::FEATURE_AUTOMATION       => 'Automation — บันทึก template ข้อความอัตโนมัติ',
+            self::FEATURE_AI_DRAFT         => 'AI ช่วยร่างข้อความ (LINE / Automation / Content)',
+            self::FEATURE_BROADCAST        => 'LINE Broadcast',
+            self::FEATURE_ANALYTICS_DEEP   => 'Analytics ลึก (Referrer + AI สรุป)',
+            self::FEATURE_COUPON           => 'ตรวจ / สแกนคูปอง',
+            self::FEATURE_GUEST_SEEK_LEADS => 'รับ Lead ฟอร์ม "ขอให้ช่วยหาที่พัก"',
+            self::FEATURE_LISTING_BOOST    => 'Boost ลำดับค้นหา + Featured',
+            self::FEATURE_AVAILABLE_BOOST  => 'Boost หน้าแพว่าง (ranking)',
+        ];
+    }
+
+    /**
+     * แถวสำหรับตารางเปรียบเทียบ tier (ใช้ในหน้า membership / admin)
+     *
+     * @return list<array{label: string, none?: bool|string, standard?: bool|string, vip?: bool|string, feature?: string}>
+     */
+    public static function comparisonRows(): array
+    {
+        $rows = [
+            ['label' => 'จัดการที่พัก / ยูนิต + แสดงบนเว็บ', 'none' => true, 'standard' => true, 'vip' => true],
+            ['label' => 'การจอง (รายการ / สร้างจอง)', 'none' => true, 'standard' => true, 'vip' => true],
+        ];
+
+        foreach (self::featureLabels() as $feature => $label) {
+            if ($feature === self::FEATURE_AVAILABLE_BOOST) {
+                $rows[] = [
+                    'label'    => $label,
+                    'none'     => false,
+                    'standard' => '+20',
+                    'vip'      => '+30',
+                ];
+                continue;
+            }
+            $rows[] = [
+                'label'   => $label,
+                'feature' => $feature,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * ค่า cell ในตารางเปรียบเทียบ
+     *
+     * @param array{label: string, none?: bool|string, standard?: bool|string, vip?: bool|string, feature?: string} $row
+     * @return bool|string
+     */
+    public static function comparisonCell(array $row, string $tier): bool|string
+    {
+        if (isset($row['feature'])) {
+            return self::tierCan($tier, $row['feature']);
+        }
+        return $row[$tier] ?? false;
     }
 }

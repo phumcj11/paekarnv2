@@ -288,7 +288,7 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
 </div>
 <?php endif; ?>
 
-<?php if (!empty($topReferrers) && $hasViewTable): ?>
+<?php if ($canDeep && !empty($topReferrers) && $hasViewTable): ?>
 <!-- Referrer breakdown -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 mb-5">
   <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">

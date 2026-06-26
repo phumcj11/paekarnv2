@@ -48,3 +48,7 @@
     </table>
   </div>
 </div>
+
+<div class="mt-6">
+  <?php $compact = false; require __DIR__ . '/../../partials/membership_tier_comparison.php'; ?>
+</div>

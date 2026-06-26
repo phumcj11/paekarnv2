@@ -7,6 +7,8 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\Csrf;
 use App\Services\FacebookService;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 
 /**
  * Facebook Page OAuth flow for Owner Portal
@@ -20,6 +22,15 @@ use App\Services\FacebookService;
 class FacebookController extends Controller
 {
     private const STATE_KEY = '_fb_oauth_state';
+    private const MSG_CONTENT = 'ฟีเจอร์การตลาดต้องสมัครแพ็กเกจ Starter ขึ้นไป';
+
+    private function ensureContentPlan(bool $json = false): bool
+    {
+        if ($json) {
+            return OwnerFeatureGate::denyJson($this, OwnerTier::FEATURE_CONTENT_PLAN, self::MSG_CONTENT);
+        }
+        return OwnerFeatureGate::denyPage(OwnerTier::FEATURE_CONTENT_PLAN, self::MSG_CONTENT);
+    }
 
     private function ownerId(): int
     {
@@ -29,6 +40,9 @@ class FacebookController extends Controller
     /** GET /owner/facebook/connect/{property_id} — start OAuth */
     public function connect(int $propertyId): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 
@@ -52,6 +66,9 @@ class FacebookController extends Controller
     /** GET /owner/facebook/callback — handle OAuth code */
     public function callback(): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 
@@ -117,6 +134,9 @@ class FacebookController extends Controller
     /** GET /owner/facebook/pick-page — choose which page to connect */
     public function pickPage(): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 
@@ -153,6 +173,9 @@ class FacebookController extends Controller
     /** POST /owner/facebook/save-page — save selected page from picker */
     public function savePage(): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 
@@ -182,6 +205,9 @@ class FacebookController extends Controller
     /** POST /owner/facebook/disconnect/{property_id} */
     public function disconnect(int $propertyId): void
     {
+        if (!$this->ensureContentPlan()) {
+            return;
+        }
         $ownerId = $this->ownerId();
         if (!$ownerId) { redirect(url('/owner/login')); return; }
 

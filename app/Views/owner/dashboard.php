@@ -3,6 +3,13 @@
            @var array|null $homeCalendar @var list<array> $calProperties
            @var list<array> $todayBookings @var list<array> $upcomingBookings */
 
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
+
+$canAvailability = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
+$canAnalytics    = OwnerFeatureGate::allowed(OwnerTier::FEATURE_ANALYTICS);
+$membershipUrl   = url('/owner/membership');
+
 $propStatusLabels = [
   'published' => ['published', 'ow-status-pill--published'],
   'draft'     => ['draft', 'ow-status-pill--draft'],
@@ -20,17 +27,25 @@ $bookingStatusLabels = [
   'completed' => 'เสร็จสิ้น',
   'no_show'   => 'ไม่มา',
 ];
-$scheduleUrl = !empty($myProperties[0]['id'])
+$scheduleUrl = !empty($myProperties[0]['id']) && $canAvailability
   ? url('/owner/properties/' . (int)$myProperties[0]['id'] . '/availability')
-  : url('/owner/properties');
+  : ($canAvailability ? url('/owner/properties') : $membershipUrl);
 ?>
 
 <!-- ==================== MOBILE LAYOUT ==================== -->
 <div class="lg:hidden">
+  <?php if ($canAvailability && !empty($homeCalendar)): ?>
   <?php \App\Core\View::partial('owner/partials/home_calendar_mobile', [
     'homeCalendar' => $homeCalendar ?? null,
     'calProperties' => $calProperties ?? [],
   ]); ?>
+  <?php elseif (!$canAvailability): ?>
+  <div class="ow-card p-4 mb-5 border border-dashed border-sky-200 bg-sky-50/50">
+    <p class="text-sm font-semibold text-sky-800">ปฏิทินวันว่าง — ต้องสมัครแพ็กเกจ</p>
+    <p class="text-xs text-sky-700 mt-1">จัดการวันว่างและจองจากปฏิทินได้เมื่ออัปเกรดเป็น Starter ขึ้นไป</p>
+    <a href="<?= e($membershipUrl) ?>" class="inline-block mt-2 text-xs font-semibold text-sky-700 hover:underline">ดูแพ็กเกจ →</a>
+  </div>
+  <?php endif; ?>
 
   <?php \App\Core\View::partial('owner/partials/home_bookings_mobile', [
     'todayBookings'    => $todayBookings ?? [],
@@ -176,7 +191,7 @@ $scheduleUrl = !empty($myProperties[0]['id'])
   <?php
   $apv = $analyticsPreview ?? [];
   $apTotal = ($apv['phone'] ?? 0) + ($apv['line'] ?? 0) + ($apv['book'] ?? 0);
-  if ($apTotal > 0 || ($apv['views'] ?? 0) > 0): ?>
+  if ($canAnalytics && ($apTotal > 0 || ($apv['views'] ?? 0) > 0)): ?>
   <a href="<?= url('/owner/analytics' . ($apv['property_id'] ? '?property_id=' . $apv['property_id'] : '')) ?>"
      class="ow-card block p-4 mb-5 border-2 border-dashed border-accent-200 hover:border-accent-400 hover:bg-accent-50/30 transition group">
     <div class="flex items-center justify-between mb-3">

@@ -6,8 +6,10 @@ use App\Core\Auth;
 use App\Core\Database;
 use App\Core\View;
 use App\Models\PropertyLeadClick;
-use App\Services\OwnerMembership;
 use App\Services\OwnerAvailabilityCalendar;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerMembership;
+use App\Services\OwnerTier;
 
 class DashboardController extends Controller
 {
@@ -106,9 +108,10 @@ class DashboardController extends Controller
             $params
         );
 
-        // Analytics preview (30 วัน)
+        // Analytics preview (30 วัน) — เฉพาะสมาชิกที่มีสิทธิ์ Analytics
         $analyticsPreview = ['phone' => 0, 'line' => 0, 'book' => 0, 'views' => 0, 'property_id' => 0];
-        if ($ownerId && !empty($calProperties)) {
+        $canAnalyticsPreview = Auth::isAdmin() || ($ownerId && OwnerFeatureGate::allowed(OwnerTier::FEATURE_ANALYTICS));
+        if ($canAnalyticsPreview && $ownerId && !empty($calProperties)) {
             $firstPid = (int)($calProperties[0]['id'] ?? 0);
             if ($firstPid && PropertyLeadClick::tableReady()) {
                 $row = Database::fetch(
@@ -159,6 +162,7 @@ class DashboardController extends Controller
         }
 
         $calPropertyId = isset($_GET['cal_p']) ? (int)$_GET['cal_p'] : (int)($calProperties[0]['id'] ?? 0);
+        $canHomeCalendar = Auth::isAdmin() || ($ownerId && OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY));
         $validCalProperty = false;
         foreach ($calProperties as $cp) {
             if ((int)$cp['id'] === $calPropertyId) {
@@ -212,7 +216,7 @@ class DashboardController extends Controller
                 break;
             }
         }
-        if ($calPropertyId > 0) {
+        if ($canHomeCalendar && $calPropertyId > 0) {
             if ($calView === 'unit' && $calUnitId > 0) {
                 $homeCalendar = OwnerAvailabilityCalendar::buildMonth($calUnitId, $calMonth, $calYear, $calTotalUnits);
                 $selectedUnitName = '';

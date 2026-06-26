@@ -3,6 +3,8 @@ use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Session;
 use App\Services\OwnerMembership;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 $user = Auth::user();
 $flashSuccess = Session::flash('success');
 $flashError   = Session::flash('error');
@@ -51,6 +53,17 @@ $chatUrl = $firstPropertyId ? url('/owner/properties/' . $firstPropertyId . '/li
 $calendarUrl = $firstPropertyId
   ? url('/owner/properties/' . $firstPropertyId . '/availability')
   : url('/owner/properties');
+$membershipUrl = url('/owner/membership');
+$navFeatureMap = [
+  '/owner/analytics'      => OwnerTier::FEATURE_ANALYTICS,
+  '/owner/line-contacts'  => OwnerTier::FEATURE_LINE_CRM,
+  '/owner/automation'     => OwnerTier::FEATURE_AUTOMATION,
+  '/owner/content-plans'  => OwnerTier::FEATURE_CONTENT_PLAN,
+  '/owner/coupons/verify' => OwnerTier::FEATURE_COUPON,
+  '/owner/coupons/scan'   => OwnerTier::FEATURE_COUPON,
+];
+$canAvailabilityNav = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
+$canLineCrmNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_CRM);
 ?><!DOCTYPE html>
 <html lang="th">
 <head>
@@ -101,9 +114,15 @@ $calendarUrl = $firstPropertyId
       $href = $it[0];
       $kind = $it[3] ?? null;
       $navCls = ($kind === 'units_hub') ? ow_sidebar_units_active() : ow_active($href);
+      $feat = $navFeatureMap[$href] ?? null;
+      $allowed = !$feat || OwnerFeatureGate::allowed($feat);
+      $linkHref = $allowed ? url($href) : $membershipUrl;
+      $lockCls = $allowed ? '' : ' opacity-70';
       ?>
-      <a href="<?= url($href) ?>" class="ow-sidebar-link <?= $navCls ?>">
-        <i data-lucide="<?= $it[1] ?>" class="w-4 h-4 shrink-0"></i> <?= $it[2] ?>
+      <a href="<?= $linkHref ?>" class="ow-sidebar-link <?= $navCls ?><?= $lockCls ?>"<?= $allowed ? '' : ' title="ต้องสมัครแพ็กเกจ"' ?>>
+        <i data-lucide="<?= $it[1] ?>" class="w-4 h-4 shrink-0"></i>
+        <span class="flex-1"><?= $it[2] ?></span>
+        <?php if (!$allowed): ?><i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i><?php endif; ?>
       </a>
     <?php endforeach; ?>
   </nav>
@@ -186,10 +205,10 @@ $calendarUrl = $firstPropertyId
     <a href="<?= url('/owner/bookings') ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/bookings') ?>">
       <i data-lucide="calendar-check" class="w-5 h-5"></i><span>การจอง</span>
     </a>
-    <a href="<?= e($calendarUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/availability') ?>">
+    <a href="<?= $canAvailabilityNav ? e($calendarUrl) : e($membershipUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/availability') ?>"<?= $canAvailabilityNav ? '' : ' title="ต้องสมัครแพ็กเกจ"' ?>>
       <i data-lucide="calendar-days" class="w-5 h-5"></i><span>ปฏิทิน</span>
     </a>
-    <a href="<?= url('/owner/line-contacts' . ($firstPropertyId ? '?property_id=' . $firstPropertyId : '')) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/line-contacts') ?>">
+    <a href="<?= $canLineCrmNav ? url('/owner/line-contacts' . ($firstPropertyId ? '?property_id=' . $firstPropertyId : '')) : e($membershipUrl) ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/line-contacts') ?>">
       <i data-lucide="message-circle" class="w-5 h-5"></i><span>LINE CRM</span>
     </a>
     <a href="<?= url('/owner/profile') ?>" class="ow-bottom-nav__item <?= ow_nav_active('/owner/profile') ?>">

@@ -10,6 +10,8 @@ use App\Core\View;
 use App\Models\Property;
 use App\Support\PropertyBookingCapabilities;
 use App\Services\AdminApprovalNotifyService;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 use App\Services\PropertyLineService;
 
 class PropertyController extends Controller
@@ -244,6 +246,9 @@ class PropertyController extends Controller
     /** POST /owner/properties/{id}/line-test — test push ไป LINE User ID */
     public function lineTest(int $id): void
     {
+        if (!OwnerFeatureGate::denyJson($this, OwnerTier::FEATURE_LINE_HUB, 'LINE Hub ต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { $this->json(['ok' => false, 'message' => 'ไม่พบที่พัก'], 403); }
 
@@ -313,6 +318,9 @@ class PropertyController extends Controller
     /** POST /owner/properties/{id}/line-rich-menu — สร้าง/ลบ Rich Menu */
     public function lineRichMenu(int $id): void
     {
+        if (!OwnerFeatureGate::denyJson($this, OwnerTier::FEATURE_LINE_HUB, 'LINE Hub ต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { $this->json(['ok' => false, 'message' => 'ไม่พบที่พัก'], 403); }
 

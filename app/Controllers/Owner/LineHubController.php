@@ -7,6 +7,8 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\View;
 use App\Models\Property;
+use App\Services\OwnerFeatureGate;
+use App\Services\OwnerTier;
 
 /**
  * หน้ารวมตั้งค่า LINE OA + Chatbot ต่อที่พัก
@@ -25,6 +27,9 @@ class LineHubController extends Controller
     /** GET /owner/properties/{id}/line */
     public function index(int $id): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_LINE_HUB, 'LINE Hub ต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 
@@ -78,6 +83,9 @@ class LineHubController extends Controller
     /** POST /owner/properties/{id}/line — บันทึก LINE settings */
     public function save(int $id): void
     {
+        if (!OwnerFeatureGate::denyPage(OwnerTier::FEATURE_LINE_HUB, 'LINE Hub ต้องสมัครแพ็กเกจ Starter ขึ้นไป')) {
+            return;
+        }
         $property = $this->findOwn($id);
         if (!$property) { http_response_code(404); View::render('errors/404', [], 'layouts/owner'); return; }
 

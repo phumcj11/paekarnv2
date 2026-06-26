@@ -13,10 +13,13 @@
  * @var array    $prevMonth
  * @var array    $nextMonth
  * @var string   $today
+ * @var bool     $canAiDraft
  * @var array[]  $groups
  * @var array[]  $leads
  */
 use App\Models\ContentPlan;
+
+$canAiDraft = $canAiDraft ?? true;
 
 $statusColors = ContentPlan::STATUS_COLORS;
 $statusLabels = ContentPlan::STATUS_LABELS;
@@ -299,6 +302,12 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
       <?php endif; ?>
 
       <!-- AI Generate -->
+      <?php if (!$canAiDraft): ?>
+      <div class="rounded-xl border border-violet-200 bg-violet-50 p-3">
+        <p class="text-xs font-semibold text-violet-800">AI ช่วยเขียนโพสต์ — ต้องใช้แพ็กเกจ Starter ขึ้นไป</p>
+        <a href="<?= url('/owner/membership') ?>" class="inline-block mt-2 text-xs font-semibold text-violet-700 hover:underline">ดูแพ็กเกจ →</a>
+      </div>
+      <?php else: ?>
       <div class="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2">
         <div class="flex items-center gap-2">
           <i data-lucide="sparkles" class="w-4 h-4 text-violet-500 shrink-0"></i>
@@ -315,6 +324,7 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
         </button>
         <div x-show="aiError" x-cloak class="text-xs text-red-600 mt-1" x-text="aiError"></div>
       </div>
+      <?php endif; ?>
 
       <!-- Title -->
       <div>
@@ -867,11 +877,15 @@ $hasSocialCols = !empty($properties) && array_key_exists('instagram_url', $prope
                class="inline-flex items-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-semibold rounded-lg transition">
               <i data-lucide="external-link" class="w-3 h-3"></i> โพสต์
             </a>
+            <?php if (!$canAiDraft): ?>
+            <a href="<?= url('/owner/membership') ?>" class="inline-flex items-center gap-1 px-2 py-1.5 bg-violet-50 text-violet-600 text-[10px] font-semibold rounded-lg">AI ต้องอัปเกรด</a>
+            <?php else: ?>
             <button type="button" @click="aiComment(lead)" :disabled="aiLoadingId === lead.id"
                     class="inline-flex items-center gap-1 px-2 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold rounded-lg transition disabled:opacity-60">
               <i data-lucide="sparkles" class="w-3 h-3"></i>
               <span x-text="aiLoadingId === lead.id ? '...' : 'AI ตอบ'"></span>
             </button>
+            <?php endif; ?>
             <button type="button" @click="openEdit(lead)"
                     class="inline-flex items-center gap-1 px-2 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg transition">
               <i data-lucide="pencil" class="w-3 h-3"></i> แก้ไข
