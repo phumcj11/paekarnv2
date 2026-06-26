@@ -21,6 +21,7 @@ use App\Controllers\PlacesController;
 use App\Controllers\ActivitiesController;
 use App\Controllers\ActivityCheckoutController;
 use App\Controllers\PromptPayQrController;
+use App\Controllers\StripeWebhookController;
 use App\Controllers\TrackOrderController;
 use App\Controllers\CompareController;
 use App\Controllers\BookingConfirmationController;
@@ -56,7 +57,9 @@ return function (Router $r): void {
     $r->get('/coupons',                           [CouponController::class, 'index']);
     $r->get('/coupons/buy',                       [CouponController::class, 'buy']);
     $r->post('/coupons/checkout',                 [CouponController::class, 'checkout'])->middleware('csrf');
+    $r->get('/coupons/stripe/return',             [CouponController::class, 'stripeReturn']);
     $r->get('/coupons/success/{order_no}',        [CouponController::class, 'success']);
+    $r->post('/webhooks/stripe',                  [StripeWebhookController::class, 'stripe']);
 
     // ---------- Guest: ขอให้ช่วยหาที่พัก ----------
     $r->get('/guest-seek',       [GuestSeekController::class, 'show']);

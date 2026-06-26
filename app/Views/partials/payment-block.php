@@ -201,8 +201,16 @@ $serverQrSrc = $serverQrB64 ? 'data:image/png;base64,' . $serverQrB64 : '';
     </div>
   </div>
 
-  <!-- Credit card disabled panel -->
-  <?php if ($showGatewaySlot && !$gatewayEnabled): ?>
+  <!-- Credit card panel -->
+  <?php if ($showGatewaySlot && $gatewayEnabled): ?>
+  <div x-show="method==='credit_card'" x-transition class="mt-4 p-4 rounded-xl bg-violet-50 border border-violet-200 text-sm text-slate-700">
+    <div class="font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+      <i data-lucide="shield-check" class="w-4 h-4 text-violet-600"></i> ชำระผ่าน Stripe อย่างปลอดภัย
+    </div>
+    <p class="text-slate-600">กดยืนยันแล้วจะถูกพาไปหน้าชำระเงินของ Stripe รองรับ Visa / Mastercard / JCB</p>
+    <p class="text-xs text-slate-500 mt-2">ไม่ต้องอัปโหลดสลิป — ระบบยืนยันการชำระอัตโนมัติ</p>
+  </div>
+  <?php elseif ($showGatewaySlot && !$gatewayEnabled): ?>
   <div x-show="method==='credit_card'" x-transition class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-600">
     <i data-lucide="info" class="w-4 h-4 inline"></i> ระบบบัตรเครดิตอยู่ระหว่างเตรียมเปิดให้บริการ กรุณาเลือก PromptPay หรือโอนผ่านธนาคารแทน
   </div>

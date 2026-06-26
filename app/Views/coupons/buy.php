@@ -124,7 +124,8 @@ $campaignJson = htmlspecialchars(json_encode(array_map(static fn ($c) => [
                 class="w-full mt-2 py-3 bg-accent-500 hover:bg-accent-600 disabled:bg-accent-300 text-white font-bold rounded-xl inline-flex items-center justify-center gap-2 transition">
           <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="submitting"></i>
           <i data-lucide="check-circle" class="w-5 h-5" x-show="!submitting"></i>
-          <span x-show="!submitting">ยืนยันการซื้อ</span>
+          <span x-show="!submitting && method!=='credit_card'">ยืนยันการซื้อ</span>
+          <span x-show="!submitting && method==='credit_card'">ชำระด้วยบัตรเครดิต</span>
           <span x-show="submitting">กำลังส่ง...</span>
         </button>
         <p class="text-xs text-slate-500 mt-3 text-center">การกดยืนยันถือว่าคุณยอมรับเงื่อนไขการให้บริการ</p>
@@ -143,7 +144,8 @@ $campaignJson = htmlspecialchars(json_encode(array_map(static fn ($c) => [
         <button type="submit" :disabled="submitting"
                 class="px-5 py-3 bg-accent-500 hover:bg-accent-600 disabled:bg-accent-300 text-white font-bold rounded-xl inline-flex items-center gap-2">
           <i data-lucide="loader-2" class="w-4 h-4 animate-spin" x-show="submitting"></i>
-          <span x-show="!submitting">ยืนยันการซื้อ</span>
+          <span x-show="!submitting && method!=='credit_card'">ยืนยันการซื้อ</span>
+          <span x-show="!submitting && method==='credit_card'">ชำระด้วยบัตรเครดิต</span>
           <span x-show="submitting">กำลังส่ง...</span>
         </button>
       </div>

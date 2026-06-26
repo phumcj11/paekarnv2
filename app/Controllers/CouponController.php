@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\CouponOrder;
 use App\Models\Property;
 use App\Services\CouponService;
+use App\Services\StripeService;
 
 class CouponController extends Controller
 {
@@ -73,6 +74,50 @@ class CouponController extends Controller
         ]);
         $qty = max(1, min(10, (int)$data['qty']));
 
+        $paymentMethod = (string) ($_POST['payment_method'] ?? 'promptpay');
+        $customerId = Auth::customerId();
+        $buyer = [
+            'name' => $data['name'],
+            'phone' => $data['phone'],
+            'email' => $data['email'] ?? null,
+            'payment_method' => $paymentMethod,
+            'campaign_code' => trim((string)($_POST['campaign_code'] ?? '')) ?: null,
+        ];
+
+        if ($paymentMethod === 'credit_card') {
+            if (!StripeService::isConfigured()) {
+                Session::flash('error', 'ช่องทางบัตรเครดิตยังไม่พร้อมใช้งาน กรุณาเลือก PromptPay หรือโอนธนาคาร');
+                back();
+            }
+
+            $result = CouponService::purchase($buyer, $qty, $customerId, null);
+            $orderRow = CouponOrder::find($result['order_id']);
+            if (!$orderRow) {
+                Session::flash('error', 'ไม่สามารถสร้างคำสั่งซื้อได้');
+                back();
+            }
+
+            try {
+                $session = StripeService::createCouponCheckoutSession(
+                    $orderRow,
+                    url('/coupons/stripe/return') . '?session_id={CHECKOUT_SESSION_ID}',
+                    url('/coupons/buy')
+                );
+                Database::update(
+                    'coupon_orders',
+                    ['stripe_checkout_session_id' => $session->id],
+                    'id = :id',
+                    ['id' => (int) $orderRow['id']]
+                );
+                redirect((string) $session->url);
+            } catch (\Throwable $e) {
+                CouponService::cancelOrder((int) $orderRow['id']);
+                error_log('[Stripe checkout] ' . $e->getMessage());
+                Session::flash('error', 'ไม่สามารถเปิดหน้าชำระเงินได้ กรุณาลองใหม่หรือเลือกช่องทางอื่น');
+                back();
+            }
+        }
+
         $slip = null;
         try {
             $slip = Upload::image('slip', 'slips');
@@ -80,15 +125,6 @@ class CouponController extends Controller
             Session::flash('error', $e->getMessage());
             back();
         }
-
-        $customerId = Auth::customerId();
-        $buyer = [
-            'name' => $data['name'],
-            'phone' => $data['phone'],
-            'email' => $data['email'] ?? null,
-            'payment_method' => $_POST['payment_method'] ?? 'promptpay',
-            'campaign_code' => trim((string)($_POST['campaign_code'] ?? '')) ?: null,
-        ];
 
         $result = CouponService::purchase($buyer, $qty, $customerId, $slip);
 
@@ -122,6 +158,33 @@ class CouponController extends Controller
             $result['codes']
         );
         redirect($successUrl);
+    }
+
+    public function stripeReturn(): void
+    {
+        $sessionId = trim((string) ($_GET['session_id'] ?? ''));
+        if ($sessionId === '' || !StripeService::isConfigured()) {
+            Session::flash('error', 'ไม่พบข้อมูลการชำระเงิน');
+            redirect(url('/coupons/buy'));
+        }
+
+        try {
+            $session = StripeService::retrieveCheckoutSession($sessionId);
+            if ($session->payment_status === 'paid') {
+                StripeService::fulfillCouponOrderFromSession($session);
+                $orderId = (int) ($session->metadata['order_id'] ?? 0);
+                $order = $orderId > 0 ? CouponOrder::find($orderId) : null;
+                if ($order) {
+                    Session::flash('success', 'ชำระเงินสำเร็จ! เก็บรหัสคูปองไว้ใช้งาน');
+                    redirect(url('/coupons/success/' . $order['order_no']));
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Stripe return] ' . $e->getMessage());
+        }
+
+        Session::flash('error', 'การชำระเงินยังไม่สำเร็จหรือถูกยกเลิก');
+        redirect(url('/coupons/buy'));
     }
 
     public function success(string $orderNo): void

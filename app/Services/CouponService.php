@@ -53,6 +53,57 @@ class CouponService
     }
 
     /**
+     * Mark coupon order paid after Stripe Checkout — idempotent; sends notifications once.
+     */
+    public static function completeStripePayment(int $orderId, string $sessionId, ?string $paymentIntentId): bool
+    {
+        $order = CouponOrder::find($orderId);
+        if (!$order) {
+            return false;
+        }
+
+        $wasPaid = (string) $order['status'] === 'paid';
+        $payload = [
+            'stripe_checkout_session_id' => $sessionId,
+        ];
+        if ($paymentIntentId !== null && $paymentIntentId !== '') {
+            $payload['stripe_payment_intent_id'] = $paymentIntentId;
+        }
+        if (!$wasPaid) {
+            $payload['status'] = 'paid';
+            $payload['paid_at'] = date('Y-m-d H:i:s');
+        }
+
+        Database::update('coupon_orders', $payload, 'id = :id', ['id' => $orderId]);
+
+        if ($wasPaid) {
+            return false;
+        }
+
+        $coupons = Database::fetchAll(
+            'SELECT code FROM coupons WHERE order_id = :id ORDER BY id',
+            ['id' => $orderId]
+        );
+        $codes = array_map(static fn (array $c): string => (string) $c['code'], $coupons);
+        $buyer = [
+            'name'  => (string) ($order['buyer_name'] ?? ''),
+            'phone' => (string) ($order['buyer_phone'] ?? ''),
+            'email' => $order['buyer_email'] ?? null,
+        ];
+
+        self::notifyPurchaseOrder(
+            !empty($order['customer_id']) ? (int) $order['customer_id'] : null,
+            $buyer,
+            (int) ($order['quantity'] ?? 1),
+            (int) ($order['total_price'] ?? 0),
+            $orderId,
+            $codes
+        );
+
+        return true;
+    }
+
+    /**
      * แจ้งเตือนหลังซื้อคูปอง — เรียกหลังส่ง redirect แล้ว (เช่น หลัง fastcgi_finish_request)
      * เพื่อไม่ให้ผู้ใช้รอ mail()/LINE หลายคนค้างที่หน้า checkout
      */

@@ -1,0 +1,13 @@
+{
+    "name": "paekan/paekarnv2",
+    "description": "Paekan.com travel booking and coupon platform",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "stripe/stripe-php": "^16.0"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

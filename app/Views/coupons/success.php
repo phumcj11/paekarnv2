@@ -10,7 +10,8 @@
     <p class="text-slate-600">หมายเลขคำสั่งซื้อ: <b><?= e($order['order_no']) ?></b></p>
     <?php if ($order['status'] === 'pending'): ?>
       <div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
-        <i data-lucide="clock" class="w-4 h-4"></i> รอตรวจสอบสลิป
+        <i data-lucide="clock" class="w-4 h-4"></i>
+        <?= ($order['payment_method'] ?? '') === 'credit_card' ? 'รอชำระเงินด้วยบัตรเครดิต' : 'รอตรวจสอบสลิป' ?>
       </div>
     <?php else: ?>
       <div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">

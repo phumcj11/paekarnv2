@@ -28,6 +28,7 @@ class SettingsController extends Controller
         'coupon_cta_button_label','coupon_cta_button_label_short',
         'bank_name','bank_account','bank_holder','promptpay_id',
         'payment_gateway_enabled','payment_gateway_provider','payment_gateway_public_key','payment_gateway_secret_key',
+        'payment_gateway_webhook_secret',
         'activity_checkout_gateway_enabled',
         'facebook_url','line_oa','line_friend_url','facebook_plugins_app_id',
         'fb_app_id','fb_app_secret',

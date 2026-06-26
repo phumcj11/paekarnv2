@@ -109,15 +109,16 @@ $gatewayEnabled = (string)($values['payment_gateway_enabled'] ?? '') === '1';
     </div>
   </label>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <?php
     $gatewayFields = [
-        'payment_gateway_provider'  => ['ผู้ให้บริการ Gateway', 'เช่น omise / 2c2p / stripe'],
-        'payment_gateway_public_key'  => ['Public Key', 'ใส่ public/publishable key ของ provider'],
-        'payment_gateway_secret_key'  => ['Secret Key', 'เก็บเป็นความลับ ไม่แสดงในหน้าเว็บ'],
+        'payment_gateway_provider'  => ['ผู้ให้บริการ Gateway', 'ใส่ stripe สำหรับซื้อคูปองด้วยบัตรเครดิต'],
+        'payment_gateway_public_key'  => ['Publishable Key', 'pk_test_... หรือ pk_live_... จาก Stripe Dashboard'],
+        'payment_gateway_secret_key'  => ['Secret Key', 'sk_test_... หรือ sk_live_... — เก็บเป็นความลับ'],
+        'payment_gateway_webhook_secret'  => ['Webhook Signing Secret', 'whsec_... จาก Stripe → Webhooks → endpoint'],
     ];
     foreach ($gatewayFields as $k => [$label, $hint]):
-        $isSecret = $k === 'payment_gateway_secret_key';
+        $isSecret = in_array($k, ['payment_gateway_secret_key', 'payment_gateway_webhook_secret'], true);
         ob_start();
         ?>
         <input type="<?= $isSecret ? 'password' : 'text' ?>"
@@ -131,7 +132,7 @@ $gatewayEnabled = (string)($values['payment_gateway_enabled'] ?? '') === '1';
 
   <div class="text-xs text-slate-500 flex items-start gap-1.5 px-1">
     <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
-    <span>ระบบ Gateway ยังเป็น slot รอเชื่อมต่อ — เมื่อเปิดใช้จริง ทีมงานจะ implement ตาม provider ที่เลือก</span>
+    <span>Stripe Checkout ใช้กับหน้าซื้อคูปอง — ตั้ง provider = <b>stripe</b> แล้วเพิ่ม Webhook endpoint <b><?= e(url('/webhooks/stripe')) ?></b> (event: checkout.session.completed)</span>
   </div>
 
   <?php $activityGateway = (string)($values['activity_checkout_gateway_enabled'] ?? '') === '1'; ?>
@@ -151,6 +152,6 @@ settings_section(
     'ชำระผ่านบัตรเครดิต / Gateway',
     'credit-card',
     $gatewayContent,
-    'เตรียม slot สำหรับ Omise / 2C2P ในอนาคต',
+    'Stripe Checkout สำหรับหน้าซื้อคูปอง — ต้องตั้ง Webhook ใน Stripe Dashboard',
     'text-violet-600'
 );

@@ -17,6 +17,15 @@ jobs:
           node-version: '20'
           cache: npm
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist
+
       - name: Build CSS
         run: npm ci && npm run build:css
 
@@ -170,6 +179,9 @@ jobs:
             fi
             if [ -f "$APP/scripts/migrate_domain_settings.sh" ]; then
               bash "$APP/scripts/migrate_domain_settings.sh" || echo "WARN: migrate_domain_settings failed (may already be applied)"
+            fi
+            if [ -f "$APP/scripts/migrate_stripe_coupon_orders.sh" ]; then
+              bash "$APP/scripts/migrate_stripe_coupon_orders.sh" || echo "WARN: migrate_stripe_coupon_orders failed (may already be applied)"
             fi
 
             echo "=== cleanup ==="

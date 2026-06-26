@@ -56,6 +56,7 @@ nano app/Config/database.local.php
 4. ติดตั้ง dependency และ build CSS
 
 ```bash
+composer install --no-dev --no-interaction
 npm ci
 npm run build:css
 ```
@@ -161,7 +162,15 @@ export DB_NAME='production_db_name'
 export DB_USER='production_db_user'
 export DB_PASS='production_db_password'
 bash scripts/migrate_password_reset.sh
+bash scripts/migrate_stripe_coupon_orders.sh
 ```
+
+## Stripe Payment Gateway (Coupons)
+
+1. Admin → Settings → Commerce: เปิด Gateway, ใส่ `stripe`, keys จาก Stripe Dashboard
+2. Stripe Dashboard → Webhooks → Add endpoint `https://paekan.com/webhooks/stripe`
+3. เลือก event `checkout.session.completed` แล้วคัดลอก Signing secret (`whsec_...`) ไป Admin
+4. ทดสอบ sandbox ด้วยบัตร `4242 4242 4242 4242`
 
 ## Pre-Deploy Checklist
 
