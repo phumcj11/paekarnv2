@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# VPS Setup Script — paekarn.com
+# VPS Setup Script — paekan.com
 # รันบน VPS:
 #   export DB_NAME='...'
 #   export DB_USER='...'
@@ -9,7 +9,7 @@
 # =============================================================================
 set -e
 
-DOMAIN="${DOMAIN:-paekarn.com}"
+DOMAIN="${DOMAIN:-paekan.com}"
 APP_DIR="${APP_DIR:-/var/www/paekarn}"
 GITHUB_REPO="${GITHUB_REPO:-https://github.com/phumcj11/paekarnv2.git}"
 DB_NAME="${DB_NAME:-}"
@@ -22,7 +22,7 @@ if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
 fi
 
 echo "============================================"
-echo " paekarn.com VPS Setup"
+echo " paekan.com VPS Setup"
 echo "============================================"
 
 # -----------------------------------------------------------------------

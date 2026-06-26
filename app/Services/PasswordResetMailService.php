@@ -17,7 +17,7 @@ final class PasswordResetMailService
         }
 
         $site    = (string) Setting::get('site_name', 'แพกาญ.com');
-        $from    = (string) Setting::get('email_from', 'no-reply@paekarn.com');
+        $from    = (string) Setting::get('email_from', 'no-reply@paekan.com');
         $resetUrl = rtrim((string) Application::$publicUrl, '/')
             . '/owner/reset-password?token=' . urlencode($plainToken);
 

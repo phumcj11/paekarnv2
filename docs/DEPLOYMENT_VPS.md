@@ -4,7 +4,7 @@
 
 ## Production Assumptions
 
-- Domain: `paekarn.com`
+- Domain: `paekan.com` (primary) — `paekarn.com` redirects 301 to `paekan.com`
 - App runtime: Pure PHP + MySQL + Tailwind CSS
 - Recommended document root: `public/`
 - Hosting panel split layout is supported: app code outside `public_html`, with `public_html/index.php` booting `APP_BASE`
@@ -87,7 +87,7 @@ Nginx example:
 ```nginx
 server {
     listen 80;
-    server_name paekarn.com www.paekarn.com;
+    server_name paekan.com www.paekan.com;
     root /var/www/paekarn/public;
     index index.php;
 
@@ -111,7 +111,7 @@ server {
 8. เปิด SSL หลัง DNS ชี้มาแล้ว
 
 ```bash
-certbot --nginx -d paekarn.com -d www.paekarn.com
+certbot --nginx -d paekan.com -d www.paekan.com
 ```
 
 ## Optional VPS Setup Script
@@ -122,7 +122,7 @@ certbot --nginx -d paekarn.com -d www.paekarn.com
 export DB_NAME='production_db_name'
 export DB_USER='production_db_user'
 export DB_PASS='production_db_password'
-export DOMAIN='paekarn.com'
+export DOMAIN='paekan.com'
 export APP_DIR='/var/www/paekarn'
 bash scripts/vps-setup.sh
 ```

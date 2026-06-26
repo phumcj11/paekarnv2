@@ -189,7 +189,7 @@ $canLineCrmNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_CRM);
 
   <footer class="px-4 sm:px-6 py-4 text-xs text-slate-500 border-t border-slate-200 bg-white hidden lg:block">
     <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
-      <span>© <?= date('Y') ?> paekarn.com — Owner Portal</span>
+      <span>© <?= date('Y') ?> paekan.com — Owner Portal</span>
       <div class="flex gap-4">
         <a href="<?= url('/privacy') ?>" class="hover:text-core-600">นโยบายความเป็นส่วนตัว</a>
         <a href="<?= url('/contact') ?>" class="hover:text-core-600">ติดต่อเรา</a>

@@ -1,0 +1,32 @@
+# Domain migration — external services checklist
+# อัปเดตมือหลัง paekan.com ใช้งานได้ (ไม่สามารถ automate จาก repo)
+
+## DNS (สำคัญ — ต้องชี้ IP เดียวกับ paekarn.com)
+# paekan.com และ www.paekan.com → A record ชี้ IP เดียวกับ paekarn.com
+# ตรวจ: nslookup paekan.com และ nslookup paekarn.com ต้องได้ IP เดียวกัน
+
+## Hosting panel
+# - เพิ่ม domain paekan.com ใน account เดิม
+# - ออก SSL (Let's Encrypt) สำหรับ paekan.com + www.paekan.com
+
+## GitHub Secrets (optional)
+# VPS_PAEKAN_PUBLIC_HTML=/home/pcj/domains/paekan.com/public_html
+# VPS_ENABLE_PAEKARN_REDIRECT=1   # ตั้งหลังทดสอบ paekan.com แล้ว
+
+## LINE Developers Console
+# Webhook URL:     https://paekan.com/line/webhook
+# Login callback:  https://paekan.com/line/callback
+
+## Meta Developer (Facebook OAuth — Content Plan)
+# Valid OAuth Redirect URIs: https://paekan.com/owner/content-plan/facebook/callback
+# (ตรวจ path จริงใน app ก่อนอัปเดต)
+
+## Cron (ถ้าใช้ web cron แทน CLI)
+# https://paekan.com/cron.php?key=YOUR_KEY
+
+## Google Search Console
+# - เพิ่ม property https://paekan.com
+# - ส่ง sitemap: https://paekan.com/sitemap.xml
+
+## Email (optional)
+# MX + SPF สำหรับ paekan.com ถ้าใช้ no-reply@paekan.com

@@ -190,7 +190,7 @@ $showUpsell = $upsellFeatures !== [];
   <?php endif; ?>
 
   <div class="text-center text-xs text-slate-500 pt-2 pb-1 space-y-2">
-    <p>© <?= date('Y') ?> paekarn.com — Owner Portal</p>
+    <p>© <?= date('Y') ?> paekan.com — Owner Portal</p>
     <div class="flex justify-center gap-4">
       <a href="<?= url('/contact') ?>" class="hover:text-core-600">ติดต่อเรา</a>
     </div>

@@ -91,11 +91,11 @@ jobs:
               --exclude='cron.php' \
               "$APP/public/" "$PUBLIC_HTML/"
 
-            echo "=== ensure public_html/index.php points to paekarnv2 ==="
+            echo "=== ensure public_html/index.php points to $APP ==="
             {
               echo '<?php'
               echo 'declare(strict_types=1);'
-              echo "define('APP_BASE', '/home/pcj/domains/paekarn.com/paekarnv2');"
+              echo "define('APP_BASE', '$APP');"
               echo "require_once APP_BASE . '/app/Core/Application.php';"
               echo '\App\Core\Application::boot(APP_BASE);'
               echo '\App\Core\Application::run();'
@@ -146,6 +146,27 @@ jobs:
             fi
             if [ -f "$APP/scripts/migrate_owner_property_limit.sh" ]; then
               bash "$APP/scripts/migrate_owner_property_limit.sh" || echo "WARN: migrate_owner_property_limit failed (may already be applied)"
+            fi
+            if [ -f "$APP/scripts/migrate_domain_settings.sh" ]; then
+              bash "$APP/scripts/migrate_domain_settings.sh" || echo "WARN: migrate_domain_settings failed (may already be applied)"
+            fi
+
+            echo "=== domain migration: paekan.com ==="
+            PAEKAN_PUBLIC_HTML="${{ secrets.VPS_PAEKAN_PUBLIC_HTML }}"
+            if [ -z "$PAEKAN_PUBLIC_HTML" ]; then
+              PAEKAN_PUBLIC_HTML="/home/pcj/domains/paekan.com/public_html"
+            fi
+            if [ -d "$(dirname "$PAEKAN_PUBLIC_HTML")" ] || [ -d "$PAEKAN_PUBLIC_HTML" ]; then
+              export APP_BASE="$APP"
+              export PAEKAN_PUBLIC_HTML
+              export PAEKARN_PUBLIC_HTML="$PUBLIC_HTML"
+              if [ -f "$APP/scripts/migrate-domain-paekan.sh" ]; then
+                ENABLE_PAEKARN_REDIRECT="${{ secrets.VPS_ENABLE_PAEKARN_REDIRECT }}"
+                export ENABLE_PAEKARN_REDIRECT
+                bash "$APP/scripts/migrate-domain-paekan.sh" || echo "WARN: migrate-domain-paekan failed"
+              fi
+            else
+              echo "WARN: paekan.com public_html not found ($PAEKAN_PUBLIC_HTML) — add domain in hosting panel first"
             fi
 
             echo "=== cleanup ==="

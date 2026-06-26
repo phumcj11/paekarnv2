@@ -397,7 +397,7 @@ class CronService
             $msg = "📢 แจ้งเตือน: {$prop['name']} ยังว่างวันเสาร์นี้!\n\n"
                  . "📅 {$satThai} ยังมีห้องว่าง\n"
                  . "🔔 อย่าลืม Broadcast ให้ลูกค้า LINE หรืออัปเดตโซเชียลมีเดีย\n\n"
-                 . "👉 จัดการได้ที่ paekarn.com/owner/line-contacts";
+                 . "👉 จัดการได้ที่ paekan.com/owner/line-contacts";
 
             try {
                 if (LineService::push((string)$ownerUser['line_user_id'], $msg)) {
@@ -569,7 +569,7 @@ class CronService
                         ['uid' => $r['user_id']]
                     );
                     if (!empty($uRow['line_user_id'])) {
-                        $renewUrl = (string)Setting::get('app_url', 'https://paekarn.com') . '/owner/membership';
+                        $renewUrl = (string)Setting::get('app_url', 'https://paekan.com') . '/owner/membership';
                         $msg = "⚠️ แจ้งเตือนสมาชิกแพกาญ.com\n\n"
                              . "แพ็กเกจ {$tierLabel} ของคุณจะหมดอายุ{$typeLabel}\n"
                              . "📅 วันหมดอายุ: {$expThai}\n\n"

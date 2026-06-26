@@ -1,0 +1,15 @@
+# =============================================================================
+# ไฟล์นี้ใช้วาง (หรือ append) ลงใน public_html ของ paekarn.com (domain เก่า)
+# เพื่อ redirect 301 ทุก request ไป paekan.com (domain ใหม่)
+#
+# วิธีใช้:
+#   cp scripts/redirect-paekarn.htaccess /home/pcj/domains/paekarn.com/public_html/.htaccess
+#
+# ถ้า panel มี Redirect GUI ให้ตั้งที่นั่นได้เลย ไม่ต้องใช้ไฟล์นี้
+# =============================================================================
+
+RewriteEngine On
+
+# Redirect ทั้ง paekarn.com และ www.paekarn.com ไป https://paekan.com
+RewriteCond %{HTTP_HOST} ^(www\.)?paekarn\.com$ [NC]
+RewriteRule ^ https://paekan.com%{REQUEST_URI} [R=301,L]
