@@ -123,7 +123,7 @@ export DB_NAME='production_db_name'
 export DB_USER='production_db_user'
 export DB_PASS='production_db_password'
 export DOMAIN='paekan.com'
-export APP_DIR='/var/www/paekarn'
+export APP_DIR='/home/pcj/domains/paekan.com/paekarnv2'
 bash scripts/vps-setup.sh
 ```
 
@@ -136,8 +136,8 @@ Workflow: `.github/workflows/deploy.yml`
 - `VPS_HOST`
 - `VPS_USER`
 - `VPS_SSH_PRIVATE_KEY`
-- `VPS_APP_DIR`
-- `VPS_PUBLIC_HTML`
+- `VPS_APP_DIR` → `/home/pcj/domains/paekan.com/paekarnv2`
+- `VPS_PUBLIC_HTML` → `/home/pcj/domains/paekan.com/public_html`
 - `VPS_FILE_OWNER`
 - `VPS_DB_NAME`
 - `VPS_DB_USER`
@@ -149,7 +149,8 @@ Workflow: `.github/workflows/deploy.yml`
 - `VPS_FILE_OWNER` คือ user/group owner ของไฟล์บน VPS เช่น `www-data` หรือ user hosting panel
 - `app/Config/database.local.php` ควรถูกสร้างบน VPS และไม่ถูก overwrite โดย deploy
 - Workflow จะไม่ sync `public/install.php` และ `public/cron.php` ไป `public_html`
-- Workflow จะพยายามสร้าง `public_html/uploads` เป็น symlink ไปที่ `APP/public/uploads` ถ้ายังไม่มี uploads เดิม
+- Workflow รัน `scripts/move-app-to-paekan.sh` อัตโนมัติครั้งแรก (ย้าย app จาก paekarn.com → paekan.com)
+- `paekarn.com` ตั้ง redirect 301 ไป `paekan.com` โดยอัตโนมัติ
 
 ## Migration Scripts
 

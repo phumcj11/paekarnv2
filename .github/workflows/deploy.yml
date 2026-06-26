@@ -51,7 +51,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          command_timeout: 10m
+          command_timeout: 15m
           script: |
             set -e
             APP="${{ secrets.VPS_APP_DIR }}"
@@ -62,16 +62,31 @@ jobs:
             export DB_PASS="${{ secrets.VPS_DB_PASS }}"
             SRC=/tmp/paekarn-deploy-src
 
-            if [ -z "$APP" ] || [ -z "$PUBLIC_HTML" ]; then
-              echo "Missing VPS_APP_DIR or VPS_PUBLIC_HTML secret"
-              exit 1
-            fi
+            CANONICAL_APP="/home/pcj/domains/paekan.com/paekarnv2"
+            CANONICAL_PUBLIC="/home/pcj/domains/paekan.com/public_html"
+
             if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
               echo "Missing VPS_DB_NAME, VPS_DB_USER, or VPS_DB_PASS secret"
               exit 1
             fi
             if [ -z "$FILE_OWNER" ]; then
               FILE_OWNER="$(whoami)"
+            fi
+
+            echo "=== move app to paekan.com (one-time) ==="
+            if [ -f "$SRC/scripts/move-app-to-paekan.sh" ]; then
+              bash "$SRC/scripts/move-app-to-paekan.sh" || echo "WARN: move-app-to-paekan failed"
+            fi
+
+            if [ -d "$CANONICAL_APP/app" ]; then
+              APP="$CANONICAL_APP"
+              PUBLIC_HTML="$CANONICAL_PUBLIC"
+              echo "Using canonical paths: APP=$APP PUBLIC_HTML=$PUBLIC_HTML"
+            fi
+
+            if [ -z "$APP" ] || [ -z "$PUBLIC_HTML" ]; then
+              echo "Missing VPS_APP_DIR or VPS_PUBLIC_HTML secret (and canonical app not found)"
+              exit 1
             fi
 
             echo "=== sync app files ==="
@@ -91,7 +106,7 @@ jobs:
               --exclude='cron.php' \
               "$APP/public/" "$PUBLIC_HTML/"
 
-            echo "=== ensure public_html/index.php points to $APP ==="
+            echo "=== ensure public_html/index.php + .htaccess ==="
             {
               echo '<?php'
               echo 'declare(strict_types=1);'
@@ -100,18 +115,17 @@ jobs:
               echo '\App\Core\Application::boot(APP_BASE);'
               echo '\App\Core\Application::run();'
             } > "$PUBLIC_HTML/index.php"
+            if [ -f "$APP/public/.htaccess" ]; then
+              cp "$APP/public/.htaccess" "$PUBLIC_HTML/.htaccess"
+            fi
 
-            echo "=== permissions ==="
+            echo "=== permissions + uploads symlink ==="
             mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
-            if [ -L "$PUBLIC_HTML/uploads" ]; then
-              :
-            elif [ -d "$PUBLIC_HTML/uploads" ] && [ -z "$(ls -A "$PUBLIC_HTML/uploads" 2>/dev/null)" ]; then
-              rmdir "$PUBLIC_HTML/uploads"
+            if [ -d "$PUBLIC_HTML/uploads" ] && [ ! -L "$PUBLIC_HTML/uploads" ]; then
+              rm -rf "$PUBLIC_HTML/uploads"
+            fi
+            if [ ! -e "$PUBLIC_HTML/uploads" ]; then
               ln -s "$APP/public/uploads" "$PUBLIC_HTML/uploads"
-            elif [ ! -e "$PUBLIC_HTML/uploads" ]; then
-              ln -s "$APP/public/uploads" "$PUBLIC_HTML/uploads"
-            else
-              echo "WARN: $PUBLIC_HTML/uploads exists and is not empty; keep it as-is"
             fi
             chown -R "$FILE_OWNER:$FILE_OWNER" "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
             chmod -R 775 "$APP/storage" "$APP/public/uploads"
@@ -149,28 +163,6 @@ jobs:
             fi
             if [ -f "$APP/scripts/migrate_domain_settings.sh" ]; then
               bash "$APP/scripts/migrate_domain_settings.sh" || echo "WARN: migrate_domain_settings failed (may already be applied)"
-            fi
-
-            echo "=== domain migration: paekan.com ==="
-            PAEKAN_PUBLIC_HTML="${{ secrets.VPS_PAEKAN_PUBLIC_HTML }}"
-            if [ -z "$PAEKAN_PUBLIC_HTML" ]; then
-              PAEKAN_PUBLIC_HTML="/home/pcj/domains/paekan.com/public_html"
-            fi
-            if [ -d "$(dirname "$PAEKAN_PUBLIC_HTML")" ] || [ -d "$PAEKAN_PUBLIC_HTML" ]; then
-              mkdir -p "$PAEKAN_PUBLIC_HTML"
-              export APP_BASE="$APP"
-              export PAEKAN_PUBLIC_HTML
-              export PAEKARN_PUBLIC_HTML="$PUBLIC_HTML"
-              if [ -f "$APP/scripts/migrate-domain-paekan.sh" ]; then
-                ENABLE_PAEKARN_REDIRECT="${{ secrets.VPS_ENABLE_PAEKARN_REDIRECT }}"
-                export ENABLE_PAEKARN_REDIRECT
-                bash "$APP/scripts/migrate-domain-paekan.sh" || echo "WARN: migrate-domain-paekan failed"
-              fi
-              if [ -d "$PAEKAN_PUBLIC_HTML/uploads" ]; then
-                chown -R "$FILE_OWNER:$FILE_OWNER" "$PAEKAN_PUBLIC_HTML/uploads" 2>/dev/null || true
-              fi
-            else
-              echo "WARN: paekan.com public_html not found ($PAEKAN_PUBLIC_HTML) — add domain in hosting panel first"
             fi
 
             echo "=== cleanup ==="

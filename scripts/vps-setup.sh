@@ -10,7 +10,7 @@
 set -e
 
 DOMAIN="${DOMAIN:-paekan.com}"
-APP_DIR="${APP_DIR:-/var/www/paekarn}"
+APP_DIR="${APP_DIR:-/home/pcj/domains/paekan.com/paekarnv2}"
 GITHUB_REPO="${GITHUB_REPO:-https://github.com/phumcj11/paekarnv2.git}"
 DB_NAME="${DB_NAME:-}"
 DB_USER="${DB_USER:-}"
