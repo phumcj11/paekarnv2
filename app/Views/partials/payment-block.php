@@ -30,7 +30,7 @@ $serverQrB64 = ($bank['promptpay'] ?? '') !== ''
 $serverQrSrc = $serverQrB64 ? 'data:image/png;base64,' . $serverQrB64 : '';
 ?>
 <div class="bg-white border border-slate-200 rounded-2xl p-5"
-     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>, <?= json_encode($serverQrSrc, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>)"
+     x-data='paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>)'
      x-init="
        $watch('method', () => refreshQr());
        $watch(() => (<?= $amountVar ?>), () => refreshQr());
@@ -84,25 +84,32 @@ $serverQrSrc = $serverQrB64 ? 'data:image/png;base64,' . $serverQrB64 : '';
       </div>
 
       <div class="p-4 sm:p-5 space-y-4">
-        <div class="pp-qr-frame relative mx-auto w-full max-w-[260px] min-h-[220px] aspect-square rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div class="pp-qr-frame relative mx-auto w-full max-w-[260px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <?php if ($serverQrSrc !== ''): ?>
-          <img src="<?= e($serverQrSrc) ?>"
-               :src="qrSrc || serverQrSrc"
+          <img x-ref="qrImg"
+               src="<?= e($serverQrSrc) ?>"
                alt="Thai QR Payment"
-               class="block h-full w-full object-contain">
+               width="220"
+               height="220"
+               class="block w-[220px] max-w-full h-auto mx-auto object-contain">
           <?php else: ?>
-          <img :src="qrSrc"
+          <img x-ref="qrImg"
+               :src="qrSrc"
                alt="Thai QR Payment"
-               class="block h-full w-full object-contain"
+               width="220"
+               height="220"
+               class="block w-[220px] max-w-full h-auto mx-auto object-contain min-h-[200px]"
                x-show="!!qrSrc">
           <?php endif; ?>
           <div x-show="qrLoading" x-cloak class="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-white/90">
             <div class="h-9 w-9 rounded-full border-[3px] border-slate-200 border-t-accent-500 animate-spin" aria-hidden="true"></div>
             <span class="text-xs text-slate-500">กำลังสร้าง QR...</span>
           </div>
-          <div x-show="!qrLoading && !qrSrc && !serverQrSrc" x-cloak class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-50 px-4 text-center text-xs text-slate-500">
+          <?php if ($serverQrSrc === ''): ?>
+          <div x-show="!qrLoading && !qrSrc" x-cloak class="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-50 px-4 text-center text-xs text-slate-500">
             <span x-text="qrError || 'กำลังโหลด QR...'"></span>
           </div>
+          <?php endif; ?>
         </div>
 
         <div class="space-y-2 border-t border-slate-100 pt-4">

@@ -410,10 +410,9 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
-  Alpine.data('paymentBlock', (endpoint, amountKey, serverQrSrc = '') => ({
+  Alpine.data('paymentBlock', (endpoint, amountKey) => ({
     paymentAmount: 0,
-    qrSrc: serverQrSrc || '',
-    serverQrSrc: serverQrSrc || '',
+    qrSrc: '',
     qrLoading: false,
     qrError: '',
     copied: '',
@@ -496,6 +495,9 @@ document.addEventListener('alpine:init', () => {
             this.qrLoading = false;
             if (d.ok && d.image) {
               this.qrSrc = d.image;
+              if (this.$refs.qrImg) {
+                this.$refs.qrImg.src = d.image;
+              }
             } else {
               this.qrError = d.msg || 'ไม่สามารถสร้าง QR ได้';
             }
