@@ -55,6 +55,20 @@ $placeholderCover = 'https://placehold.co/96x96?text=Paekan';
       <?php endif; ?>
     </div>
     <hr class="my-3">
+    <?php
+      $propCount = count($properties);
+      $maxProps  = (int)($owner['max_properties'] ?? 1);
+      $overQuota = $propCount > $maxProps;
+    ?>
+    <div class="text-sm space-y-1">
+      <div class="text-xs text-slate-500 mb-1">โควต้าที่พัก</div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold <?= $overQuota ? 'text-rose-600' : '' ?>"><?= $propCount ?> / <?= $maxProps ?></span>
+        <?php if ($overQuota): ?><span class="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">เกินโควต้า</span><?php endif; ?>
+      </div>
+      <a href="<?= url('/admin/owners/' . $owner['id'] . '/edit') ?>" class="text-xs text-primary-600 hover:underline">แก้ไขโควต้า →</a>
+    </div>
+    <hr class="my-3">
     <div class="text-sm">
       <div class="text-xs text-slate-500 mb-1">สถานะพาร์ทเนอร์</div>
       <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold <?= e($partnerBadgeClass) ?>"><i data-lucide="circle" class="w-2 h-2 fill-current"></i> <?= e($partnerStatus) ?></span>

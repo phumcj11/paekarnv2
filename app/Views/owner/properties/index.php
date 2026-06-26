@@ -1,18 +1,40 @@
-<?php /** @var array $rows */
+<?php
+/** @var array $rows @var bool $canAdd @var bool $isOverQuota @var int $maxProps */
 use App\Services\OwnerFeatureGate;
 use App\Services\OwnerTier;
 
-$canLineHub = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_HUB);
+$canLineHub      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_HUB);
 $canAvailability = OwnerFeatureGate::allowed(OwnerTier::FEATURE_AVAILABILITY);
-$membershipUrl = url('/owner/membership');
+$membershipUrl   = url('/owner/membership');
+$canAdd          ??= true;
+$isOverQuota     ??= false;
+$maxProps        ??= 1;
 ?>
+
+<?php if ($isOverQuota): ?>
+<div class="mb-4 flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700">
+  <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 mt-0.5"></i>
+  <div>
+    <p class="font-semibold">คุณมี <?= count($rows) ?> ที่พัก เกินโควต้า (สูงสุด <?= $maxProps ?>)</p>
+    <p class="mt-0.5 text-rose-600">ยังเข้าจัดการที่พักเดิมได้ทุกแห่ง แต่สร้างที่พักใหม่ไม่ได้จนกว่า Admin จะเพิ่มโควต้า</p>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="bg-white rounded-2xl border border-slate-200 shadow-soft">
   <div class="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="hotel" class="w-5 h-5 text-accent-600"></i> ที่พักของฉัน</h2>
-      <p class="text-sm text-slate-500">ทั้งหมด <?= number_format(count($rows)) ?> รายการ</p>
+      <p class="text-sm text-slate-500">ทั้งหมด <?= number_format(count($rows)) ?> / <?= $maxProps ?> ที่พัก</p>
     </div>
-    <a href="<?= url('/owner/properties/create') ?>" class="px-4 py-2 bg-accent-500 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> เพิ่มที่พัก</a>
+    <?php if ($canAdd): ?>
+      <a href="<?= url('/owner/properties/create') ?>" class="px-4 py-2 bg-accent-500 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> เพิ่มที่พัก</a>
+    <?php else: ?>
+      <div class="flex flex-col items-end gap-1">
+        <span class="px-4 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 cursor-not-allowed"><i data-lucide="lock" class="w-4 h-4"></i> เพิ่มที่พัก</span>
+        <span class="text-xs text-slate-400">ถึงโควต้าแล้ว — ติดต่อแอดมินเพื่อขอเพิ่ม</span>
+      </div>
+    <?php endif; ?>
   </div>
 
   <?php if (empty($rows)): ?>

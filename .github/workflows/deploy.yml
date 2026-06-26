@@ -144,6 +144,9 @@ jobs:
             if [ -f "$APP/scripts/migrate_vps.sh" ]; then
               bash "$APP/scripts/migrate_vps.sh" || echo "WARN: migrate_vps failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_owner_property_limit.sh" ]; then
+              bash "$APP/scripts/migrate_owner_property_limit.sh" || echo "WARN: migrate_owner_property_limit failed (may already be applied)"
+            fi
 
             echo "=== cleanup ==="
             rm -rf "$SRC"

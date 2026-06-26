@@ -8,13 +8,16 @@ use App\Core\Session;
 use App\Core\View;
 use App\Models\User;
 use App\Models\AuditLog;
+use App\Services\OwnerPropertyLimit;
 
 class OwnerController extends Controller
 {
     public function index(): void
     {
+        $hasMaxCol = Database::tableHasColumn('owners', 'max_properties');
+        $maxSql = $hasMaxCol ? ', o.max_properties' : ', 1 AS max_properties';
         $rows = Database::fetchAll(
-            "SELECT o.*, u.name, u.email, u.phone,
+            "SELECT o.*, u.name, u.email, u.phone{$maxSql},
                     (SELECT COUNT(*) FROM properties p WHERE p.owner_id=o.id) AS property_count
              FROM owners o JOIN users u ON u.id=o.user_id ORDER BY o.id DESC"
         );
@@ -62,7 +65,7 @@ class OwnerController extends Controller
             'status'   => 'active',
         ]);
 
-        $ownerId = Database::insert('owners', [
+        $ownerRow = [
             'user_id'            => $userId,
             'business_name'      => $data['business_name'],
             'tax_id'             => trim((string)($_POST['tax_id'] ?? '')) ?: null,
@@ -73,7 +76,11 @@ class OwnerController extends Controller
             'discount_agreement' => $discount,
             'commission_rate'    => $commission,
             'notes'              => trim((string)($_POST['notes'] ?? '')) ?: null,
-        ]);
+        ];
+        if (Database::tableHasColumn('owners', 'max_properties')) {
+            $ownerRow['max_properties'] = max(1, min(99, (int)($_POST['max_properties'] ?? 1)));
+        }
+        $ownerId = Database::insert('owners', $ownerRow);
 
         Session::flash('success', 'สร้างเจ้าของแพเรียบร้อย');
         redirect(url('/admin/owners/' . $ownerId));
@@ -81,8 +88,10 @@ class OwnerController extends Controller
 
     public function show(int $id): void
     {
+        $hasMaxCol = Database::tableHasColumn('owners', 'max_properties');
+        $maxSql = $hasMaxCol ? ', o.max_properties' : ', 1 AS max_properties';
         $owner = Database::fetch(
-            "SELECT o.*, u.name, u.email, u.phone, u.id AS user_id FROM owners o
+            "SELECT o.*, u.name, u.email, u.phone, u.id AS user_id{$maxSql} FROM owners o
              JOIN users u ON u.id=o.user_id WHERE o.id = :id",
             ['id' => $id]
         );
@@ -104,8 +113,10 @@ class OwnerController extends Controller
 
     public function edit(int $id): void
     {
+        $hasMaxCol = Database::tableHasColumn('owners', 'max_properties');
+        $maxSql = $hasMaxCol ? ', o.max_properties' : ', 1 AS max_properties';
         $record = Database::fetch(
-            "SELECT o.*, u.name, u.email, u.phone, u.id AS user_id FROM owners o
+            "SELECT o.*, u.name, u.email, u.phone, u.id AS user_id{$maxSql} FROM owners o
              JOIN users u ON u.id=o.user_id WHERE o.id = :id",
             ['id' => $id]
         );
@@ -122,8 +133,10 @@ class OwnerController extends Controller
 
     public function update(int $id): void
     {
+        $hasMaxCol = Database::tableHasColumn('owners', 'max_properties');
+        $maxSql = $hasMaxCol ? ', o.max_properties' : ', 1 AS max_properties';
         $record = Database::fetch(
-            'SELECT o.*, u.id AS user_id FROM owners o JOIN users u ON u.id=o.user_id WHERE o.id = :id',
+            "SELECT o.*, u.id AS user_id{$maxSql} FROM owners o JOIN users u ON u.id=o.user_id WHERE o.id = :id",
             ['id' => $id]
         );
         if (!$record) {
@@ -192,7 +205,7 @@ class OwnerController extends Controller
         }
         User::update((int)$record['user_id'], $userRow);
 
-        Database::update('owners', [
+        $ownerUpdate = [
             'business_name'      => $data['business_name'],
             'tax_id'             => trim((string)($_POST['tax_id'] ?? '')) ?: null,
             'bank_name'          => trim((string)($_POST['bank_name'] ?? '')) ?: null,
@@ -205,7 +218,15 @@ class OwnerController extends Controller
             'membership_tier'          => $tier,
             'membership_expires_at'    => $tier === 'none' ? null : $expAt,
             'membership_grace_until'   => $tier === 'none' ? null : $graceAt,
-        ], 'id = :id', ['id' => $id]);
+        ];
+
+        $newMaxProps = null;
+        if (Database::tableHasColumn('owners', 'max_properties')) {
+            $newMaxProps = max(1, min(99, (int)($_POST['max_properties'] ?? 1)));
+            $ownerUpdate['max_properties'] = $newMaxProps;
+        }
+
+        Database::update('owners', $ownerUpdate, 'id = :id', ['id' => $id]);
 
         $afterMem = [
             'membership_tier'          => $tier,
@@ -219,6 +240,18 @@ class OwnerController extends Controller
                     'before' => $beforeMem,
                     'after'  => $afterMem,
                     'reason' => trim((string)($_POST['membership_adjust_reason'] ?? '')),
+                ],
+                'owner',
+                $id
+            );
+        }
+
+        if ($newMaxProps !== null && (int)($record['max_properties'] ?? 1) !== $newMaxProps) {
+            AuditLog::record(
+                'admin_owner_quota_adjust',
+                [
+                    'before' => (int)($record['max_properties'] ?? 1),
+                    'after'  => $newMaxProps,
                 ],
                 'owner',
                 $id

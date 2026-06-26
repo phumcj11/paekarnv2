@@ -8,6 +8,7 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Models\AuditLog;
 use App\Models\Property;
+use App\Services\OwnerPropertyLimit;
 use App\Support\PropertyBookingCapabilities;
 
 class PropertyController extends Controller
@@ -189,6 +190,12 @@ class PropertyController extends Controller
         $oid = (int)$data['owner_id'];
         if (!Database::fetch('SELECT id FROM owners WHERE id = :id', ['id' => $oid])) {
             Session::flash('error', 'ไม่พบเจ้าของแพที่เลือก');
+            back();
+        }
+
+        if (!OwnerPropertyLimit::canAddProperty($oid)) {
+            $max = OwnerPropertyLimit::maxProperties($oid);
+            Session::flash('error', "เจ้าของคนนี้ถึงโควต้าแล้ว (สูงสุด {$max} ที่พัก) — ไปเพิ่ม max_properties ใน /admin/owners/{$oid}/edit ก่อน");
             back();
         }
 

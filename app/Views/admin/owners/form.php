@@ -121,7 +121,7 @@ $memDtLocal = static function (?string $db): string {
     <?php endif; ?>
   </div>
 
-  <aside>
+  <aside class="space-y-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-3 lg:sticky lg:top-24">
       <div>
         <label class="text-sm font-medium mb-1 block">สถานะพาร์ทเนอร์</label>
@@ -132,6 +132,15 @@ $memDtLocal = static function (?string $db): string {
             <option value="<?= $st ?>" <?= $stSel === $st ? 'selected' : '' ?>><?= $st ?></option>
           <?php endforeach; ?>
         </select>
+      </div>
+      <div>
+        <label class="text-sm font-medium mb-1 block flex items-center gap-1.5">
+          <i data-lucide="hotel" class="w-4 h-4 text-slate-500"></i> โควต้าที่พัก (max)
+        </label>
+        <input type="number" name="max_properties" min="1" max="99"
+               value="<?= e(old('max_properties', $rec['max_properties'] ?? 1)) ?>"
+               class="w-full px-3 py-2 rounded-lg border border-slate-300 tabular-nums">
+        <p class="text-[11px] text-slate-500 mt-0.5">Owner สร้างที่พักเองได้ไม่เกินค่านี้ — default 1</p>
       </div>
       <button type="submit" class="w-full py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold"><?= $isEdit ? 'บันทึก' : 'สร้างเจ้าของแพ' ?></button>
     </div>

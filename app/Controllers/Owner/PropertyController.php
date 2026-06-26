@@ -11,6 +11,7 @@ use App\Models\Property;
 use App\Support\PropertyBookingCapabilities;
 use App\Services\AdminApprovalNotifyService;
 use App\Services\OwnerFeatureGate;
+use App\Services\OwnerPropertyLimit;
 use App\Services\OwnerTier;
 use App\Services\PropertyLineService;
 
@@ -38,13 +39,27 @@ class PropertyController extends Controller
                     (SELECT COUNT(*) FROM bookings b WHERE b.property_id=p.id) AS booking_count
              FROM properties p WHERE $where ORDER BY p.created_at DESC", $params);
 
+        $canAdd      = !$ownerId || OwnerPropertyLimit::canAddProperty($ownerId);
+        $isOverQuota = $ownerId && OwnerPropertyLimit::isOverQuota($ownerId);
+        $maxProps    = $ownerId ? OwnerPropertyLimit::maxProperties($ownerId) : 1;
+
         View::render('owner/properties/index', [
-            'page_title' => 'ที่พักของฉัน', 'rows' => $rows,
+            'page_title'  => 'ที่พักของฉัน',
+            'rows'        => $rows,
+            'canAdd'      => $canAdd,
+            'isOverQuota' => $isOverQuota,
+            'maxProps'    => $maxProps,
         ], 'layouts/owner');
     }
 
     public function create(): void
     {
+        $ownerId = Auth::ownerId();
+        if ($ownerId && !OwnerPropertyLimit::canAddProperty($ownerId)) {
+            Session::flash('error', 'ถึงโควต้าที่พักแล้ว — ติดต่อแอดมินเพื่อขอเพิ่มโควต้า');
+            redirect(url('/owner/properties'));
+            return;
+        }
         $amenities = Database::fetchAll("SELECT * FROM amenities ORDER BY sort_order");
         View::render('owner/properties/form', [
             'page_title' => 'เพิ่มที่พักใหม่',
@@ -54,6 +69,12 @@ class PropertyController extends Controller
 
     public function store(): void
     {
+        $ownerId = Auth::ownerId();
+        if ($ownerId && !OwnerPropertyLimit::canAddProperty($ownerId)) {
+            Session::flash('error', 'ถึงโควต้าที่พักแล้ว — ติดต่อแอดมินเพื่อขอเพิ่มโควต้า');
+            redirect(url('/owner/properties'));
+            return;
+        }
         $data = $this->validate([
             'name'         => 'required|max:180',
             'type'         => 'required|in:raft,resort,homestay,house,pool_villa,hotel,camping',

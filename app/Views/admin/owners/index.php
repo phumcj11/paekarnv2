@@ -11,7 +11,7 @@
           <th class="text-left px-5 py-3">ติดต่อ</th>
           <th class="text-left px-5 py-3">ธุรกิจ</th>
           <th class="text-left px-5 py-3">บัญชีธนาคาร</th>
-          <th class="text-left px-5 py-3">ที่พัก</th>
+          <th class="text-left px-5 py-3">ที่พัก / โควต้า</th>
           <th class="text-left px-5 py-3">สถานะ</th>
           <th class="text-right px-5 py-3"></th>
         </tr>
@@ -24,7 +24,11 @@
           <td class="px-5 py-3 text-xs"><?= e($o['email']) ?><div class="text-slate-500"><?= e($o['phone']) ?></div></td>
           <td class="px-5 py-3"><?= e($o['business_name'] ?? '-') ?></td>
           <td class="px-5 py-3 text-xs"><?= e($o['bank_name']) ?><div class="font-mono"><?= e($o['bank_account']) ?></div></td>
-          <td class="px-5 py-3"><?= $o['property_count'] ?> รายการ</td>
+          <?php $pc = (int)($o['property_count'] ?? 0); $mp = (int)($o['max_properties'] ?? 1); $over = $pc > $mp; ?>
+          <td class="px-5 py-3 <?= $over ? 'text-rose-600 font-semibold' : '' ?>">
+            <?= $pc ?> / <?= $mp ?>
+            <?php if ($over): ?><span class="ml-1 text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">เกิน</span><?php endif; ?>
+          </td>
           <td class="px-5 py-3"><span class="text-xs font-semibold bg-<?= $c ?>-100 text-<?= $c ?>-700 px-2 py-1 rounded-full"><?= e($o['partner_status']) ?></span></td>
           <td class="px-5 py-3 text-right space-x-1 whitespace-nowrap">
             <a href="<?= url('/admin/owners/' . $o['id']) ?>" class="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg inline-flex items-center gap-1"><i data-lucide="eye" class="w-3.5 h-3.5"></i> ดู</a>
