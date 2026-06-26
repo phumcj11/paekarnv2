@@ -22,14 +22,20 @@ $gatewayEnabled = (string) \App\Models\Setting::get('payment_gateway_enabled', '
 $qrEndpoint = url('/api-promptpay-qr');
 ?>
 <div class="bg-white border border-slate-200 rounded-2xl p-5"
-     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>, <?= json_encode($amountVar, JSON_UNESCAPED_UNICODE) ?>)">
+     x-data="paymentBlock(<?= json_encode($qrEndpoint, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>)"
+     x-init="
+       paymentAmount = (<?= $amountVar ?>) || 0;
+       $watch('method', () => refreshQr());
+       refreshQr();
+       $watch(() => (<?= $amountVar ?>), v => { paymentAmount = v || 0; refreshQr(); });
+     ">
   <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="credit-card" class="w-5 h-5 text-primary-600"></i> วิธีการชำระเงิน</h2>
 
   <!-- Method picker -->
   <div class="grid grid-cols-1 sm:grid-cols-<?= $showGatewaySlot ? '3' : '2' ?> gap-2 mt-3">
     <label class="flex items-center gap-2 px-4 py-3 border-2 rounded-xl cursor-pointer transition"
-           :class="checkoutMethod==='promptpay'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200 hover:border-slate-300'">
-      <input type="radio" name="payment_method" value="promptpay" x-model="checkoutMethod" class="hidden">
+           :class="method==='promptpay'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200 hover:border-slate-300'">
+      <input type="radio" name="payment_method" value="promptpay" x-model="method" class="hidden">
       <i data-lucide="qr-code" class="w-5 h-5 text-accent-600"></i>
       <div class="flex-1">
         <div class="font-semibold text-sm">PromptPay</div>
@@ -37,8 +43,8 @@ $qrEndpoint = url('/api-promptpay-qr');
       </div>
     </label>
     <label class="flex items-center gap-2 px-4 py-3 border-2 rounded-xl cursor-pointer transition"
-           :class="checkoutMethod==='bank_transfer'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200 hover:border-slate-300'">
-      <input type="radio" name="payment_method" value="bank_transfer" x-model="checkoutMethod" class="hidden">
+           :class="method==='bank_transfer'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200 hover:border-slate-300'">
+      <input type="radio" name="payment_method" value="bank_transfer" x-model="method" class="hidden">
       <i data-lucide="landmark" class="w-5 h-5 text-accent-600"></i>
       <div class="flex-1">
         <div class="font-semibold text-sm">โอนผ่านธนาคาร</div>
@@ -48,8 +54,8 @@ $qrEndpoint = url('/api-promptpay-qr');
     <?php if ($showGatewaySlot): ?>
     <label class="flex items-center gap-2 px-4 py-3 border-2 rounded-xl transition relative
                   <?= $gatewayEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-60' ?>"
-           :class="checkoutMethod==='credit_card'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200'">
-      <input type="radio" name="payment_method" value="credit_card" x-model="checkoutMethod"
+           :class="method==='credit_card'?'border-accent-500 bg-accent-50 shadow-sm':'border-slate-200'">
+      <input type="radio" name="payment_method" value="credit_card" x-model="method"
              <?= $gatewayEnabled ? '' : 'disabled' ?> class="hidden">
       <i data-lucide="credit-card" class="w-5 h-5 text-accent-600"></i>
       <div class="flex-1">
@@ -64,7 +70,7 @@ $qrEndpoint = url('/api-promptpay-qr');
   </div>
 
   <!-- PromptPay panel — Thai QR Payment card -->
-  <div x-show="checkoutMethod==='promptpay'" x-transition class="mt-4">
+  <div x-show="method==='promptpay'" x-transition class="mt-4">
     <div class="pp-qr-card">
       <div class="pp-qr-header">
         <div class="pp-qr-header-title">Thai QR Payment</div>
@@ -117,7 +123,7 @@ $qrEndpoint = url('/api-promptpay-qr');
   </div>
 
   <!-- Bank transfer panel -->
-  <div x-show="checkoutMethod==='bank_transfer'" x-transition class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+  <div x-show="method==='bank_transfer'" x-transition class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
     <div class="font-semibold text-slate-800 mb-2 flex items-center gap-1.5">
       <i data-lucide="landmark" class="w-4 h-4 text-primary-600"></i> <?= e($bank['bank_name']) ?>
     </div>
@@ -144,7 +150,7 @@ $qrEndpoint = url('/api-promptpay-qr');
   </div>
 
   <!-- Slip uploader -->
-  <div x-show="checkoutMethod==='promptpay' || checkoutMethod==='bank_transfer'" x-transition class="mt-4">
+  <div x-show="method==='promptpay' || method==='bank_transfer'" x-transition class="mt-4">
     <label class="text-sm font-medium text-slate-700 mb-1 block">อัปโหลดสลิปการโอน</label>
     <label class="relative flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 hover:bg-accent-50/30 transition"
            :class="slipPreview ? 'border-emerald-400 bg-emerald-50/40' : ''">
@@ -177,7 +183,7 @@ $qrEndpoint = url('/api-promptpay-qr');
 
   <!-- Credit card disabled panel -->
   <?php if ($showGatewaySlot && !$gatewayEnabled): ?>
-  <div x-show="checkoutMethod==='credit_card'" x-transition class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-600">
+  <div x-show="method==='credit_card'" x-transition class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-600">
     <i data-lucide="info" class="w-4 h-4 inline"></i> ระบบบัตรเครดิตอยู่ระหว่างเตรียมเปิดให้บริการ กรุณาเลือก PromptPay หรือโอนผ่านธนาคารแทน
   </div>
   <?php endif; ?>

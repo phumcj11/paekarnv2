@@ -410,7 +410,7 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
-  Alpine.data('paymentBlock', (endpoint, amountKey) => ({
+  Alpine.data('paymentBlock', (endpoint) => ({
     paymentAmount: 0,
     qrSrc: '',
     qrLoading: false,
@@ -422,27 +422,10 @@ document.addEventListener('alpine:init', () => {
 
     parentFormData() {
       const form = this.$el.closest('form');
-      if (form && form._x_dataStack && form._x_dataStack[0]) {
-        return form._x_dataStack[0];
+      if (!form || !form._x_dataStack || !form._x_dataStack.length) {
+        return null;
       }
-      return null;
-    },
-
-    get checkoutMethod() {
-      return this.parentFormData()?.method ?? 'promptpay';
-    },
-
-    set checkoutMethod(value) {
-      const parent = this.parentFormData();
-      if (parent) parent.method = value;
-    },
-
-    parentAmount() {
-      const parent = this.parentFormData();
-      if (!parent) return 0;
-      const value = parent[amountKey];
-      const num = typeof value === 'number' ? value : Number(value);
-      return Number.isFinite(num) ? num : 0;
+      return form._x_dataStack[form._x_dataStack.length - 1];
     },
 
     formatAmount() {
@@ -480,7 +463,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     refreshQr() {
-      if (this.checkoutMethod !== 'promptpay') return;
+      const parent = this.parentFormData();
+      if (!parent || parent.method !== 'promptpay') return;
       this.qrLoading = true;
       this.qrError = '';
       this.qrSrc = '';
@@ -499,16 +483,6 @@ document.addEventListener('alpine:init', () => {
           this.qrLoading = false;
           this.qrError = 'เกิดข้อผิดพลาด';
         });
-    },
-
-    init() {
-      this.paymentAmount = this.parentAmount();
-      this.$watch(() => this.checkoutMethod, () => this.refreshQr());
-      this.$watch(() => this.parentAmount(), (value) => {
-        this.paymentAmount = value || 0;
-        this.refreshQr();
-      });
-      this.refreshQr();
     },
   }));
 
