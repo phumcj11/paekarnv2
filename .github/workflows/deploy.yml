@@ -190,6 +190,20 @@ jobs:
               bash "$APP/scripts/migrate_membership_split_tiers.sh" || echo "WARN: migrate_membership_split_tiers failed (may already be applied)"
             fi
 
+            echo "=== service-only owner backfill (one-time) ==="
+            MARKER="$APP/storage/backups/.service_only_backfill_v1"
+            if [ -f "$APP/scripts/fix_service_only_owners.sh" ] && [ ! -f "$MARKER" ]; then
+              export DB_NAME="$VPS_DB_NAME" DB_USER="$VPS_DB_USER" DB_PASS="$VPS_DB_PASS"
+              export APP_DIR="$APP"
+              echo "  dry-run..."
+              DRY_RUN=1 BACKFILL_V1=1 bash "$APP/scripts/fix_service_only_owners.sh" || true
+              echo "  apply..."
+              BACKFILL_V1=1 bash "$APP/scripts/fix_service_only_owners.sh" || echo "WARN: fix_service_only_owners failed"
+              /usr/bin/php "$APP/cli/cron.php" membership_sync_listing_boost 2>/dev/null || php "$APP/cli/cron.php" membership_sync_listing_boost || echo "WARN: membership_sync_listing_boost failed"
+            elif [ -f "$MARKER" ]; then
+              echo "  skip — already applied ($MARKER)"
+            fi
+
             echo "=== cleanup ==="
             rm -rf "$SRC"
 
