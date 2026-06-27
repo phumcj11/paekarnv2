@@ -140,6 +140,10 @@ class AIController extends Controller
                 $redirectUrl = url('/properties?') . http_build_query($looseFilters);
             } else {
                 $summary = 'ไม่พบที่พักตามเงื่อนไข ลองปรับคำค้นหา';
+                $workingRedirect = self::resolveSmartSearchRedirectFilters($searchFilters);
+                if ($workingRedirect !== null) {
+                    $redirectUrl = url('/properties?') . http_build_query($workingRedirect) . '&_aiq=' . rawurlencode($q);
+                }
             }
         }
 
@@ -186,5 +190,40 @@ class AIController extends Controller
         $resp = AIService::generate($instruction, $text, 0.3);
         if (!$resp) { $this->json(['ok' => false, 'error' => 'AI ปิดอยู่']); return; }
         $this->json(['ok' => true, 'text' => $resp]);
+    }
+
+    /**
+     * When strict AI filters return nothing, pick looser filters that still yield listings for redirect.
+     *
+     * @param array<string,mixed> $filters
+     * @return array<string,mixed>|null
+     */
+    private static function resolveSmartSearchRedirectFilters(array $filters): ?array
+    {
+        $base = $filters;
+        unset($base['group_type'], $base['must_have'], $base['intent'], $base['budget_max'], $base['budget_min']);
+
+        $attempts = [
+            $base,
+            array_diff_key($base, ['q' => true]),
+            array_diff_key($base, ['q' => true, 'guests' => true]),
+            array_diff_key($base, ['guests' => true]),
+            ['type' => $base['type'] ?? ''],
+        ];
+
+        foreach ($attempts as $attempt) {
+            $attempt = array_filter(
+                $attempt,
+                static fn ($v) => $v !== '' && $v !== null && $v !== [] && $v !== false
+            );
+            if ($attempt === []) {
+                continue;
+            }
+            if ((int)(Property::search($attempt, 1, 1)['total'] ?? 0) > 0) {
+                return $attempt;
+            }
+        }
+
+        return null;
     }
 }

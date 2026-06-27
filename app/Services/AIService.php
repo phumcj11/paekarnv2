@@ -125,6 +125,7 @@ Extract filters from a natural language Thai query as JSON:
 }
 Rules:
 - NEVER put mood/atmosphere words in q or must_have: เงียบ, ฟิน, สงบ, โรแมนติก, ส่วนตัว, บรรยากาศดี, ชิล, ผ่อนคลาย
+- When user mentions แพ/แพริมน้ำ/แพลาก/แพพัก → set type=raft and OMIT those words from q (do not search them as keywords)
 - When type=raft, omit ริมน้ำ/ริมแม่น้ำ/ลอยน้ำ from must_have — raft already implies riverside
 - Budget: สามพัน=3000, ห้าพัน=5000, หมื่น=10000 → budget_max
 - group_type: couple=คู่/ฮันนีมูน, family=ครอบครัว/พาเด็ก, friends=เพื่อน, group=หมู่คณะ/บริษัท
@@ -144,7 +145,7 @@ P;
         if (preg_match('/\{[\s\S]*\}/', $resp, $m)) {
             $data = json_decode($m[0], true);
             if (is_array($data)) {
-                return self::normalizeSmartSearchFilters(self::cleanFilters($data));
+                return self::finalizeSmartSearchFilters(self::cleanFilters($data), $query);
             }
         }
         return self::heuristicSearch($query);
@@ -161,8 +162,10 @@ P;
         }
         if (preg_match('/(หมา|แมว|สัตว์|pet)/u', $q)) $f['pet'] = true;
         if (preg_match('/(คูปอง|coupon|ส่วนลด)/u', $q)) $f['coupon'] = true;
-        $types = ['พูลวิลล่า'=>'pool_villa','พูลวิลลา'=>'pool_villa','แพ'=>'raft','รีสอร์ท'=>'resort','โฮมสเตย์'=>'homestay','บ้าน'=>'house','โรงแรม'=>'hotel','แคมป์'=>'camping'];
-        foreach ($types as $kw => $en) if (str_contains($q, $kw)) { $f['type'] = $en; break; }
+        $inferredType = self::inferSearchTypeFromText($q);
+        if ($inferredType !== null) {
+            $f['type'] = $inferredType;
+        }
         $zoneCandidates = Zone::namesForSelectMerged(null);
         usort($zoneCandidates, static fn ($a, $b) => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));
         foreach ($zoneCandidates as $z) {
@@ -178,6 +181,58 @@ P;
         elseif (preg_match('/(เพื่อน|แก๊ง)/u', $q))                 $f['group_type'] = 'friends';
         $f['q'] = $q;
 
+        return self::finalizeSmartSearchFilters($f, $q);
+    }
+
+    /**
+     * Infer listing type from Thai/EN accommodation keywords (longest match first).
+     */
+    private static function inferSearchTypeFromText(string $text): ?string
+    {
+        $map = [
+            'พูลวิลล่า' => 'pool_villa',
+            'พูลวิลลา' => 'pool_villa',
+            'pool villa' => 'pool_villa',
+            'แพริมน้ำ' => 'raft',
+            'แพลาก' => 'raft',
+            'แพพัก' => 'raft',
+            'แพ' => 'raft',
+            'รีสอร์ท' => 'resort',
+            'โฮมสเตย์' => 'homestay',
+            'บ้านพัก' => 'house',
+            'บ้าน' => 'house',
+            'โรงแรม' => 'hotel',
+            'แคมป์ปิ้ง' => 'camping',
+            'แคมป์' => 'camping',
+        ];
+        uksort($map, static fn ($a, $b) => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));
+        foreach ($map as $kw => $type) {
+            if (str_contains($text, $kw)) {
+                return $type;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $f
+     * @return array<string,mixed>
+     */
+    private static function finalizeSmartSearchFilters(array $f, string $originalQuery): array
+    {
+        $f = self::normalizeSmartSearchFilters($f);
+        if (!empty($f['type'])) {
+            return $f;
+        }
+
+        $inferred = self::inferSearchTypeFromText($originalQuery);
+        if ($inferred === null) {
+            return $f;
+        }
+
+        $f['type'] = $inferred;
+
         return self::normalizeSmartSearchFilters($f);
     }
 
@@ -190,6 +245,15 @@ P;
     private static function normalizeSmartSearchFilters(array $f): array
     {
         $raw = isset($f['q']) ? trim((string)$f['q']) : '';
+
+        // LLM often puts แพริมน้ำ in q without type=raft — infer before stripping.
+        if (empty($f['type']) && $raw !== '') {
+            $inferred = self::inferSearchTypeFromText($raw);
+            if ($inferred !== null) {
+                $f['type'] = $inferred;
+            }
+        }
+
         if ($raw === '') {
             unset($f['q']);
 
