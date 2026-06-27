@@ -71,6 +71,21 @@ settings_field(
 );
 
 ob_start();
+$salesOpen = (string)($values['membership_sales_open'] ?? '1');
+?>
+<select name="membership_sales_open" class="<?= $ic ?>">
+  <option value="0" <?= $salesOpen === '0' ? 'selected' : '' ?>>ปิด — แสดง «เปิดให้บริการเร็วๆนี้»</option>
+  <option value="1" <?= $salesOpen === '1' ? 'selected' : '' ?>>เปิด — ให้ owner สมัครแพ็กเกจได้</option>
+</select>
+<?php
+settings_field(
+    'เปิดขายแพ็กเกจสมาชิก (หน้า owner)',
+    ob_get_clean(),
+    'ปิดไว้ระหว่างเตรียมราคา · เปิดเมื่อพร้อมรับสมัครและชำระเงิน',
+    'ค่าเริ่มต้นหลัง deploy = เปิด'
+);
+
+ob_start();
 ?>
 <input type="number" name="membership_boost_priority_standard" min="0" max="9999" value="<?= e($values['membership_boost_priority_standard'] ?? '20') ?>" class="<?= $ic ?>">
 <?php

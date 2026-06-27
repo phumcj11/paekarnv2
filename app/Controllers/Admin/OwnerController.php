@@ -326,6 +326,37 @@ class OwnerController extends Controller
         redirect(url('/admin/owners/' . $id));
     }
 
+    public function markServiceOnly(int $id): void
+    {
+        if (!OwnerMembership::splitTiersAvailable()) {
+            Session::flash('error', 'ต้องรัน migration แยก tier ก่อน');
+            back();
+        }
+
+        $owner = Database::fetch('SELECT id FROM owners WHERE id = :id', ['id' => $id]);
+        if (!$owner) {
+            Session::flash('error', 'ไม่พบเจ้าของแพ');
+            back();
+        }
+
+        OwnerMembership::applyDimensionUpdate($id, 'feature', [
+            'tier'        => 'none',
+            'expires_at'  => null,
+            'grace_until' => null,
+        ]);
+        MembershipListingBoostService::syncOwnerBoost($id);
+
+        AuditLog::record(
+            'admin_owner_service_only',
+            ['owner_id' => $id],
+            'owner',
+            $id
+        );
+
+        Session::flash('success', 'ตั้งเป็นแพ็กบริการอย่างเดียวแล้ว — ปิดฟีเจอร์ระบบ');
+        redirect(url('/admin/owners/' . $id));
+    }
+
     public function destroy(int $id): void
     {
         $owner = Database::fetch('SELECT id, user_id FROM owners WHERE id = :id', ['id' => $id]);

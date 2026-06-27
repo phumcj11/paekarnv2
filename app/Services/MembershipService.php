@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Models\MembershipOrder;
 use App\Models\MembershipPlan;
 use App\Models\AuditLog;
+use App\Models\Setting;
 
 class MembershipService
 {
@@ -241,6 +242,6 @@ class MembershipService
     /** เปิดรับสมัครแพ็กเกจแล้วหรือยัง (false = แสดง "เปิดให้บริการเร็วๆนี้") */
     public static function salesOpen(): bool
     {
-        return false;
+        return (int) Setting::get('membership_sales_open', '1') === 1;
     }
 }

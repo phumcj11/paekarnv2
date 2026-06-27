@@ -81,6 +81,15 @@ $placeholderCover = 'https://placehold.co/96x96?text=Paekan';
       <?php endif; ?>
       <?php endif; ?>
     </div>
+    <?php if (OwnerMembership::splitTiersAvailable() && OwnerMembership::featureTier($owner) !== 'none'): ?>
+    <form method="post" action="<?= url('/admin/owners/' . (int) $owner['id'] . '/service-only') ?>" class="mt-2"
+          onsubmit="return confirm('ปิดแพ็กระบบ (feature tier) — เหลือแพ็กบริการอย่างเดียว?');">
+      <?= csrf() ?>
+      <button type="submit" class="w-full py-1.5 rounded-lg border border-amber-300 text-amber-900 text-xs font-semibold hover:bg-amber-50">
+        ตั้งเป็นแพ็กบริการอย่างเดียว (ปิดฟีเจอร์ระบบ)
+      </button>
+    </form>
+    <?php endif; ?>
     <?php
       $servicePerks = $servicePerks ?? [];
       $perkStatusClass = [
