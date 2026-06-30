@@ -196,4 +196,45 @@ class Upload
 
         return $out;
     }
+
+    /**
+     * รับไฟล์จาก input เดียวหรือ multiple (name="image[]" multiple)
+     *
+     * @return list<array{name:string,type:string,tmp_name:string,error:int,size:int}>
+     */
+    public static function galleryUploadEntries(string $key): array
+    {
+        $entries = self::normalizeIndexedFiles($key);
+        if ($entries !== []) {
+            return $entries;
+        }
+        if (!empty($_FILES[$key]) && !is_array($_FILES[$key]['name'] ?? null)) {
+            return [$_FILES[$key]];
+        }
+
+        return [];
+    }
+
+    /**
+     * อัปโหลดหลายรูปจาก request key เดียว
+     *
+     * @return array{0:list<string>,1:list<string>} paths, errors
+     */
+    public static function imagesFromRequest(string $key, string $folder = 'misc'): array
+    {
+        $paths = [];
+        $errors = [];
+        foreach (self::galleryUploadEntries($key) as $file) {
+            try {
+                $path = self::imageFromEntry($file, $folder);
+                if ($path !== null) {
+                    $paths[] = $path;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        return [$paths, $errors];
+    }
 }

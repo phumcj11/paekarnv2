@@ -673,9 +673,10 @@ $bookingCaps = $property
   </div>
   <form method="post" action="<?= $propUrl('/' . $property['id'] . '/images') ?>" enctype="multipart/form-data" class="flex flex-wrap gap-2 mb-4">
     <?= csrf() ?>
-    <input type="file" name="image" accept="image/*" required class="flex-1 min-w-[200px] text-sm file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-accent-500 file:text-white file:font-semibold file:cursor-pointer">
+    <input type="file" name="image[]" accept="image/*" multiple required class="flex-1 min-w-[200px] text-sm file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-accent-500 file:text-white file:font-semibold file:cursor-pointer">
     <button type="submit" class="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1 shrink-0"><i data-lucide="upload" class="w-4 h-4"></i> อัปโหลด</button>
   </form>
+  <p class="text-xs text-slate-500 mb-4">เลือกได้หลายรูปพร้อมกัน (Ctrl/Cmd+คลิก หรือลากเลือก)</p>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
     <?php foreach (($images ?? []) as $img): ?>
     <div class="relative group">

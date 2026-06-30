@@ -366,20 +366,25 @@ class PropertyController extends Controller
     {
         $property = Database::fetch('SELECT id FROM properties WHERE id = :id', ['id' => $id]);
         if (!$property) { http_response_code(404); View::render('errors/404'); return; }
-        try {
-            $path = Upload::image('image', 'properties');
-            if ($path) {
-                $ins = ['property_id' => $id, 'path' => $path, 'sort_order' => 0];
-                if (Database::tableHasColumn('property_images', 'unit_id')) {
-                    $ins['unit_id'] = null;
-                }
-                Database::insert('property_images', $ins);
-                Session::flash('success', 'อัปโหลดรูปภาพเรียบร้อย');
-            } else {
-                Session::flash('error', 'ไม่ได้เลือกไฟล์');
+
+        [$paths, $errors] = Upload::imagesFromRequest('image', 'properties');
+        $uploaded = 0;
+        foreach ($paths as $path) {
+            $ins = ['property_id' => $id, 'path' => $path, 'sort_order' => 0];
+            if (Database::tableHasColumn('property_images', 'unit_id')) {
+                $ins['unit_id'] = null;
             }
-        } catch (\Throwable $e) {
-            Session::flash('error', $e->getMessage());
+            Database::insert('property_images', $ins);
+            $uploaded++;
+        }
+        if ($uploaded > 0) {
+            Session::flash('success', 'อัปโหลด ' . $uploaded . ' รูปเรียบร้อย');
+        }
+        if ($errors !== []) {
+            Session::flash('error', implode(' · ', array_unique($errors)));
+        }
+        if ($uploaded === 0 && $errors === []) {
+            Session::flash('error', 'ไม่ได้เลือกไฟล์');
         }
         redirect(url('/admin/properties/' . $id . '/edit'));
     }
