@@ -68,8 +68,102 @@ class Upload
         }
 
         ImageOptimizer::generateVariants($name);
+        self::publishRelativeToDocumentRoot($name);
 
         return $name;
+    }
+
+    public static function appUploadsRoot(): string
+    {
+        return Application::$basePath . '/public/uploads';
+    }
+
+    public static function webUploadsRoot(): ?string
+    {
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+        if ($docRoot === '') {
+            return null;
+        }
+
+        return $docRoot . '/uploads';
+    }
+
+    /** App uploads and web document-root uploads resolve to the same directory (local dev or symlink). */
+    public static function uploadsAreLinked(): bool
+    {
+        $appRoot = self::appUploadsRoot();
+        $webRoot = self::webUploadsRoot();
+        if ($webRoot === null || !is_dir($appRoot)) {
+            return true;
+        }
+
+        $appReal = realpath($appRoot);
+        $webReal = realpath($webRoot);
+
+        return $appReal !== false && $webReal !== false && $appReal === $webReal;
+    }
+
+    /**
+     * Copy uploaded file (+ WebP variants) to DOCUMENT_ROOT/uploads when it differs from app storage.
+     * Production VPS keeps app code outside public_html; without a symlink new uploads 404 until deploy.
+     */
+    public static function publishRelativeToDocumentRoot(string $relative): void
+    {
+        $relative = ltrim(trim($relative), '/');
+        if ($relative === '' || str_starts_with($relative, 'http')) {
+            return;
+        }
+        if (self::uploadsAreLinked()) {
+            return;
+        }
+
+        $webRoot = self::webUploadsRoot();
+        if ($webRoot === null) {
+            return;
+        }
+
+        ['dir' => $dir, 'base' => $base] = ImageOptimizer::splitBase($relative);
+        $appDir = self::appUploadsRoot() . ($dir !== '' ? '/' . $dir : '');
+        if (!is_dir($appDir)) {
+            return;
+        }
+
+        $webDir = $webRoot . ($dir !== '' ? '/' . $dir : '');
+        if (!is_dir($webDir) && !@mkdir($webDir, 0775, true) && !is_dir($webDir)) {
+            return;
+        }
+
+        foreach (glob($appDir . '/' . $base . '*') ?: [] as $src) {
+            if (!is_file($src)) {
+                continue;
+            }
+            $dest = $webDir . '/' . basename($src);
+            if (!is_file($dest) || filemtime($src) > @filemtime($dest)) {
+                @copy($src, $dest);
+            }
+        }
+    }
+
+    /** Remove a relative upload path from app storage (and web mirror when split). */
+    public static function deleteRelative(?string $relative): void
+    {
+        $relative = ltrim(trim((string) $relative), '/');
+        if ($relative === '' || str_starts_with($relative, 'http')) {
+            return;
+        }
+
+        ['dir' => $dir, 'base' => $base] = ImageOptimizer::splitBase($relative);
+        foreach ([self::appUploadsRoot(), self::webUploadsRoot()] as $root) {
+            if ($root === null || !is_dir($root)) {
+                continue;
+            }
+            $dirFull = $root . ($dir !== '' ? '/' . $dir : '');
+            foreach (glob($dirFull . '/' . $base . '*') ?: [] as $file) {
+                if (is_file($file)) {
+                    @unlink($file);
+                }
+            }
+        }
     }
 
     /** @deprecated Use ImageOptimizer::variantRelativePath($path, 'thumb') */

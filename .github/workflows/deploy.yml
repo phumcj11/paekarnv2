@@ -128,23 +128,28 @@ jobs:
               cp "$APP/public/.htaccess" "$PUBLIC_HTML/.htaccess"
             fi
 
-            echo "=== permissions + sync uploads to public_html ==="
+            echo "=== permissions + uploads symlink (public_html → app/public/uploads) ==="
             mkdir -p "$APP/storage/cache" "$APP/storage/backups" "$APP/public/uploads"
-            mkdir -p "$PUBLIC_HTML/uploads"
-            if [ -L "$PUBLIC_HTML/uploads" ]; then
-              rm -f "$PUBLIC_HTML/uploads"
-              mkdir -p "$PUBLIC_HTML/uploads"
-            elif [ -d "$PUBLIC_HTML/uploads" ] && [ ! -L "$PUBLIC_HTML/uploads" ]; then
-              :
-            else
-              mkdir -p "$PUBLIC_HTML/uploads"
+            UPLOADS_SRC="$APP/public/uploads"
+            UPLOADS_DEST="$PUBLIC_HTML/uploads"
+            if [ -d "$UPLOADS_DEST" ] && [ ! -L "$UPLOADS_DEST" ]; then
+              echo "  merging legacy public_html/uploads into app storage..."
+              rsync -av "$UPLOADS_DEST/" "$UPLOADS_SRC/" || true
+              rm -rf "$UPLOADS_DEST"
             fi
-            rsync -av "$APP/public/uploads/" "$PUBLIC_HTML/uploads/"
-            UPLOAD_COUNT="$(find "$APP/public/uploads" -type f 2>/dev/null | wc -l | tr -d ' ')"
-            echo "  upload files synced: $UPLOAD_COUNT"
+            if [ ! -e "$UPLOADS_DEST" ]; then
+              ln -s "$UPLOADS_SRC" "$UPLOADS_DEST"
+              echo "  ✓ created uploads symlink"
+            elif [ -L "$UPLOADS_DEST" ]; then
+              echo "  ✓ uploads symlink already present"
+            else
+              echo "  WARN: $UPLOADS_DEST exists and is not a symlink"
+            fi
+            UPLOAD_COUNT="$(find "$UPLOADS_SRC" -type f 2>/dev/null | wc -l | tr -d ' ')"
+            echo "  upload files: $UPLOAD_COUNT"
             rm -f "$APP/storage/cache/pages/"*.cache 2>/dev/null || true
-            chown -R "$FILE_OWNER:$FILE_OWNER" "$PUBLIC_HTML" "$APP/storage" "$APP/public/uploads"
-            chmod -R 775 "$APP/storage" "$APP/public/uploads"
+            chown -R "$FILE_OWNER:$FILE_OWNER" "$PUBLIC_HTML" "$APP/storage" "$UPLOADS_SRC"
+            chmod -R 775 "$APP/storage" "$UPLOADS_SRC"
 
             echo "=== run DB migrations ==="
             if [ -f "$APP/scripts/migrate_owner_manual_booking.sh" ]; then

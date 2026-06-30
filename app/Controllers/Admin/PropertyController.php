@@ -397,9 +397,8 @@ class PropertyController extends Controller
         );
         if ($row) {
             Database::delete('property_images', 'id = :i', ['i' => $img]);
-            $full = \App\Core\Application::$basePath . '/public/uploads/' . $row['path'];
-            if (is_file($full) && !str_starts_with((string)$row['path'], 'http')) {
-                @unlink($full);
+            if (!str_starts_with((string)$row['path'], 'http')) {
+                Upload::deleteRelative((string)$row['path']);
             }
         }
         Session::flash('success', 'ลบรูปภาพเรียบร้อย');
