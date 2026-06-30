@@ -8,6 +8,7 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Models\AuditLog;
 use App\Models\Property;
+use App\Models\Zone;
 use App\Services\OwnerPropertyLimit;
 use App\Support\PropertyBookingCapabilities;
 
@@ -231,6 +232,10 @@ class PropertyController extends Controller
 
         AuditLog::record('property_created', ['name' => $payload['name'], 'status' => $payload['status']], 'property', $id);
 
+        Zone::maybeFlashDistrictZoneMismatch(
+            trim((string)($_POST['district'] ?? '')),
+            $data['zone']
+        );
         Session::flash('success', 'สร้างที่พักเรียบร้อย');
         redirect(url('/admin/properties/' . $id . '/edit'));
     }
@@ -349,6 +354,10 @@ class PropertyController extends Controller
 
         AuditLog::record('property_updated', ['name' => $payload['name'], 'status' => $payload['status']], 'property', $id);
 
+        Zone::maybeFlashDistrictZoneMismatch(
+            trim((string)($_POST['district'] ?? '')),
+            $data['zone']
+        );
         Session::flash('success', 'บันทึกการเปลี่ยนแปลงเรียบร้อย');
         redirect(url('/admin/properties/' . $id . '/edit'));
     }

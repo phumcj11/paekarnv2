@@ -1,7 +1,9 @@
 <?php
-/** @var array<string,mixed>|null $zone */
+/** @var array<string,mixed>|null $zone @var list<string> $districtChoices @var list<string> $selectedDistricts */
 $isEdit = $zone !== null;
 $id = $isEdit ? (int)$zone['id'] : 0;
+$selectedDistricts = $selectedDistricts ?? [];
+$selectedLookup = array_fill_keys($selectedDistricts, true);
 ?>
 <div class="max-w-lg bg-white rounded-2xl border border-slate-200 shadow-soft p-6">
   <h2 class="font-bold text-lg mb-4"><?= $isEdit ? 'แก้ไขโซน' : 'เพิ่มโซน' ?></h2>
@@ -17,6 +19,19 @@ $id = $isEdit ? (int)$zone['id'] : 0;
       <input type="number" name="sort_order" value="<?= e((string)($zone['sort_order'] ?? '0')) ?>"
              class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-accent-500 outline-none">
       <p class="text-[11px] text-slate-500 mt-1">เลขน้อยขึ้นก่อนใน dropdown</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-2">อำเภอที่แนะนำให้เลือกโซน นี้</label>
+      <p class="text-[11px] text-slate-500 mb-2">เมื่อเจ้าของที่พักเลือกอำเภอ ระบบจะแสดงโซน นี้เป็นตัวเลือกแนะนำ (เลือกได้หลายอำเภอ)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+        <?php foreach ($districtChoices as $dist): ?>
+          <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="checkbox" name="districts[]" value="<?= e($dist) ?>" class="rounded border-slate-300 text-accent-600"
+              <?= isset($selectedLookup[$dist]) ? 'checked' : '' ?>>
+            <span><?= e($dist) ?></span>
+          </label>
+        <?php endforeach; ?>
+      </div>
     </div>
     <div class="flex gap-2 pt-2">
       <button type="submit" class="px-5 py-2.5 bg-accent-600 text-white rounded-lg font-semibold"><?= $isEdit ? 'บันทึก' : 'สร้าง' ?></button>

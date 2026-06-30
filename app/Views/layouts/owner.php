@@ -8,6 +8,7 @@ use App\Services\OwnerTier;
 $user = Auth::user();
 $flashSuccess = Session::flash('success');
 $flashError   = Session::flash('error');
+$flashInfo    = Session::flash('info');
 Session::consumeOld();
 if (!function_exists('ow_active')) {
   function ow_active(string $needle, string $cls = 'ow-sidebar-link--active'): string {
@@ -185,6 +186,11 @@ $canLineCrmNav      = OwnerFeatureGate::allowed(OwnerTier::FEATURE_LINE_CRM);
   <?php if ($flashError): ?>
     <div class="mx-4 sm:mx-6 mt-4 max-w-[1440px] lg:mx-auto w-full px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2 text-sm">
       <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i><?= e($flashError) ?>
+    </div>
+  <?php endif; ?>
+  <?php if ($flashInfo): ?>
+    <div class="mx-4 sm:mx-6 mt-4 max-w-[1440px] lg:mx-auto w-full px-4 py-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex items-center gap-2 text-sm">
+      <i data-lucide="info" class="w-4 h-4 shrink-0"></i><?= e($flashInfo) ?>
     </div>
   <?php endif; ?>
 

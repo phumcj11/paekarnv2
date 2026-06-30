@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\View;
 use App\Models\Zone;
+use App\Support\ThailandGeo;
 
 class ZoneController extends Controller
 {
@@ -32,8 +33,10 @@ class ZoneController extends Controller
         }
 
         View::render('admin/zones/form', [
-            'page_title' => 'เพิ่มโซน',
-            'zone'       => null,
+            'page_title'        => 'เพิ่มโซน',
+            'zone'              => null,
+            'districtChoices'   => ThailandGeo::kanchanaburiDistricts(),
+            'selectedDistricts' => [],
         ], 'layouts/admin');
     }
 
@@ -55,10 +58,11 @@ class ZoneController extends Controller
         }
 
         $sort = (int)($_POST['sort_order'] ?? 0);
-        Zone::create([
+        $id = Zone::create([
             'name'       => $name,
             'sort_order' => $sort,
         ]);
+        Zone::syncDistrictMap($id, $_POST['districts'] ?? []);
         Session::flash('success', 'เพิ่มโซนเรียบร้อย');
 
         redirect(url('/admin/zones'));
@@ -79,8 +83,10 @@ class ZoneController extends Controller
         }
 
         View::render('admin/zones/form', [
-            'page_title' => 'แก้ไขโซน',
-            'zone'       => $zone,
+            'page_title'        => 'แก้ไขโซน',
+            'zone'              => $zone,
+            'districtChoices'   => ThailandGeo::kanchanaburiDistricts(),
+            'selectedDistricts' => Zone::districtsForZoneName((string)($zone['name'] ?? '')),
         ], 'layouts/admin');
     }
 
@@ -119,6 +125,7 @@ class ZoneController extends Controller
             'name'       => $newName,
             'sort_order' => (int)($_POST['sort_order'] ?? 0),
         ]);
+        Zone::syncDistrictMap($id, $_POST['districts'] ?? []);
 
         Session::flash('success', 'อัปเดตโซนเรียบร้อย — ชื่อถูกอัปเดตในที่พัก / ที่เที่ยว และรูปปกโซนหน้าแรก (ถ้ามี) แล้ว');
 
@@ -144,6 +151,10 @@ class ZoneController extends Controller
             Session::flash('error', 'ลบไม่ได้ — ยังมีที่พักหรือที่เที่ยวที่ใช้ชื่อโซนนี้อยู่ (' . (int)$u['properties'] . ' / ' . (int)$u['visitor_places'] . ')');
 
             redirect(url('/admin/zones'));
+        }
+
+        if (Zone::districtMapTableExists()) {
+            Database::query('DELETE FROM zone_district_map WHERE zone_name = :n', ['n' => $name]);
         }
 
         Zone::destroy($id);

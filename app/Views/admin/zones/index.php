@@ -13,6 +13,7 @@
         <tr>
           <th class="text-left px-5 py-3">ชื่อโซน</th>
           <th class="text-left px-5 py-3">ลำดับ</th>
+          <th class="text-left px-5 py-3">อำเภอที่แนะนำ</th>
           <th class="text-left px-5 py-3">ที่พัก (ทั้งหมด / เผยแพร่)</th>
           <th class="text-left px-5 py-3">ที่เที่ยว</th>
           <th class="text-right px-5 py-3"></th>
@@ -23,6 +24,7 @@
         <tr class="hover:bg-slate-50">
           <td class="px-5 py-3 font-semibold text-slate-900"><?= e($z['name']) ?></td>
           <td class="px-5 py-3 tabular-nums"><?= (int)($z['sort_order'] ?? 0) ?></td>
+          <td class="px-5 py-3 text-xs text-slate-600 max-w-[14rem]"><?= e((string)($z['mapped_districts'] ?? '')) ?: '—' ?></td>
           <td class="px-5 py-3"><?= (int)($z['cnt_properties'] ?? 0) ?> / <?= (int)($z['cnt_published'] ?? 0) ?></td>
           <td class="px-5 py-3"><?= (int)($z['cnt_visitor_places'] ?? 0) ?></td>
           <td class="px-5 py-3 text-right whitespace-nowrap">

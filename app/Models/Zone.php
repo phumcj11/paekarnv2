@@ -129,11 +129,17 @@ class Zone extends Model
             return [];
         }
 
+        $districtCol = self::districtMapTableExists()
+            ? ', (SELECT GROUP_CONCAT(m.district ORDER BY m.sort_order ASC, m.district ASC SEPARATOR \', \')
+                 FROM zone_district_map m WHERE m.zone_name = z.name) AS mapped_districts'
+            : ', NULL AS mapped_districts';
+
         return Database::fetchAll(
             'SELECT z.*,
                 (SELECT COUNT(*) FROM properties p WHERE TRIM(p.zone) = z.name) AS cnt_properties,
                 (SELECT COUNT(*) FROM properties p WHERE TRIM(p.zone) = z.name AND p.status = \'published\') AS cnt_published,
-                (SELECT COUNT(*) FROM visitor_places vp WHERE TRIM(vp.zone) = z.name) AS cnt_visitor_places
+                (SELECT COUNT(*) FROM visitor_places vp WHERE TRIM(vp.zone) = z.name) AS cnt_visitor_places'
+            . $districtCol . '
              FROM zones z
              ORDER BY z.sort_order ASC, z.name ASC'
         );
@@ -182,6 +188,13 @@ class Zone extends Model
             unset($map[$oldName]);
             \App\Models\Setting::set('home_zone_cover_images', json_encode($map, JSON_UNESCAPED_UNICODE));
         }
+
+        if (self::districtMapTableExists()) {
+            Database::query(
+                'UPDATE zone_district_map SET zone_name = :new WHERE zone_name = :old',
+                ['new' => $newName, 'old' => $oldName]
+            );
+        }
     }
 
     public static function usageCountsForName(string $name): array
@@ -197,5 +210,157 @@ class Zone extends Model
         )['c'];
 
         return ['properties' => $props, 'visitor_places' => $places];
+    }
+
+    public static function districtMapTableExists(): bool
+    {
+        try {
+            Database::fetch('SELECT 1 FROM `zone_district_map` LIMIT 1');
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /** @return list<string> */
+    public static function recommendedZonesForDistrict(string $district): array
+    {
+        $district = trim($district);
+        if ($district === '' || !self::districtMapTableExists()) {
+            return [];
+        }
+
+        $rows = Database::fetchAll(
+            'SELECT zone_name FROM zone_district_map
+             WHERE district = :d
+             ORDER BY sort_order ASC, zone_name ASC',
+            ['d' => $district]
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $z = trim((string)($r['zone_name'] ?? ''));
+            if ($z !== '') {
+                $out[] = $z;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * district => list of zone names (for JS on property form).
+     *
+     * @return array<string, list<string>>
+     */
+    public static function districtMapGrouped(): array
+    {
+        if (!self::districtMapTableExists()) {
+            return [];
+        }
+
+        $rows = Database::fetchAll(
+            'SELECT district, zone_name FROM zone_district_map ORDER BY district ASC, sort_order ASC, zone_name ASC'
+        );
+        $map = [];
+        foreach ($rows as $r) {
+            $d = trim((string)($r['district'] ?? ''));
+            $z = trim((string)($r['zone_name'] ?? ''));
+            if ($d === '' || $z === '') {
+                continue;
+            }
+            $map[$d][] = $z;
+        }
+
+        return $map;
+    }
+
+    /** @return list<string> */
+    public static function districtsForZoneName(string $zoneName): array
+    {
+        $zoneName = trim($zoneName);
+        if ($zoneName === '' || !self::districtMapTableExists()) {
+            return [];
+        }
+
+        $rows = Database::fetchAll(
+            'SELECT district FROM zone_district_map
+             WHERE zone_name = :z
+             ORDER BY sort_order ASC, district ASC',
+            ['z' => $zoneName]
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $d = trim((string)($r['district'] ?? ''));
+            if ($d !== '') {
+                $out[] = $d;
+            }
+        }
+
+        return $out;
+    }
+
+    /** @param list<string> $districts */
+    public static function syncDistrictMapForZoneName(string $zoneName, array $districts): void
+    {
+        $zoneName = trim($zoneName);
+        if ($zoneName === '' || !self::districtMapTableExists()) {
+            return;
+        }
+
+        Database::query('DELETE FROM zone_district_map WHERE zone_name = :z', ['z' => $zoneName]);
+
+        $sort = 0;
+        foreach ($districts as $d) {
+            $d = trim((string)$d);
+            if ($d === '') {
+                continue;
+            }
+            $sort++;
+            Database::insert('zone_district_map', [
+                'zone_name'  => $zoneName,
+                'district'   => $d,
+                'sort_order' => $sort,
+            ]);
+        }
+    }
+
+    /** @param list<string> $districts */
+    public static function syncDistrictMap(int $zoneId, array $districts): void
+    {
+        $row = self::find($zoneId);
+        if (!$row) {
+            return;
+        }
+
+        self::syncDistrictMapForZoneName((string)($row['name'] ?? ''), $districts);
+    }
+
+    public static function zoneMatchesDistrict(?string $zone, ?string $district): bool
+    {
+        $zone = trim((string)$zone);
+        $district = trim((string)$district);
+        if ($zone === '' || $district === '') {
+            return true;
+        }
+
+        $recommended = self::recommendedZonesForDistrict($district);
+        if ($recommended === []) {
+            return true;
+        }
+
+        return in_array($zone, $recommended, true);
+    }
+
+    public static function maybeFlashDistrictZoneMismatch(?string $district, ?string $zone): void
+    {
+        if (self::zoneMatchesDistrict($zone, $district)) {
+            return;
+        }
+
+        \App\Core\Session::flash(
+            'info',
+            'หมายเหตุ: โซนที่เลือกไม่อยู่ในรายการแนะนำสำหรับอำเภอนี้ — แอดมินจะตรวจสอบอีกครั้ง'
+        );
     }
 }

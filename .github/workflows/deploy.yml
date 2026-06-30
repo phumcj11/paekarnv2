@@ -194,6 +194,9 @@ jobs:
             if [ -f "$APP/scripts/migrate_membership_split_tiers.sh" ]; then
               bash "$APP/scripts/migrate_membership_split_tiers.sh" || echo "WARN: migrate_membership_split_tiers failed (may already be applied)"
             fi
+            if [ -f "$APP/scripts/migrate_zone_district_map.sh" ]; then
+              bash "$APP/scripts/migrate_zone_district_map.sh" || echo "WARN: migrate_zone_district_map failed (may already be applied)"
+            fi
 
             echo "=== service-only owner backfill (one-time) ==="
             MARKER="$APP/storage/backups/.service_only_backfill_v1"

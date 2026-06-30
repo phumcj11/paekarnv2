@@ -4,6 +4,7 @@ use App\Core\Session;
 $user = Auth::user();
 $flashSuccess = Session::flash('success');
 $flashError   = Session::flash('error');
+$flashInfo    = Session::flash('info');
 Session::consumeOld();
 $cur = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $sidebarProviderPending = class_exists(\App\Models\ActivityProvider::class)
@@ -83,6 +84,9 @@ $sidebarProductPending = class_exists(\App\Models\ActivityProduct::class)
   <?php endif; ?>
   <?php if ($flashError): ?>
     <div class="mx-4 sm:mx-6 mt-4 px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2"><i data-lucide="alert-circle" class="w-4 h-4"></i><?= e($flashError) ?></div>
+  <?php endif; ?>
+  <?php if ($flashInfo): ?>
+    <div class="mx-4 sm:mx-6 mt-4 px-4 py-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex items-center gap-2"><i data-lucide="info" class="w-4 h-4"></i><?= e($flashInfo) ?></div>
   <?php endif; ?>
 
   <main class="flex-1 min-h-0 min-w-0 p-4 sm:p-6"><?= $content ?? '' ?></main>

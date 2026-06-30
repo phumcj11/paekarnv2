@@ -10,6 +10,11 @@ $propUrl = fn(string $suffix = '') => url('/' . $route_prefix . '/properties' . 
 $intakeVals = $property ? \App\Models\Property::decodeOwnerIntake($property['owner_intake'] ?? null) : [];
 $isEdit = !empty($property);
 $zone_options_list = $zone_options ?? \App\Models\Property::zonesForSelect($property['zone'] ?? null);
+$zoneDistrictMap = \App\Models\Zone::districtMapGrouped();
+$zoneOptionLabels = [];
+foreach ($zone_options_list as $zopt) {
+    $zoneOptionLabels[$zopt] = \App\Models\Zone::labelForSelect($zopt);
+}
 $kanchanaburiProvince = 'กาญจนบุรี';
 $kanchanaburiDistricts = \App\Support\ThailandGeo::kanchanaburiDistricts();
 $selectedDistrict = trim((string) old('district', $property['district'] ?? ''));
@@ -234,16 +239,6 @@ $bookingCaps = $property
           </select>
         </div>
         <div>
-          <?php $zoneVal = (string)($property['zone'] ?? ''); ?>
-          <label class="text-sm font-medium mb-1 block">โซน / พื้นที่ <span class="text-rose-500">*</span></label>
-          <select name="zone" id="owner-property-zone" required class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
-            <option value="">— เลือกโซน / พื้นที่ —</option>
-            <?php foreach ($zone_options_list as $zopt): ?>
-              <option value="<?= e($zopt) ?>" <?= $zoneVal === $zopt ? 'selected' : '' ?>><?= e(\App\Models\Zone::labelForSelect($zopt)) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div>
           <label class="text-sm font-medium mb-1 block">จังหวัด</label>
           <input type="hidden" name="province" value="<?= e($kanchanaburiProvince) ?>">
           <input type="text" readonly value="<?= e($kanchanaburiProvince) ?>"
@@ -251,7 +246,7 @@ $bookingCaps = $property
         </div>
         <div>
           <label class="text-sm font-medium mb-1 block">อำเภอ</label>
-          <select name="district" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
+          <select name="district" id="owner-property-district" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
             <option value="">— เลือกอำเภอ —</option>
             <?php foreach ($kanchanaburiDistricts as $dist): ?>
               <option value="<?= e($dist) ?>" <?= $selectedDistrict === $dist ? 'selected' : '' ?>><?= e($dist) ?></option>
@@ -260,6 +255,18 @@ $bookingCaps = $property
               <option value="<?= e($selectedDistrict) ?>" selected><?= e($selectedDistrict) ?></option>
             <?php endif; ?>
           </select>
+        </div>
+        <div class="md:col-span-2">
+          <?php $zoneVal = (string)($property['zone'] ?? ''); ?>
+          <label class="text-sm font-medium mb-1 block">โซน / พื้นที่ <span class="text-rose-500">*</span></label>
+          <select name="zone" id="owner-property-zone" required class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white">
+            <option value="">— เลือกโซน / พื้นที่ —</option>
+            <?php foreach ($zone_options_list as $zopt): ?>
+              <option value="<?= e($zopt) ?>" <?= $zoneVal === $zopt ? 'selected' : '' ?>><?= e($zoneOptionLabels[$zopt] ?? $zopt) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <p class="text-xs text-slate-500 mt-1">โซน ใช้จัดกลุ่มบนหน้าเว็บและค้นหา (เช่น แพริมแม่น้ำแคว) — ไม่จำเป็นต้องตรงชื่ออำเภอ ระบบจะแนะนำให้เมื่อเลือกอำเภอแล้ว</p>
+          <p id="owner-property-zone-hint" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2"></p>
         </div>
         <div class="md:col-span-2">
           <label class="text-sm font-medium mb-1 block">ที่อยู่</label>
@@ -610,6 +617,83 @@ $bookingCaps = $property
   <?php endif; ?>
 
 </form>
+<script>
+window.__ZONE_DISTRICT_MAP__ = <?= json_encode($zoneDistrictMap, JSON_UNESCAPED_UNICODE) ?>;
+window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
+    static fn(string $z): array => ['value' => $z, 'label' => $zoneOptionLabels[$z] ?? $z],
+    $zone_options_list
+)), JSON_UNESCAPED_UNICODE) ?>;
+(function () {
+  const districtEl = document.getElementById('owner-property-district');
+  const zoneEl = document.getElementById('owner-property-zone');
+  const hintEl = document.getElementById('owner-property-zone-hint');
+  if (!districtEl || !zoneEl) return;
+
+  const map = window.__ZONE_DISTRICT_MAP__ || {};
+  const allOptions = window.__ZONE_OPTIONS__ || [];
+  const placeholder = '— เลือกโซน / พื้นที่ —';
+
+  function addOption(parent, opt, selected) {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (selected) o.selected = true;
+    parent.appendChild(o);
+  }
+
+  function rebuildZoneSelect() {
+    const district = districtEl.value.trim();
+    const current = zoneEl.value;
+    const recommended = district && Array.isArray(map[district]) ? map[district] : [];
+    const recommendedSet = new Set(recommended);
+
+    zoneEl.innerHTML = '';
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = placeholder;
+    zoneEl.appendChild(emptyOpt);
+
+    if (recommended.length > 0) {
+      const groupRec = document.createElement('optgroup');
+      groupRec.label = 'แนะนำสำหรับ ' + district;
+      recommended.forEach(function (val) {
+        const opt = allOptions.find(function (o) { return o.value === val; });
+        if (opt) addOption(groupRec, opt, current === opt.value);
+      });
+      if (groupRec.children.length) zoneEl.appendChild(groupRec);
+    }
+
+    const groupOther = document.createElement('optgroup');
+    groupOther.label = recommended.length > 0 ? 'โซนอื่นทั้งหมด' : 'โซนทั้งหมด';
+    allOptions.forEach(function (opt) {
+      if (recommendedSet.has(opt.value)) return;
+      addOption(groupOther, opt, current === opt.value);
+    });
+    if (groupOther.children.length) zoneEl.appendChild(groupOther);
+
+    if (current && !zoneEl.querySelector('option[value="' + CSS.escape(current) + '"]')) {
+      addOption(zoneEl, { value: current, label: current }, true);
+    }
+
+    if (hintEl) {
+      if (district && recommended.length === 0) {
+        hintEl.textContent = 'ยังไม่มีโซนแนะนำสำหรับอำเภอนี้ — เลือกโซนที่ใกล้เคียงที่สุด หรือติดต่อแอดมิน';
+        hintEl.classList.remove('hidden');
+      } else {
+        hintEl.textContent = '';
+        hintEl.classList.add('hidden');
+      }
+    }
+
+    if (!current && recommended.length === 1) {
+      zoneEl.value = recommended[0];
+    }
+  }
+
+  districtEl.addEventListener('change', rebuildZoneSelect);
+  rebuildZoneSelect();
+})();
+</script>
 <script>
 (function () {
   const root = document.getElementById('admin-slug-field');

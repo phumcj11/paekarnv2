@@ -8,6 +8,7 @@ use App\Core\Session;
 use App\Core\Upload;
 use App\Core\View;
 use App\Models\Property;
+use App\Models\Zone;
 use App\Support\PropertyBookingCapabilities;
 use App\Services\AdminApprovalNotifyService;
 use App\Services\OwnerFeatureGate;
@@ -135,6 +136,10 @@ class PropertyController extends Controller
         } catch (\Throwable $e) {
         }
 
+        Zone::maybeFlashDistrictZoneMismatch(
+            trim((string)($_POST['district'] ?? '')),
+            $data['zone']
+        );
         Session::flash('success', 'สร้างที่พักเรียบร้อย รอ Admin อนุมัติ · ขั้นถัดไป: เพิ่มห้องหรือแพแต่ละลำ (ปุ่ม «จัดการห้อง/แพ» ด้านบน)');
         redirect(url('/owner/properties/' . $id . '/edit'));
     }
@@ -260,6 +265,10 @@ class PropertyController extends Controller
         Property::syncPropertyAmenities($id, $_POST['amenities'] ?? []);
         Property::recalcMinPrice($id);
 
+        Zone::maybeFlashDistrictZoneMismatch(
+            trim((string)($_POST['district'] ?? '')),
+            $data['zone']
+        );
         Session::flash('success', 'บันทึกการเปลี่ยนแปลงเรียบร้อย');
         redirect(url('/owner/properties/' . $id . '/edit'));
     }
