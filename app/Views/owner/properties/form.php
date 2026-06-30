@@ -265,7 +265,7 @@ $bookingCaps = $property
               <option value="<?= e($zopt) ?>" <?= $zoneVal === $zopt ? 'selected' : '' ?>><?= e($zoneOptionLabels[$zopt] ?? $zopt) ?></option>
             <?php endforeach; ?>
           </select>
-          <p class="text-xs text-slate-500 mt-1">โซน ใช้จัดกลุ่มบนหน้าเว็บและค้นหา (เช่น แพริมแม่น้ำแคว) — ไม่จำเป็นต้องตรงชื่ออำเภอ ระบบจะแนะนำให้เมื่อเลือกอำเภอแล้ว</p>
+          <p id="owner-property-zone-help" class="text-xs text-slate-500 mt-1">โซน ใช้จัดกลุ่มบนหน้าเว็บและค้นหา — ที่พักบนบก (พูลวิลล่า/โรงแรม) เลือกชื่ออำเภอได้ แพริมน้ำเลือกโซนแม่น้ำ/เขื่อน</p>
           <p id="owner-property-zone-hint" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2"></p>
         </div>
         <div class="md:col-span-2">
@@ -627,11 +627,17 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
   const districtEl = document.getElementById('owner-property-district');
   const zoneEl = document.getElementById('owner-property-zone');
   const hintEl = document.getElementById('owner-property-zone-hint');
+  const helpEl = document.getElementById('owner-property-zone-help');
+  const typeEl = document.getElementById('prop-type-select');
   if (!districtEl || !zoneEl) return;
 
   const map = window.__ZONE_DISTRICT_MAP__ || {};
   const allOptions = window.__ZONE_OPTIONS__ || [];
   const placeholder = '— เลือกโซน / พื้นที่ —';
+
+  function isRaftType() {
+    return typeEl && typeEl.value === 'raft';
+  }
 
   function addOption(parent, opt, selected) {
     const o = document.createElement('option');
@@ -641,11 +647,24 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
     parent.appendChild(o);
   }
 
+  function updateHelpText() {
+    if (!helpEl) return;
+    if (isRaftType()) {
+      helpEl.textContent = 'โซน ใช้จัดกลุ่มบนหน้าเว็บและค้นหา (เช่น แพริมแม่น้ำแคว) — เลือกโซนแม่น้ำ/เขื่อนที่ตรงกับตำแหน่งแพ';
+    } else {
+      helpEl.textContent = 'โซน ใช้จัดกลุ่มบนหน้าเว็บและค้นหา — ที่พักบนบก (พูลวิลล่า/โรงแรม) เลือกชื่ออำเภอได้ แพริมน้ำเลือกโซนแม่น้ำ/เขื่อน';
+    }
+  }
+
   function rebuildZoneSelect() {
     const district = districtEl.value.trim();
     const current = zoneEl.value;
-    const recommended = district && Array.isArray(map[district]) ? map[district] : [];
-    const recommendedSet = new Set(recommended);
+    const isRaft = isRaftType();
+    const mappedRecommended = district && Array.isArray(map[district]) ? map[district] : [];
+    const recommendedSet = new Set(mappedRecommended);
+    if (!isRaft && district) {
+      recommendedSet.add(district);
+    }
 
     zoneEl.innerHTML = '';
     const emptyOpt = document.createElement('option');
@@ -653,10 +672,17 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
     emptyOpt.textContent = placeholder;
     zoneEl.appendChild(emptyOpt);
 
-    if (recommended.length > 0) {
+    const showRecGroup = district && (!isRaft || mappedRecommended.length > 0);
+    if (showRecGroup) {
       const groupRec = document.createElement('optgroup');
       groupRec.label = 'แนะนำสำหรับ ' + district;
-      recommended.forEach(function (val) {
+      if (!isRaft && district) {
+        addOption(groupRec, {
+          value: district,
+          label: district + ' — ที่พักทั่วไปในอำเภอ',
+        }, current === district);
+      }
+      mappedRecommended.forEach(function (val) {
         const opt = allOptions.find(function (o) { return o.value === val; });
         if (opt) addOption(groupRec, opt, current === opt.value);
       });
@@ -664,7 +690,7 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
     }
 
     const groupOther = document.createElement('optgroup');
-    groupOther.label = recommended.length > 0 ? 'โซนอื่นทั้งหมด' : 'โซนทั้งหมด';
+    groupOther.label = recommendedSet.size > 0 ? 'โซนอื่นทั้งหมด' : 'โซนทั้งหมด';
     allOptions.forEach(function (opt) {
       if (recommendedSet.has(opt.value)) return;
       addOption(groupOther, opt, current === opt.value);
@@ -676,8 +702,10 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
     }
 
     if (hintEl) {
-      if (district && recommended.length === 0) {
-        hintEl.textContent = 'ยังไม่มีโซนแนะนำสำหรับอำเภอนี้ — เลือกโซนที่ใกล้เคียงที่สุด หรือติดต่อแอดมิน';
+      if (district && mappedRecommended.length === 0) {
+        hintEl.textContent = isRaft
+          ? 'ยังไม่มีโซนแนะนำสำหรับอำเภอนี้ — เลือกโซนที่ใกล้เคียงที่สุด หรือติดต่อแอดมิน'
+          : 'เลือกชื่ออำเภอด้านบนได้เลย ถ้าที่พักไม่ริมน้ำ — หรือเลือกโซนท่องเที่ยวที่ใกล้เคียง';
         hintEl.classList.remove('hidden');
       } else {
         hintEl.textContent = '';
@@ -685,12 +713,23 @@ window.__ZONE_OPTIONS__ = <?= json_encode(array_values(array_map(
       }
     }
 
-    if (!current && recommended.length === 1) {
-      zoneEl.value = recommended[0];
+    if (!current) {
+      if (!isRaft && district) {
+        zoneEl.value = district;
+      } else if (isRaft && mappedRecommended.length === 1) {
+        zoneEl.value = mappedRecommended[0];
+      }
     }
   }
 
   districtEl.addEventListener('change', rebuildZoneSelect);
+  if (typeEl) {
+    typeEl.addEventListener('change', function () {
+      updateHelpText();
+      rebuildZoneSelect();
+    });
+  }
+  updateHelpText();
   rebuildZoneSelect();
 })();
 </script>

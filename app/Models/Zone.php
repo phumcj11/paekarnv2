@@ -344,6 +344,10 @@ class Zone extends Model
             return true;
         }
 
+        if ($zone === $district) {
+            return true;
+        }
+
         $recommended = self::recommendedZonesForDistrict($district);
         if ($recommended === []) {
             return true;
