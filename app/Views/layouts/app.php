@@ -113,7 +113,7 @@ h1,h2,h3,h4,h5,h6,.font-heading { font-family: var(--font-heading); }
 main{min-height:35vh}
 </style>
 </head>
-<body class="bg-cloud text-ink pb-[4.75rem] md:pb-0">
+<body class="bg-cloud text-ink<?= empty($hide_mobile_tab_bar) ? ' pb-[4.75rem] md:pb-0' : '' ?>">
 
 <?php \App\Core\View::partial('partials/nav'); ?>
 
@@ -135,11 +135,17 @@ main{min-height:35vh}
 
 <main><?= $content ?? '' ?></main>
 
+<?php if (empty($hide_public_footer)): ?>
 <?php \App\Core\View::partial('partials/footer'); ?>
+<?php endif; ?>
+<?php if (empty($hide_mobile_tab_bar)): ?>
 <?php \App\Core\View::partial('partials/mobile-tab-bar', ['page' => $page ?? '']); ?>
+<?php endif; ?>
 <?php \App\Core\View::partial('partials/compare-toast'); ?>
 <?php \App\Core\View::partial('partials/compare-bar'); ?>
+<?php if (empty($hide_floating_actions)): ?>
 <?php \App\Core\View::partial('partials/floating-actions', ['page' => $page ?? '']); ?>
+<?php endif; ?>
 
 <script>
 // Compare store config — inline because it uses PHP-generated URLs

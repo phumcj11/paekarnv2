@@ -10,6 +10,40 @@ use App\Services\AIService;
 
 class AIController extends Controller
 {
+    /** GET /ai-search — mobile-first AI raft search landing page */
+    public function landing(): void
+    {
+        $featured = Property::featuredByType('raft', 8, true);
+        if ($featured === []) {
+            $featured = Property::newestByType('raft', 8);
+            $featured = Property::expandListingRowsForDisplay($featured);
+        }
+        $featured = Property::attachGalleryThumbnails($featured);
+        $featured = Property::attachUnitStats($featured);
+
+        $heroPath = '';
+        if ($featured !== []) {
+            $first = $featured[0];
+            $heroPath = trim((string)($first['listing_unit_cover'] ?? ''));
+            if ($heroPath === '') {
+                $heroPath = trim((string)($first['cover_image'] ?? ''));
+            }
+        }
+
+        $this->view('ai_search/landing', [
+            'page'                => 'ai-search',
+            'featuredRafts'       => $featured,
+            'heroImage'           => $heroPath !== '' ? upload_img($heroPath, 'md') : '',
+            'preload_lcp_image'   => $heroPath !== '' ? upload_img($heroPath, 'md') : '',
+            'meta_title'          => 'AI ช่วยค้นหาแพกาญจนบุรีที่ใช่สำหรับคุณ — แพกาญ.com',
+            'meta_description'    => 'บอกจำนวนคน งบ และสิ่งที่ต้องการ ให้ AI ช่วยค้นหาและแนะนำแพกาญจนบุรีที่เหมาะกับคุณภายในไม่กี่วินาที',
+            'meta_canonical'      => url('/ai-search'),
+            'hide_public_footer'  => true,
+            'hide_mobile_tab_bar' => true,
+            'hide_floating_actions' => true,
+        ]);
+    }
+
     /** POST /ai/chat — chatbot widget */
     public function chat(): void
     {
@@ -49,8 +83,30 @@ class AIController extends Controller
     {
         $q = trim((string)($this->input()['query'] ?? ''));
         if ($q === '') { $this->json(['ok' => false, 'error' => 'empty']); return; }
+        if (mb_strlen($q, 'UTF-8') > 800) {
+            $this->json(['ok' => false, 'error' => 'query_too_long'], 422);
+            return;
+        }
 
-        $filters     = AIService::smartSearch($q);
+        $now = time();
+        $hits = Session::get('ai_smart_search_hits', []);
+        $hits = is_array($hits)
+            ? array_values(array_filter($hits, static fn ($ts): bool => is_int($ts) && $ts > $now - 60))
+            : [];
+        if (count($hits) >= 10) {
+            $this->json([
+                'ok'    => false,
+                'error' => 'ค้นหาบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+            ], 429);
+            return;
+        }
+        $hits[] = $now;
+        Session::set('ai_smart_search_hits', $hits);
+
+        $filters = AIService::smartSearch($q);
+        if (($this->input()['scope'] ?? '') === 'raft') {
+            $filters['type'] = 'raft';
+        }
         // Build redirect: strip non-PropertyController fields, append original query for display notice
         $redirectFilters = $filters;
         unset($redirectFilters['group_type'], $redirectFilters['must_have'], $redirectFilters['intent']);

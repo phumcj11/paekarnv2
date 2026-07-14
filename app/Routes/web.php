@@ -123,6 +123,7 @@ return function (Router $r): void {
     $r->post('/track-order', [TrackOrderController::class, 'lookup'])->middleware('csrf');
 
     // ---------- Phase 3: AI ----------
+    $r->get('/ai-search',          [AIController::class, 'landing']);
     $r->post('/ai/chat',          [AIController::class, 'chat']);
     $r->post('/ai/smart-search',  [AIController::class, 'smartSearch']);
     $r->post('/ai/generate',      [AIController::class, 'generate'])->middleware('auth');

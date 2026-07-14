@@ -43,6 +43,7 @@ class SeoController extends Controller
         $urls = [];
         $urls[] = ['loc' => $base . '/', 'changefreq' => 'daily'];
         $urls[] = ['loc' => $base . '/properties', 'changefreq' => 'daily'];
+        $urls[] = ['loc' => $base . '/ai-search', 'changefreq' => 'weekly'];
         $urls[] = ['loc' => $base . '/rafts', 'changefreq' => 'daily'];
         $urls[] = ['loc' => $base . '/resorts', 'changefreq' => 'daily'];
         $urls[] = ['loc' => $base . '/hotels', 'changefreq' => 'daily'];
