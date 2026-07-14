@@ -20,21 +20,13 @@ class AIController extends Controller
         }
         $featured = Property::attachGalleryThumbnails($featured);
         $featured = Property::attachUnitStats($featured);
-
-        $heroPath = '';
-        if ($featured !== []) {
-            $first = $featured[0];
-            $heroPath = trim((string)($first['listing_unit_cover'] ?? ''));
-            if ($heroPath === '') {
-                $heroPath = trim((string)($first['cover_image'] ?? ''));
-            }
-        }
+        $heroImage = asset('ai-raft-search-mobile-hero.webp');
 
         $this->view('ai_search/landing', [
             'page'                => 'ai-search',
             'featuredRafts'       => $featured,
-            'heroImage'           => $heroPath !== '' ? upload_img($heroPath, 'md') : '',
-            'preload_lcp_image'   => $heroPath !== '' ? upload_img($heroPath, 'md') : '',
+            'heroImage'           => $heroImage,
+            'preload_lcp_image'   => $heroImage,
             'meta_title'          => 'AI ช่วยค้นหาแพกาญจนบุรีที่ใช่สำหรับคุณ — แพกาญ.com',
             'meta_description'    => 'บอกจำนวนคน งบ และสิ่งที่ต้องการ ให้ AI ช่วยค้นหาและแนะนำแพกาญจนบุรีที่เหมาะกับคุณภายในไม่กี่วินาที',
             'meta_canonical'      => url('/ai-search'),

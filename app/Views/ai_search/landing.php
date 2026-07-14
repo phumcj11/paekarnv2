@@ -15,9 +15,9 @@ $heroImage = trim((string)($heroImage ?? ''));
          width="1280"
          height="800"
          fetchpriority="high"
-         class="absolute inset-0 -z-20 h-full w-full object-cover object-center opacity-45 blur-[1px] scale-[1.02]">
+         class="absolute inset-0 -z-20 h-full w-full object-cover object-center opacity-80 scale-[1.02]">
     <?php endif; ?>
-    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-white/70 via-sky-50/50 to-[#f7fbfc]"></div>
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-white/35 via-sky-50/20 to-[#f7fbfc]"></div>
     <div class="absolute -left-24 top-36 -z-10 h-72 w-72 rounded-full bg-cyan-200/30 blur-3xl"></div>
     <div class="absolute -right-24 top-16 -z-10 h-80 w-80 rounded-full bg-blue-200/30 blur-3xl"></div>
 
