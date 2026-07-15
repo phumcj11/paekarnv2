@@ -84,16 +84,16 @@ DEALLOCATE PREPARE stmt;
 SQL
 
 echo "=== analytics_page_views indexes ==="
-add_index analytics_page_views idx_apv_counted_created   "(is_counted, created_at)"
-add_index analytics_page_views idx_apv_visitor_created   "(visitor_hash, created_at)"
-add_index analytics_page_views idx_apv_version_created   "(tracking_version, created_at)"
-add_index analytics_page_views idx_apv_property_counted  "(property_id, is_counted, created_at)"
+add_index analytics_page_views idx_apv_counted_created   "is_counted, created_at"
+add_index analytics_page_views idx_apv_visitor_created   "visitor_hash, created_at"
+add_index analytics_page_views idx_apv_version_created   "tracking_version, created_at"
+add_index analytics_page_views idx_apv_property_counted  "property_id, is_counted, created_at"
 
 echo "=== property_lead_clicks indexes ==="
-add_index property_lead_clicks idx_plc_counted_created     "(is_counted, created_at)"
-add_index property_lead_clicks idx_plc_visitor_dedup       "(visitor_hash, property_id, click_type, unit_id, created_at)"
-add_index property_lead_clicks idx_plc_version_created     "(tracking_version, created_at)"
-add_index property_lead_clicks idx_plc_property_type_count "(property_id, click_type, is_counted, created_at)"
+add_index property_lead_clicks idx_plc_counted_created     "is_counted, created_at"
+add_index property_lead_clicks idx_plc_visitor_dedup       "visitor_hash, property_id, click_type, unit_id, created_at"
+add_index property_lead_clicks idx_plc_version_created     "tracking_version, created_at"
+add_index property_lead_clicks idx_plc_property_type_count "property_id, click_type, is_counted, created_at"
 
 echo "=== mark existing rows as legacy (tracking_version=1) ==="
 $MYSQL -e "UPDATE analytics_page_views SET tracking_version = 1 WHERE tracking_version IS NULL OR tracking_version = 0" 2>/dev/null || true
