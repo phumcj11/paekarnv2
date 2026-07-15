@@ -22,9 +22,19 @@ class AvailablePropertiesService
         if ($type) $params['type'] = $type;
 
         $hasAvUpdated  = Database::tableHasColumn('availability', 'updated_at');
-        $hasLeadClicks = Database::tableHasColumn('property_lead_clicks', 'id');
+        $hasLeadClicks = Database::tableHasColumn('property_lead_clicks', 'is_counted');
 
-        // freshness: ใช้ updated_at ถ้ามี ไม่งั้นใช้ availability.date ใน 7 วันข้างหน้าเป็น proxy
+        $leadScore = $hasLeadClicks
+            ? "LEAST(COALESCE((SELECT COUNT(*) FROM property_lead_clicks lc
+                              WHERE lc.property_id = p.id
+                              AND lc.is_counted = 1
+                              AND lc.tracking_version = 2
+                              AND lc.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), 0), 10)"
+            : ($hasLeadClicksLegacy = Database::tableHasColumn('property_lead_clicks', 'id'))
+                ? "LEAST(COALESCE((SELECT COUNT(*) FROM property_lead_clicks lc
+                                  WHERE lc.property_id = p.id
+                                  AND lc.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), 0), 10)"
+                : "0";
         $calendarFreshSelect = $hasAvUpdated
             ? "(SELECT MAX(av2.updated_at) FROM availability av2
                 WHERE av2.unit_id IN (SELECT id FROM property_units WHERE property_id = p.id)
@@ -42,12 +52,6 @@ class AvailablePropertiesService
                    WHERE av2.unit_id IN (SELECT id FROM property_units WHERE property_id = p.id)
                    AND av2.date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
                    AND av2.status = 'open' LIMIT 1) IS NOT NULL, 5, 0)";
-
-        $leadScore = $hasLeadClicks
-            ? "LEAST(COALESCE((SELECT COUNT(*) FROM property_lead_clicks lc
-                              WHERE lc.property_id = p.id
-                              AND lc.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), 0), 10)"
-            : "0";
 
         $boostCfg = OwnerTier::featuresConfig()['boost'] ?? [];
         $vipBoost = max(0, (int) ($boostCfg['vip'] ?? 30));

@@ -12,9 +12,17 @@
  * @var float       $clickRate
  * @var array[]     $topReferrers
  * @var string|null $aiSummaryUrl
+ * @var bool        $v2Ready
+ * @var string|null $v2StartedAt
+ * @var int         $uniqueVisitors
+ * @var int         $uniqueMonth
  * @var bool        $hasLeadTable
  * @var bool        $hasViewTable
  */
+$v2Ready = $v2Ready ?? false;
+$v2StartedAt = $v2StartedAt ?? null;
+$uniqueVisitors = $uniqueVisitors ?? 0;
+$uniqueMonth = $uniqueMonth ?? 0;
 $property = null;
 foreach ($properties as $p) {
     if ((int)$p['id'] === $propertyId) { $property = $p; break; }
@@ -61,6 +69,11 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
     <?= e($property['name']) ?>
   </span>
   <?php endif; ?>
+  <?php if ($v2Ready): ?>
+  <span class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5 font-semibold">
+    Analytics V2<?= $v2StartedAt ? ' · ตั้งแต่ ' . e(date('d/m/Y', strtotime($v2StartedAt))) : '' ?>
+  </span>
+  <?php endif; ?>
 </div>
 
 <?php if (!$propertyId): ?>
@@ -84,17 +97,20 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4">
     <div class="flex items-center gap-2 text-slate-500 text-xs mb-2">
       <i data-lucide="eye" class="w-4 h-4 text-blue-500 shrink-0"></i>
-      ดูหน้าที่พัก
+      <?= $v2Ready ? 'Page views (คนจริง)' : 'ดูหน้าที่พัก' ?>
     </div>
     <div class="text-2xl font-bold text-slate-800"><?= number_format($views) ?></div>
-    <div class="text-[10px] text-slate-400 mt-1"><?= $range ?> วัน · เดือนนี้ <?= number_format($viewsMonth) ?></div>
+    <?php if ($v2Ready): ?>
+    <div class="text-[10px] text-emerald-600 mt-1">ผู้เข้าชมไม่ซ้ำ <?= number_format($uniqueVisitors) ?></div>
+    <?php endif; ?>
+    <div class="text-[10px] text-slate-400 mt-1"><?= $range ?> วัน · เดือนนี้ <?= number_format($viewsMonth) ?><?= $v2Ready ? ' (unique ' . number_format($uniqueMonth) . ')' : '' ?></div>
   </div>
 
   <!-- Phone -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4">
     <div class="flex items-center gap-2 text-slate-500 text-xs mb-2">
       <i data-lucide="phone" class="w-4 h-4 text-emerald-500 shrink-0"></i>
-      กดโทร
+      <?= $v2Ready ? 'คลิกปุ่มโทร (ไม่ซ้ำ)' : 'กดโทร' ?>
     </div>
     <div class="text-2xl font-bold text-slate-800"><?= number_format($clicks['phone']) ?></div>
     <div class="text-[10px] text-slate-400 mt-1"><?= $range ?> วัน · เดือนนี้ <?= number_format($clicksMonth['phone']) ?></div>
@@ -104,7 +120,7 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4">
     <div class="flex items-center gap-2 text-slate-500 text-xs mb-2">
       <svg class="w-4 h-4 text-[#06C755] shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.98 1.6 5.6 4.08 7.27L5.5 22l4.15-2.05A10.94 10.94 0 0 0 12 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
-      กด LINE
+      <?= $v2Ready ? 'กด LINE (ไม่ซ้ำ)' : 'กด LINE' ?>
     </div>
     <div class="text-2xl font-bold text-slate-800"><?= number_format($clicks['line']) ?></div>
     <div class="text-[10px] text-slate-400 mt-1"><?= $range ?> วัน · เดือนนี้ <?= number_format($clicksMonth['line']) ?></div>
@@ -114,7 +130,7 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
   <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-4">
     <div class="flex items-center gap-2 text-slate-500 text-xs mb-2">
       <i data-lucide="calendar-check" class="w-4 h-4 text-accent-600 shrink-0"></i>
-      กดจอง
+      <?= $v2Ready ? 'กดจอง (ไม่ซ้ำ)' : 'กดจอง' ?>
     </div>
     <div class="text-2xl font-bold text-slate-800"><?= number_format($clicks['book']) ?></div>
     <div class="text-[10px] text-slate-400 mt-1"><?= $range ?> วัน · เดือนนี้ <?= number_format($clicksMonth['book']) ?></div>
@@ -159,9 +175,9 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
       <div class="text-[10px] text-violet-500 mt-1"><?= $viewToContact ?? 0 ?>% จากผู้เข้าชม</div>
     </div>
     <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
-      <div class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">จองยืนยัน</div>
+      <div class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">จองยืนยัน (จริง)</div>
       <div class="text-xl font-bold text-slate-800 mt-1"><?= number_format($bookingsInRange['confirmed'] ?? 0) ?></div>
-      <div class="text-[10px] text-emerald-500 mt-1"><?= $contactToBook ?? 0 ?>% จาก contact</div>
+      <div class="text-[10px] text-emerald-500 mt-1">สร้าง <?= number_format($bookingsInRange['total'] ?? 0) ?> · แยกจากคลิกปุ่มจอง</div>
     </div>
     <div class="rounded-xl bg-amber-50 border border-amber-100 p-3">
       <div class="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">รายได้จอง</div>
@@ -205,16 +221,26 @@ $chartViewLabels = json_encode(array_column($dailyViews,  'date'));
     สรุปช่วง <?= $range ?> วัน
   </h3>
   <ul class="text-sm text-slate-700 space-y-1.5">
+    <?php if ($v2Ready): ?>
+    <li class="flex items-center gap-2 text-xs text-slate-500">
+      <span class="w-2 h-2 rounded-full bg-slate-300 shrink-0"></span>
+      คลิกปุ่มโทร ≠ สายโทรสำเร็จ — ตัวเลข V2 นับเฉพาะ intent ที่ไม่ซ้ำ
+    </li>
+    <?php endif; ?>
     <?php if ($views > 0): ?>
     <li class="flex items-center gap-2">
       <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>
+      <?php if ($v2Ready): ?>
+      มีคนเข้าชมหน้าที่พัก <strong><?= number_format($views) ?></strong> ครั้ง (unique <strong><?= number_format($uniqueVisitors) ?></strong>)
+      <?php else: ?>
       มีคนเข้าชมหน้าที่พัก <strong><?= number_format($views) ?></strong> ครั้ง
+      <?php endif; ?>
     </li>
     <?php endif; ?>
     <?php if ($clicks['phone'] > 0): ?>
     <li class="flex items-center gap-2">
       <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-      กดโทร <strong><?= number_format($clicks['phone']) ?></strong> ครั้ง — มีโอกาสรับจอง
+      <?= $v2Ready ? 'คลิกปุ่มโทร (ไม่ซ้ำ)' : 'กดโทร' ?> <strong><?= number_format($clicks['phone']) ?></strong> ครั้ง
     </li>
     <?php endif; ?>
     <?php if ($clicks['line'] > 0): ?>

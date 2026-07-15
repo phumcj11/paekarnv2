@@ -6,7 +6,9 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\View;
+use App\Models\PropertyLeadClick;
 use App\Services\AIService;
+use App\Services\AnalyticsPageViewService;
 use App\Services\OwnerFeatureGate;
 use App\Services\OwnerTier;
 
@@ -32,55 +34,80 @@ class AnalyticsController extends Controller
         $property = Database::fetch("SELECT name, type, zone FROM properties WHERE id = :i LIMIT 1", ['i' => $propertyId]);
         if (!$property) { $this->json(['ok' => false, 'error' => 'ไม่พบที่พัก']); return; }
 
-        $hasLeads = Database::tableHasColumn('property_lead_clicks', 'id');
-        $hasViews = Database::tableHasColumn('analytics_page_views', 'id');
+        $v2Ready = PropertyLeadClick::v2Ready() && AnalyticsPageViewService::v2Ready();
+        $stats = ['views' => 0, 'unique_visitors' => 0, 'phone' => 0, 'line' => 0, 'book' => 0, 'map' => 0];
 
-        $stats = [];
-        if ($hasViews) {
-            $v = Database::fetch("SELECT COUNT(*) AS cnt FROM analytics_page_views WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)", ['p' => $propertyId, 'r' => $range]);
+        if (AnalyticsPageViewService::v2Ready()) {
+            $v = Database::fetch(
+                "SELECT SUM(CASE WHEN is_counted = 1 THEN 1 ELSE 0 END) AS views,
+                        COUNT(DISTINCT CASE WHEN is_counted = 1 THEN visitor_hash END) AS unique_visitors
+                 FROM analytics_page_views
+                 WHERE property_id = :p AND tracking_version = 2
+                   AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                ['p' => $propertyId, 'r' => $range]
+            );
+            $stats['views'] = (int)($v['views'] ?? 0);
+            $stats['unique_visitors'] = (int)($v['unique_visitors'] ?? 0);
+        } elseif (Database::tableHasColumn('analytics_page_views', 'id')) {
+            $v = Database::fetch(
+                "SELECT COUNT(*) AS cnt FROM analytics_page_views
+                 WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                ['p' => $propertyId, 'r' => $range]
+            );
             $stats['views'] = (int)($v['cnt'] ?? 0);
         }
-        if ($hasLeads) {
+
+        if (PropertyLeadClick::tableReady()) {
+            $counted = $v2Ready ? 'AND is_counted = 1 AND tracking_version = 2' : '';
             $lRow = Database::fetch(
                 "SELECT SUM(CASE WHEN click_type='phone' THEN 1 ELSE 0 END) AS phone,
                         SUM(CASE WHEN click_type='line'  THEN 1 ELSE 0 END) AS line,
                         SUM(CASE WHEN click_type='book'  THEN 1 ELSE 0 END) AS book,
                         SUM(CASE WHEN click_type='map'   THEN 1 ELSE 0 END) AS map
-                 FROM property_lead_clicks WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                 FROM property_lead_clicks
+                 WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY) {$counted}",
                 ['p' => $propertyId, 'r' => $range]
             );
-            $stats['phone']  = (int)($lRow['phone'] ?? 0);
-            $stats['line']   = (int)($lRow['line']  ?? 0);
-            $stats['book']   = (int)($lRow['book']  ?? 0);
-            $stats['map']    = (int)($lRow['map']   ?? 0);
+            $stats['phone'] = (int)($lRow['phone'] ?? 0);
+            $stats['line']  = (int)($lRow['line'] ?? 0);
+            $stats['book']  = (int)($lRow['book'] ?? 0);
+            $stats['map']   = (int)($lRow['map'] ?? 0);
         }
 
         $bookingsRow = Database::fetch(
-            "SELECT COUNT(*) AS total, SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed
+            "SELECT COUNT(*) AS total, SUM(CASE WHEN status IN ('confirmed','completed') THEN 1 ELSE 0 END) AS confirmed
              FROM bookings b JOIN properties p ON p.id=b.property_id
              WHERE p.id = :pid AND b.created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
             ['pid' => $propertyId, 'r' => $range]
         );
 
+        $phoneLabel = $v2Ready ? 'คลิกปุ่มโทรที่ไม่ซ้ำ' : 'กดโทร';
+        $viewLabel = $v2Ready ? 'ผู้เข้าชมไม่ซ้ำ' : 'ยอดเข้าชมหน้าที่พัก';
+
         $instruction = sprintf(
             "คุณคือที่ปรึกษาการตลาดสำหรับที่พัก \"%s\" (%s) ในกาญจนบุรี\n\n" .
-            "ข้อมูลสถิติ %d วันที่ผ่านมา:\n" .
-            "- ยอดเข้าชมหน้าที่พัก: %s ครั้ง\n" .
-            "- กดโทร: %s ครั้ง\n" .
-            "- กด LINE: %s ครั้ง\n" .
-            "- กดจอง: %s ครั้ง\n" .
-            "- เปิดแผนที่: %s ครั้ง\n" .
-            "- การจองทั้งหมด: %s รายการ (ยืนยัน: %s)\n\n" .
+            "ข้อมูลสถิติ %d วันที่ผ่านมา (Analytics V2 — นับเฉพาะคนจริงที่ไม่ซ้ำ):\n" .
+            "- %s: %s\n" .
+            "- Page views (คนจริง): %s ครั้ง\n" .
+            "- %s: %s ครั้ง\n" .
+            "- กด LINE (ไม่ซ้ำ): %s ครั้ง\n" .
+            "- กดจอง (ไม่ซ้ำ): %s ครั้ง\n" .
+            "- เปิดแผนที่ (ไม่ซ้ำ): %s ครั้ง\n" .
+            "- การจองจริงที่สร้าง: %s รายการ (ยืนยัน/เสร็จ: %s)\n\n" .
+            "หมายเหตุ: คลิกปุ่มโทร ≠ สายโทรสำเร็จ\n\n" .
             "วิเคราะห์สถิตินี้เป็นภาษาไทยสั้นๆ 2-3 ประโยค บอกว่าน่าสนใจอย่างไร และแนะนำ 1 action ที่เจ้าของควรทำต่อ " .
             "ใช้ภาษาเป็นกันเอง ไม่ต้องใส่หัวข้อหรือ bullet",
             $property['name'],
             $property['type'],
             $range,
-            number_format($stats['views'] ?? 0),
-            number_format($stats['phone'] ?? 0),
-            number_format($stats['line']  ?? 0),
-            number_format($stats['book']  ?? 0),
-            number_format($stats['map']   ?? 0),
+            $viewLabel,
+            number_format($v2Ready ? $stats['unique_visitors'] : $stats['views']),
+            number_format($stats['views']),
+            $phoneLabel,
+            number_format($stats['phone']),
+            number_format($stats['line']),
+            number_format($stats['book']),
+            number_format($stats['map']),
             number_format((int)($bookingsRow['total'] ?? 0)),
             number_format((int)($bookingsRow['confirmed'] ?? 0))
         );
@@ -109,7 +136,6 @@ class AnalyticsController extends Controller
         $propertyId = (int)($_GET['property_id'] ?? ($properties[0]['id'] ?? 0));
         $range      = in_array((int)($_GET['range'] ?? 30), [7, 14, 30, 90]) ? (int)$_GET['range'] : 30;
 
-        // guard: owner ต้องเป็นเจ้าของที่พัก
         if ($ownerId && $propertyId) {
             $owns = false;
             foreach ($properties as $p) {
@@ -119,22 +145,27 @@ class AnalyticsController extends Controller
         }
 
         $canDeep = Auth::isAdmin() || ($ownerId && OwnerTier::can($ownerId, OwnerTier::FEATURE_ANALYTICS_DEEP));
+        $v2Ready = PropertyLeadClick::v2Ready() && AnalyticsPageViewService::v2Ready();
+        $v2StartedAt = AnalyticsPageViewService::v2StartedAt() ?? PropertyLeadClick::v2StartedAt();
 
-        $hasLeadTable = Database::tableHasColumn('property_lead_clicks', 'id');
+        $hasLeadTable = PropertyLeadClick::tableReady();
         $hasViewTable = Database::tableHasColumn('analytics_page_views', 'id');
 
         $clicks      = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0, 'map' => 0];
         $clicksMonth = ['phone' => 0, 'line' => 0, 'coupon' => 0, 'book' => 0, 'map' => 0];
         $views       = 0;
+        $uniqueVisitors = 0;
         $viewsMonth  = 0;
+        $uniqueMonth = 0;
         $dailyClicks = [];
         $dailyViews  = [];
-        $topDays     = [];
         $topReferrers = [];
+
+        $countedFilter = $v2Ready ? 'AND is_counted = 1 AND tracking_version = 2' : '';
+        $viewCountedFilter = $v2Ready ? 'AND is_counted = 1 AND tracking_version = 2' : '';
 
         if ($propertyId) {
             if ($hasLeadTable) {
-                // ยอดรวมตลอด / เดือนนี้
                 $row = Database::fetch(
                     "SELECT
                        SUM(CASE WHEN click_type='phone'  THEN 1 ELSE 0 END) AS phone,
@@ -143,7 +174,7 @@ class AnalyticsController extends Controller
                        SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book,
                        SUM(CASE WHEN click_type='map'    THEN 1 ELSE 0 END) AS map
                      FROM property_lead_clicks
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY) {$countedFilter}",
                     ['p' => $propertyId, 'r' => $range]
                 );
                 if ($row) {
@@ -156,19 +187,17 @@ class AnalyticsController extends Controller
                     ];
                 }
 
-                // รายวัน (สำหรับกราฟ)
                 $rawDaily = Database::fetchAll(
                     "SELECT DATE(created_at) AS day,
                        SUM(CASE WHEN click_type='phone'  THEN 1 ELSE 0 END) AS phone,
                        SUM(CASE WHEN click_type='line'   THEN 1 ELSE 0 END) AS line,
                        SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book
                      FROM property_lead_clicks
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY) {$countedFilter}
                      GROUP BY DATE(created_at)
                      ORDER BY day ASC",
                     ['p' => $propertyId, 'r' => $range]
                 );
-                // เติมวันที่ขาด
                 $dailyMap = [];
                 foreach ($rawDaily as $r2) { $dailyMap[$r2['day']] = $r2; }
                 for ($i = $range - 1; $i >= 0; $i--) {
@@ -181,7 +210,6 @@ class AnalyticsController extends Controller
                     ];
                 }
 
-                // เดือนนี้
                 $rowM = Database::fetch(
                     "SELECT
                        SUM(CASE WHEN click_type='phone'  THEN 1 ELSE 0 END) AS phone,
@@ -190,7 +218,7 @@ class AnalyticsController extends Controller
                        SUM(CASE WHEN click_type='book'   THEN 1 ELSE 0 END) AS book,
                        SUM(CASE WHEN click_type='map'    THEN 1 ELSE 0 END) AS map
                      FROM property_lead_clicks
-                     WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m')",
+                     WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m') {$countedFilter}",
                     ['p' => $propertyId]
                 );
                 if ($rowM) {
@@ -205,26 +233,53 @@ class AnalyticsController extends Controller
             }
 
             if ($hasViewTable) {
-                $vRow = Database::fetch(
-                    "SELECT COUNT(*) AS cnt FROM analytics_page_views
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
-                    ['p' => $propertyId, 'r' => $range]
-                );
-                $views = (int)($vRow['cnt'] ?? 0);
+                if ($v2Ready) {
+                    $vRow = Database::fetch(
+                        "SELECT SUM(CASE WHEN is_counted = 1 THEN 1 ELSE 0 END) AS views,
+                                COUNT(DISTINCT CASE WHEN is_counted = 1 THEN visitor_hash END) AS unique_visitors
+                         FROM analytics_page_views
+                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY) {$viewCountedFilter}",
+                        ['p' => $propertyId, 'r' => $range]
+                    );
+                    $views = (int)($vRow['views'] ?? 0);
+                    $uniqueVisitors = (int)($vRow['unique_visitors'] ?? 0);
 
-                $vRowM = Database::fetch(
-                    "SELECT COUNT(*) AS cnt FROM analytics_page_views
-                     WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m')",
-                    ['p' => $propertyId]
-                );
-                $viewsMonth = (int)($vRowM['cnt'] ?? 0);
+                    $vRowM = Database::fetch(
+                        "SELECT SUM(CASE WHEN is_counted = 1 THEN 1 ELSE 0 END) AS views,
+                                COUNT(DISTINCT CASE WHEN is_counted = 1 THEN visitor_hash END) AS unique_visitors
+                         FROM analytics_page_views
+                         WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m') {$viewCountedFilter}",
+                        ['p' => $propertyId]
+                    );
+                    $viewsMonth = (int)($vRowM['views'] ?? 0);
+                    $uniqueMonth = (int)($vRowM['unique_visitors'] ?? 0);
+                } else {
+                    $vRow = Database::fetch(
+                        "SELECT COUNT(*) AS cnt FROM analytics_page_views
+                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)",
+                        ['p' => $propertyId, 'r' => $range]
+                    );
+                    $views = (int)($vRow['cnt'] ?? 0);
 
-                // รายวัน
+                    $vRowM = Database::fetch(
+                        "SELECT COUNT(*) AS cnt FROM analytics_page_views
+                         WHERE property_id = :p AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(NOW(),'%Y-%m')",
+                        ['p' => $propertyId]
+                    );
+                    $viewsMonth = (int)($vRowM['cnt'] ?? 0);
+                }
+
                 $rawV = Database::fetchAll(
-                    "SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-                     FROM analytics_page_views
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
-                     GROUP BY DATE(created_at) ORDER BY day ASC",
+                    $v2Ready
+                        ? "SELECT DATE(created_at) AS day,
+                                  SUM(CASE WHEN is_counted = 1 THEN 1 ELSE 0 END) AS cnt
+                           FROM analytics_page_views
+                           WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY) {$viewCountedFilter}
+                           GROUP BY DATE(created_at) ORDER BY day ASC"
+                        : "SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+                           FROM analytics_page_views
+                           WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                           GROUP BY DATE(created_at) ORDER BY day ASC",
                     ['p' => $propertyId, 'r' => $range]
                 );
                 $dailyVMap = [];
@@ -237,22 +292,24 @@ class AnalyticsController extends Controller
                     ];
                 }
 
-                // Top referrers — แหล่งที่มาของผู้เข้าชม (Standard+ เท่านั้น)
                 if ($canDeep) {
                     $topReferrers = Database::fetchAll(
-                        "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
-                         FROM analytics_page_views
-                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
-                         GROUP BY referrer_host
-                         ORDER BY cnt DESC
-                         LIMIT 10",
+                        $v2Ready
+                            ? "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
+                               FROM analytics_page_views
+                               WHERE property_id = :p AND is_counted = 1 AND tracking_version = 2
+                                 AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                               GROUP BY referrer_host ORDER BY cnt DESC LIMIT 10"
+                            : "SELECT COALESCE(referrer_host, '(direct)') AS referrer, COUNT(*) AS cnt
+                               FROM analytics_page_views
+                               WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL :r DAY)
+                               GROUP BY referrer_host ORDER BY cnt DESC LIMIT 10",
                         ['p' => $propertyId, 'r' => $range]
                     );
                 }
             }
         }
 
-        // อัตรา click-to-view (click rate %)
         $clickRate = $views > 0 ? round(($clicks['phone'] + $clicks['line'] + $clicks['book']) / $views * 100, 1) : 0;
 
         $bookingsInRange = ['total' => 0, 'confirmed' => 0, 'revenue' => 0.0];
@@ -280,6 +337,8 @@ class AnalyticsController extends Controller
         View::render('owner/analytics/index', [
             'aiSummaryUrl' => ($canDeep && $propertyId) ? url('/owner/analytics/ai-summary?property_id=' . $propertyId . '&range=' . $range) : null,
             'canDeep'      => $canDeep,
+            'v2Ready'      => $v2Ready,
+            'v2StartedAt'  => $v2StartedAt,
             'page_title'   => 'Analytics — สถิติที่พัก',
             'properties'   => $properties,
             'propertyId'   => $propertyId,
@@ -287,7 +346,9 @@ class AnalyticsController extends Controller
             'clicks'       => $clicks,
             'clicksMonth'  => $clicksMonth,
             'views'        => $views,
+            'uniqueVisitors' => $uniqueVisitors,
             'viewsMonth'   => $viewsMonth,
+            'uniqueMonth'  => $uniqueMonth,
             'dailyClicks'  => $dailyClicks,
             'dailyViews'   => $dailyViews,
             'clickRate'    => $clickRate,

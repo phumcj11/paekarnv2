@@ -27,6 +27,8 @@ class SeoController extends Controller
             'Disallow: /booking/create/',
             'Disallow: /activity/checkout/',
             'Disallow: /api/',
+            'Disallow: /property/lead/',
+            'Disallow: /activities/lead/',
             '',
             "Sitemap: {$base}/sitemap.xml",
         ];

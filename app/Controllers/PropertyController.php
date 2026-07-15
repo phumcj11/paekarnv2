@@ -1036,28 +1036,23 @@ class PropertyController extends Controller
             return;
         }
 
+        $resolved = $this->resolveLeadDestination($property, $type, $unitId);
+        if (!$resolved['ok']) {
+            http_response_code(404);
+            $this->view('errors/404');
+            return;
+        }
+
+        $unitId = $resolved['unit_id'];
         PropertyLeadClick::record($propertyId, $unitId > 0 ? $unitId : null, $type);
 
         if ($type === 'phone') {
-            $caps = PropertyBookingCapabilities::fromProperty($property);
-            $phone = trim((string)($property['phone'] ?? ''));
-            if (!$caps['allow_contact'] || $phone === '') {
-                http_response_code(404);
-                $this->view('errors/404');
-                return;
-            }
+            $phone = $resolved['phone'];
             redirect('tel:' . preg_replace('/\s+/', '', $phone));
         }
 
         if ($type === 'line') {
-            $caps = PropertyBookingCapabilities::fromProperty($property);
-            $lineUrl = PropertyBookingCapabilities::lineUrl((string)($property['line_id'] ?? ''));
-            if (!$caps['show_line_contact'] || $lineUrl === '') {
-                http_response_code(404);
-                $this->view('errors/404');
-                return;
-            }
-            redirect($lineUrl);
+            redirect($resolved['line_url']);
         }
 
         if ($type === 'coupon') {
@@ -1068,22 +1063,64 @@ class PropertyController extends Controller
             redirect(url('/coupons/buy?' . http_build_query($params)));
         }
 
-        if ($unitId <= 0) {
-            $units = Property::units($propertyId);
-            $unitId = isset($units[0]['id']) ? (int)$units[0]['id'] : 0;
-        }
-        if ($unitId <= 0) {
-            redirect(url('/property/' . $property['slug']));
-            return;
-        }
         if ($type === 'map') {
-            $lat = floatval($property['latitude'] ?? 0) ?: 14.0228;
-            $lng = floatval($property['longitude'] ?? 0) ?: 99.5328;
-            redirect('https://www.google.com/maps/search/?api=1&query=' . $lat . ',' . $lng);
+            redirect($resolved['map_url']);
             return;
         }
 
         redirect(PropertyBookingCapabilities::bookUrl($propertyId, $unitId, 'book'));
+    }
+
+    /** @return array{ok:bool,unit_id:int,phone?:string,line_url?:string,map_url?:string} */
+    private function resolveLeadDestination(array $property, string $type, int $unitId): array
+    {
+        $caps = PropertyBookingCapabilities::fromProperty($property);
+        $propertyId = (int)$property['id'];
+
+        if ($type === 'phone') {
+            $phone = trim((string)($property['phone'] ?? ''));
+            return [
+                'ok'      => $caps['allow_contact'] && $phone !== '',
+                'unit_id' => $unitId,
+                'phone'   => $phone,
+            ];
+        }
+
+        if ($type === 'line') {
+            $lineUrl = PropertyBookingCapabilities::lineUrl((string)($property['line_id'] ?? ''));
+            return [
+                'ok'       => $caps['show_line_contact'] && $lineUrl !== '',
+                'unit_id'  => $unitId,
+                'line_url' => $lineUrl,
+            ];
+        }
+
+        if ($type === 'coupon') {
+            return [
+                'ok'      => $caps['coupon_enabled'],
+                'unit_id' => $unitId,
+            ];
+        }
+
+        if ($type === 'map') {
+            $lat = floatval($property['latitude'] ?? 0) ?: 14.0228;
+            $lng = floatval($property['longitude'] ?? 0) ?: 99.5328;
+            return [
+                'ok'      => true,
+                'unit_id' => $unitId,
+                'map_url' => 'https://www.google.com/maps/search/?api=1&query=' . $lat . ',' . $lng,
+            ];
+        }
+
+        if ($unitId <= 0) {
+            $units = Property::units($propertyId);
+            $unitId = isset($units[0]['id']) ? (int)$units[0]['id'] : 0;
+        }
+
+        return [
+            'ok'      => $unitId > 0 && $caps['allow_online_booking'],
+            'unit_id' => $unitId,
+        ];
     }
 
 }

@@ -6,6 +6,7 @@ use App\Core\Auth;
 use App\Core\Database;
 use App\Core\View;
 use App\Models\PropertyLeadClick;
+use App\Services\AnalyticsPageViewService;
 use App\Services\OwnerAvailabilityCalendar;
 use App\Services\OwnerFeatureGate;
 use App\Services\OwnerMembership;
@@ -118,13 +119,14 @@ class DashboardController extends Controller
         if ($canAnalyticsPreview && $ownerId && !empty($calProperties)) {
             $firstPid = (int)($calProperties[0]['id'] ?? 0);
             if ($firstPid && PropertyLeadClick::tableReady()) {
+                $v2Filter = PropertyLeadClick::v2Ready() ? 'AND is_counted = 1 AND tracking_version = 2' : '';
                 $row = Database::fetch(
                     "SELECT
                        SUM(CASE WHEN click_type='phone' THEN 1 ELSE 0 END) AS phone,
                        SUM(CASE WHEN click_type='line'  THEN 1 ELSE 0 END) AS line,
                        SUM(CASE WHEN click_type='book'  THEN 1 ELSE 0 END) AS book
                      FROM property_lead_clicks
-                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+                     WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) {$v2Filter}",
                     ['p' => $firstPid]
                 );
                 if ($row) {
@@ -137,9 +139,12 @@ class DashboardController extends Controller
                     ];
                 }
                 if (Database::tableHasColumn('analytics_page_views', 'id')) {
+                    $viewFilter = AnalyticsPageViewService::v2Ready()
+                        ? 'AND is_counted = 1 AND tracking_version = 2'
+                        : '';
                     $vRow = Database::fetch(
                         "SELECT COUNT(*) AS cnt FROM analytics_page_views
-                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+                         WHERE property_id = :p AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) {$viewFilter}",
                         ['p' => $firstPid]
                     );
                     $analyticsPreview['views'] = (int)($vRow['cnt'] ?? 0);
