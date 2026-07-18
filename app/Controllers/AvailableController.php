@@ -32,7 +32,7 @@ class AvailableController extends Controller
     public function weekend(): void
     {
         $weekend  = APS::nextWeekendDates();
-        $date     = $_GET['day'] === 'sunday' ? $weekend['sunday'] : $weekend['saturday'];
+        $date     = ($_GET['day'] ?? '') === 'sunday' ? $weekend['sunday'] : $weekend['saturday'];
         $type     = $_GET['type'] ?? null;
         $dayKey   = $date === $weekend['sunday'] ? 'sunday' : 'saturday';
         $rows     = APS::findAvailableOn($date, $type ?: null);
