@@ -17,31 +17,6 @@ if (!function_exists('self_notif_icon')) {
         };
     }
 }
-if (!function_exists('time_ago')) {
-    function time_ago(?string $dt): string {
-        if (!$dt) {
-            return '-';
-        }
-        $d = strtotime($dt);
-        if ($d === false) {
-            return '-';
-        }
-        $diff = time() - $d;
-        if ($diff < 60) {
-            return 'เมื่อสักครู่';
-        }
-        if ($diff < 3600) {
-            return floor($diff / 60) . ' นาทีที่แล้ว';
-        }
-        if ($diff < 86400) {
-            return floor($diff / 3600) . ' ชั่วโมงที่แล้ว';
-        }
-        if ($diff < 86400 * 30) {
-            return floor($diff / 86400) . ' วันที่แล้ว';
-        }
-        return date('d M', $d);
-    }
-}
 
 if (!Auth::check()) {
     return;
