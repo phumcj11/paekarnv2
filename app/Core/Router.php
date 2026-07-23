@@ -155,7 +155,15 @@ class Router
                 break;
             case 'csrf':
                 if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'DELETE'])) {
-                    if (!Csrf::verify($_POST['_csrf'] ?? '')) {
+                    if (!Csrf::verify($_POST['_csrf'] ?? null)) {
+                        $path = $this->currentPath();
+                        if (in_array($path, Csrf::publicAuthPostPaths(), true)) {
+                            Session::flash(
+                                'error',
+                                'เซสชันหมดอายุหรือเปิดฟอร์มค้างนานเกินไป กรุณากรอกและกดส่งใหม่อีกครั้ง'
+                            );
+                            redirect(Csrf::publicAuthRedirectFor($path));
+                        }
                         http_response_code(419);
                         View::render('errors/403', ['message' => 'CSRF token mismatch']);
                         exit;

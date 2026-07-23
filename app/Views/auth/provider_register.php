@@ -36,7 +36,7 @@ $zoneChoices = Property::zonesForSelect();
         </div>
       <?php endif; ?>
 
-      <form method="post" action="<?= url('/provider/register') ?>" class="space-y-3">
+      <form method="post" action="<?= url('/provider/register') ?>" class="space-y-3" id="providerRegisterForm">
         <?= csrf() ?>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -90,13 +90,25 @@ $zoneChoices = Property::zonesForSelect();
           </div>
         </div>
         <p class="text-xs text-slate-500">หลังสมัคร ทีมงานจะตรวจสอบและอนุมัติบัญชีก่อนเปิดใช้งานเต็มรูปแบบ</p>
-        <button type="submit" class="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">สมัครเป็นพาร์ทเนอร์</button>
+        <button type="submit" id="providerRegisterSubmit" class="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">สมัครเป็นพาร์ทเนอร์</button>
         <div class="text-center text-sm text-slate-600">
           มีบัญชีแล้ว? <a href="<?= url('/provider/login') ?>" class="text-teal-600 font-semibold hover:underline">เข้าสู่ระบบ</a>
         </div>
       </form>
     </div>
   </div>
-<script>document.addEventListener('DOMContentLoaded',()=>lucide.createIcons())</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  const form = document.getElementById('providerRegisterForm');
+  const btn = document.getElementById('providerRegisterSubmit');
+  if (form && btn) {
+    form.addEventListener('submit', () => {
+      btn.disabled = true;
+      btn.textContent = 'กำลังส่ง...';
+    });
+  }
+});
+</script>
 </body>
 </html>

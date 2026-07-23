@@ -111,7 +111,7 @@ body { font-family: 'Sarabun', system-ui; }
             </div>
           <?php endif; ?>
 
-          <form method="post" action="<?= url('/owner/register') ?>" class="space-y-3">
+          <form method="post" action="<?= url('/owner/register') ?>" class="space-y-3" id="ownerRegisterForm">
             <?= csrf() ?>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -162,7 +162,7 @@ body { font-family: 'Sarabun', system-ui; }
                 <input type="password" name="password_confirm" required minlength="8" class="w-full px-3 py-2.5 rounded-lg border border-slate-300">
               </div>
             </div>
-            <button type="submit" class="w-full py-3 bg-accent text-white font-bold rounded-xl hover:opacity-95 shadow-lg shadow-accent/20">
+            <button type="submit" id="ownerRegisterSubmit" class="w-full py-3 bg-accent text-white font-bold rounded-xl hover:opacity-95 shadow-lg shadow-accent/20">
               สมัครเลย
             </button>
             <?php if ($lineFriendUrl !== ''): ?>
@@ -180,6 +180,18 @@ body { font-family: 'Sarabun', system-ui; }
       </div>
     </div>
   </div>
-<script>document.addEventListener('DOMContentLoaded',()=>lucide.createIcons())</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  const form = document.getElementById('ownerRegisterForm');
+  const btn = document.getElementById('ownerRegisterSubmit');
+  if (form && btn) {
+    form.addEventListener('submit', () => {
+      btn.disabled = true;
+      btn.textContent = 'กำลังส่ง...';
+    });
+  }
+});
+</script>
 </body>
 </html>

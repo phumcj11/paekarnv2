@@ -14,8 +14,18 @@ use App\Services\PasswordResetMailService;
 
 class AuthController extends Controller
 {
+    private static function preventAuthFormCache(): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+    }
+
     public function showLogin(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/login');
     }
 
@@ -57,6 +67,7 @@ class AuthController extends Controller
 
     public function showRegister(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/register');
     }
 
@@ -136,6 +147,7 @@ class AuthController extends Controller
     // ----- Owner Auth -----
     public function showOwnerLogin(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/owner_login', [], null);
     }
 
@@ -258,6 +270,7 @@ class AuthController extends Controller
 
     public function showOwnerRegister(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/owner_register', [], null);
     }
 
@@ -326,6 +339,7 @@ class AuthController extends Controller
 
     public function showProviderLogin(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/provider_login', [], null);
     }
 
@@ -348,6 +362,7 @@ class AuthController extends Controller
 
     public function showProviderRegister(): void
     {
+        self::preventAuthFormCache();
         $this->view('auth/provider_register', [
             'types' => \App\Models\ActivityProvider::TYPES,
             'districts' => \App\Models\VisitorPlace::DISTRICTS,
