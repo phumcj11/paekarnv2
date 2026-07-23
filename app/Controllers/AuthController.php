@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use App\Services\PasswordResetMailService;
+use App\Services\RegistrationSpamGuard;
 
 class AuthController extends Controller
 {
@@ -21,6 +22,26 @@ class AuthController extends Controller
         }
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
+    }
+
+    /** @return true ถ้าบล็อกแล้ว (redirect แล้ว) */
+    private static function blockRegistrationSpam(string $channel, string $successUrl, string $successMessage): bool
+    {
+        $block = RegistrationSpamGuard::evaluate($channel, $_POST);
+        if ($block === null) {
+            return false;
+        }
+
+        if ($block['silent']) {
+            Session::flash('success', $successMessage);
+            redirect($successUrl);
+        }
+
+        Session::flash('error', $block['message']);
+        Session::withOld($_POST);
+        back();
+
+        return true;
     }
 
     public function showLogin(): void
@@ -276,6 +297,14 @@ class AuthController extends Controller
 
     public function ownerRegister(): void
     {
+        if (self::blockRegistrationSpam(
+            'owner_register',
+            url('/owner/login'),
+            'สมัครเจ้าของกิจการสำเร็จ! บัญชีของคุณอยู่ในสถานะรออนุมัติ — ทีมงานจะติดต่อกลับเร็วที่สุด'
+        )) {
+            return;
+        }
+
         $data = $this->validate([
             'name'     => 'required|max:120',
             'email'    => 'required|email|max:160',
@@ -316,6 +345,8 @@ class AuthController extends Controller
             $ownerRow['wants_sales_help'] = !empty($_POST['wants_sales_help']) ? 1 : 0;
         }
         $ownerId = (int) \App\Core\Database::insert('owners', $ownerRow);
+
+        RegistrationSpamGuard::recordSuccess('owner_register');
 
         try {
             \App\Services\AdminApprovalNotifyService::partnerRegistered(
@@ -374,6 +405,14 @@ class AuthController extends Controller
         if (!\App\Models\ActivityProvider::tableReady()) {
             Session::flash('error', 'ระบบผู้ให้บริการยังไม่พร้อม กรุณาติดต่อทีมงาน');
             redirect(url('/contact'));
+        }
+
+        if (self::blockRegistrationSpam(
+            'provider_register',
+            url('/provider/login'),
+            'สมัครผู้ให้บริการสำเร็จ! กรุณาเข้าสู่ระบบ — ทีมงานจะอนุมัติภายใน 24 ชม.'
+        )) {
+            return;
         }
 
         $data = $this->validate([
@@ -436,6 +475,8 @@ class AuthController extends Controller
         }
 
         \App\Core\Database::insert('activity_providers', $providerRow);
+
+        RegistrationSpamGuard::recordSuccess('provider_register');
 
         try {
             \App\Services\NotificationService::sendToRole(

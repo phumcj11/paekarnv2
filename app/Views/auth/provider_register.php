@@ -38,6 +38,7 @@ $zoneChoices = Property::zonesForSelect();
 
       <form method="post" action="<?= url('/provider/register') ?>" class="space-y-3" id="providerRegisterForm">
         <?= csrf() ?>
+        <?= \App\Services\RegistrationSpamGuard::hiddenFields() ?>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="text-sm font-medium mb-1 block">ชื่อ-นามสกุล <span class="text-rose-500">*</span></label>
@@ -45,7 +46,9 @@ $zoneChoices = Property::zonesForSelect();
           </div>
           <div>
             <label class="text-sm font-medium mb-1 block">เบอร์โทร <span class="text-rose-500">*</span></label>
-            <input type="tel" name="phone" required value="<?= old('phone') ?>" class="w-full px-3 py-2.5 rounded-lg border border-slate-300">
+            <input type="tel" name="phone" required value="<?= old('phone') ?>" inputmode="tel" autocomplete="tel"
+                   placeholder="0812345678" pattern="0[689][0-9]{8}"
+                   class="w-full px-3 py-2.5 rounded-lg border border-slate-300">
           </div>
         </div>
         <div>
