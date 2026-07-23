@@ -11,7 +11,9 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Models\ActivityProvider;
 use App\Models\ActivityProviderSubscription;
+use App\Models\ActivityLeadClick;
 use App\Models\Property;
+use App\Models\User;
 use App\Models\VisitorPlace;
 use App\Services\NotificationService;
 
@@ -82,9 +84,83 @@ class ActivityProviderController extends Controller
 
     public function delete(int $id): void
     {
+        $provider = ActivityProvider::find($id);
+        if (!$provider) {
+            http_response_code(404);
+            View::render('errors/404', [], 'layouts/admin');
+            return;
+        }
+
+        if ($this->providerHasOrders($id)) {
+            Session::flash('error', 'ลบไม่ได้ — มีออเดอร์ที่เกี่ยวข้อง ให้เปลี่ยนสถานะเป็น "ยกเลิก" แทน');
+            redirect(url('/admin/activity-providers/' . $id . '/edit'));
+        }
+
+        $this->purgeProviderData($id);
+
+        $userId = !empty($provider['user_id']) ? (int)$provider['user_id'] : 0;
         Database::delete('activity_providers', 'id = :id', ['id' => $id]);
+
+        if ($userId > 0) {
+            $user = User::find($userId);
+            if ($user && ($user['role'] ?? '') === 'provider') {
+                User::destroy($userId);
+            }
+        }
+
         Session::flash('success', 'ลบผู้ให้บริการเรียบร้อย');
         redirect(url('/admin/activity-providers'));
+    }
+
+    private function providerHasOrders(int $providerId): bool
+    {
+        if (!Database::tableHasColumn('activity_orders', 'id')
+            || !Database::tableHasColumn('activity_products', 'provider_id')
+        ) {
+            return false;
+        }
+
+        $count = (int)(Database::fetch(
+            "SELECT COUNT(*) AS c FROM activity_orders ao
+             INNER JOIN activity_products ap ON ap.id = ao.product_id
+             WHERE ap.provider_id = :pid",
+            ['pid' => $providerId]
+        )['c'] ?? 0);
+
+        return $count > 0;
+    }
+
+    private function purgeProviderData(int $providerId): void
+    {
+        if (Database::tableHasColumn('activity_products', 'provider_id')) {
+            $productIds = Database::fetchAll(
+                'SELECT id FROM activity_products WHERE provider_id = :pid',
+                ['pid' => $providerId]
+            );
+            foreach ($productIds as $row) {
+                $productId = (int)($row['id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                if (Database::tableHasColumn('activity_featured_campaigns', 'product_id')) {
+                    Database::delete('activity_featured_campaigns', 'product_id = :pid', ['pid' => $productId]);
+                }
+                if (Database::tableHasColumn('activity_options', 'product_id')) {
+                    Database::delete('activity_options', 'product_id = :pid', ['pid' => $productId]);
+                }
+            }
+            Database::delete('activity_products', 'provider_id = :pid', ['pid' => $providerId]);
+        }
+
+        if (ActivityProviderSubscription::tableReady()) {
+            Database::delete('activity_provider_subscriptions', 'provider_id = :pid', ['pid' => $providerId]);
+        }
+        if (Database::tableHasColumn('activity_featured_campaigns', 'provider_id')) {
+            Database::delete('activity_featured_campaigns', 'provider_id = :pid', ['pid' => $providerId]);
+        }
+        if (ActivityLeadClick::tableReady()) {
+            Database::delete('activity_lead_clicks', 'provider_id = :pid', ['pid' => $providerId]);
+        }
     }
 
     public function partnerStatus(int $id): void

@@ -188,4 +188,16 @@ $partnerStatus = (string)($provider['partner_status'] ?? 'active');
     <?php endforeach; ?>
   </div>
 </div>
+<div class="max-w-4xl mt-6 bg-white rounded-2xl border border-rose-200 shadow-soft p-5">
+  <h3 class="font-bold text-lg mb-2 text-rose-800">ลบผู้ให้บริการ</h3>
+  <p class="text-sm text-slate-600 mb-4">
+    ลบรายการและบัญชี login ที่สมัครออนไลน์ (ถ้ามี) — ใช้กับรายการ spam หรือทดสอบ
+    <?php if (!empty($provider['user_id'])): ?> · user #<?= (int)$provider['user_id'] ?><?php endif; ?>
+  </p>
+  <form method="post" action="<?= url('/admin/activity-providers/' . $provider['id'] . '/delete') ?>" onsubmit="return confirm('ลบผู้ให้บริการนี้ถาวร? ไม่สามารถกู้คืนได้')"><?= csrf() ?>
+    <button class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+      <i data-lucide="trash-2" class="w-4 h-4"></i> ลบถาวร
+    </button>
+  </form>
+</div>
 <?php endif; ?>
