@@ -19,7 +19,7 @@ class HomeController extends Controller
 {
     public function index(): void
     {
-        $cacheKey = 'home_index_v2';
+        $cacheKey = 'home_index_v3';
         $cached = PageCache::get($cacheKey);
 
         if ($cached !== null) {
@@ -47,7 +47,8 @@ class HomeController extends Controller
             return Property::attachUnitStats($rows);
         };
 
-        $featuredLimit = static fn (string $key, int $cap = 4): int => min($cap, max(1, (int)($featuredLabels[$key]['limit'] ?? $cap)));
+        $sectionLimit = HomepageSections::propertySectionLimit();
+        $featuredLimit = static fn (string $key): int => max(1, min(24, (int)($featuredLabels[$key]['limit'] ?? $sectionLimit)));
         $featuredByKey = [
             'raft'   => $prepareHomepageCards(Property::featuredByType('raft', $featuredLimit('raft'), $boostCoupon)),
             'resort' => $prepareHomepageCards(Property::featuredByType('resort', $featuredLimit('resort'), $boostCoupon)),
@@ -56,9 +57,9 @@ class HomeController extends Controller
         ];
 
         $newestRafts = array_slice(
-            $preparePropertyRows(Property::newestByType('raft', 8)),
+            $preparePropertyRows(Property::newestByType('raft', $sectionLimit * 2)),
             0,
-            4
+            $sectionLimit
         );
 
         $reviews = Review::latest(6);
@@ -98,9 +99,9 @@ class HomeController extends Controller
         $zoneRaftPayload = [];
         foreach (Property::homeZoneSectionDefinitions() as $def) {
             $rows = array_slice(
-                $preparePropertyRows(Property::publishedInZonesByType($def['zones'], 'raft', 4)),
+                $preparePropertyRows(Property::publishedInZonesByType($def['zones'], 'raft', $sectionLimit)),
                 0,
-                4
+                $sectionLimit
             );
             $primaryZone = $def['zones'][0] ?? '';
             $zoneAds = [];

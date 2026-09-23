@@ -25,7 +25,7 @@ class HomepageSections
                 'title'      => 'รีสอร์ทแนะนำ',
                 'eyebrow'    => 'รีสอร์ท',
                 'enabled'    => true,
-                'limit'      => 6,
+                'limit'      => 8,
                 'more_path'  => '/resorts',
                 'type_key'   => 'resort',
             ],
@@ -33,7 +33,7 @@ class HomepageSections
                 'title'      => 'โรงแรมแนะนำ',
                 'eyebrow'    => 'โรงแรม',
                 'enabled'    => true,
-                'limit'      => 6,
+                'limit'      => 8,
                 'more_path'  => '/hotels',
                 'type_key'   => 'hotel',
             ],
@@ -41,7 +41,7 @@ class HomepageSections
                 'title'      => 'โฮมสเตย์ & บ้านพัก',
                 'eyebrow'    => 'ที่พัก',
                 'enabled'    => true,
-                'limit'      => 6,
+                'limit'      => 8,
                 'more_path'  => '/stays',
                 'type_key'   => 'stay',
             ],
@@ -257,6 +257,14 @@ class HomepageSections
     public static function sortBoostCoupon(): bool
     {
         return (string) Setting::get('home_sort_boost_coupon', '0') === '1';
+    }
+
+    /** จำนวนการ์ดที่พักต่อ section บนหน้าแรก (แพใหม่ / แพตามโซน) */
+    public static function propertySectionLimit(): int
+    {
+        $n = (int) Setting::get('home_property_section_limit', '8');
+
+        return max(4, min(24, $n > 0 ? $n : 8));
     }
 
     /**
