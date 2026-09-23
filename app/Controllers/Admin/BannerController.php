@@ -29,7 +29,9 @@ class BannerController extends Controller
             'screenBadges' => Banner::screenBadges(),
             'placementHints' => Banner::placementHints(),
             'allSlots'   => Banner::allSlots(),
+            'bSlots'     => Banner::B_SLOTS,
             'homeSlots'  => Banner::HOME_SLOTS,
+            'specialSlots' => Banner::SPECIAL_HOME_SLOTS,
             'placesSlots'=> Banner::PLACES_SLOTS,
         ], 'layouts/admin');
     }
@@ -45,6 +47,7 @@ class BannerController extends Controller
             'screenBadges' => Banner::screenBadges(),
             'placementHints' => Banner::placementHints(),
             'allSlots'   => Banner::allSlots(),
+            'bSlots'     => Banner::B_SLOTS,
         ], 'layouts/admin');
     }
 
@@ -53,6 +56,10 @@ class BannerController extends Controller
         $data = $this->validatedBannerInput();
         try {
             $data['image_path'] = $this->resolveImageCreate();
+            $mobile = $this->resolveMobileImageCreate();
+            if ($mobile !== null) {
+                $data['mobile_image_path'] = $mobile;
+            }
         } catch (\Throwable $e) {
             Session::flash('error', $e->getMessage());
             Session::withOld($_POST);
@@ -81,6 +88,7 @@ class BannerController extends Controller
             'screenBadges' => Banner::screenBadges(),
             'placementHints' => Banner::placementHints(),
             'allSlots'   => Banner::allSlots(),
+            'bSlots'     => Banner::B_SLOTS,
         ], 'layouts/admin');
     }
 
@@ -97,6 +105,10 @@ class BannerController extends Controller
             $path = $this->resolveImageUpdate();
             if ($path !== null) {
                 $data['image_path'] = $path;
+            }
+            $mobile = $this->resolveMobileImageUpdate();
+            if ($mobile !== null) {
+                $data['mobile_image_path'] = $mobile;
             }
         } catch (\Throwable $e) {
             Session::flash('error', $e->getMessage());
@@ -130,7 +142,7 @@ class BannerController extends Controller
         if ($slot === 'places_promo_deal') {
             return '';
         }
-        throw new \RuntimeException('กรุณาอัปโหลดรูปภาพ หรือใส่ URL รูป');
+        throw new \RuntimeException('กรุณาอัปโหลดรูปภาพ Desktop หรือใส่ URL รูป');
     }
 
     /** คืน null = เก็บรูปเดิม */
@@ -146,6 +158,32 @@ class BannerController extends Controller
         return null;
     }
 
+    private function resolveMobileImageCreate(): ?string
+    {
+        $url = trim((string)($_POST['mobile_image_url'] ?? ''));
+        if ($url !== '') {
+            return $url;
+        }
+        if (!empty($_FILES['mobile_image']['tmp_name'])) {
+            return Upload::image('mobile_image', 'banners');
+        }
+
+        return null;
+    }
+
+    private function resolveMobileImageUpdate(): ?string
+    {
+        $url = trim((string)($_POST['mobile_image_url'] ?? ''));
+        if ($url !== '') {
+            return $url;
+        }
+        if (!empty($_FILES['mobile_image']['tmp_name'])) {
+            return Upload::image('mobile_image', 'banners');
+        }
+
+        return null;
+    }
+
     private function validatedBannerInput(): array
     {
         $slot = $_POST['slot'] ?? '';
@@ -153,7 +191,8 @@ class BannerController extends Controller
             Session::flash('error', 'ตำแหน่งไม่ถูกต้อง');
             redirect(url('/admin/banners'));
         }
-        return [
+
+        $data = [
             'slot'         => $slot,
             'title'        => trim((string)($_POST['title'] ?? '')),
             'subtitle'     => trim((string)($_POST['subtitle'] ?? '')) ?: null,
@@ -164,6 +203,21 @@ class BannerController extends Controller
             'starts_at'    => self::dtOrNull($_POST['starts_at'] ?? ''),
             'ends_at'      => self::dtOrNull($_POST['ends_at'] ?? ''),
         ];
+
+        if (Database::tableHasColumn('banners', 'advertiser_name')) {
+            $data['advertiser_name'] = trim((string)($_POST['advertiser_name'] ?? '')) ?: null;
+        }
+        if (Database::tableHasColumn('banners', 'alt_text')) {
+            $data['alt_text'] = trim((string)($_POST['alt_text'] ?? '')) ?: null;
+        }
+        if (Database::tableHasColumn('banners', 'open_new_tab')) {
+            $data['open_new_tab'] = !empty($_POST['open_new_tab']) ? 1 : 0;
+        }
+        if (Database::tableHasColumn('banners', 'priority')) {
+            $data['priority'] = max(0, (int)($_POST['priority'] ?? 0));
+        }
+
+        return $data;
     }
 
     private static function dtOrNull(string $v): ?string

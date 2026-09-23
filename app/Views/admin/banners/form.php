@@ -19,9 +19,19 @@ $xDataJson = htmlspecialchars(json_encode([
     <div>
       <label class="text-sm font-medium mb-1 block">ตำแหน่งบนหน้าแรก *</label>
       <select name="slot" required x-model="slot" class="w-full px-3 py-2.5 rounded-xl border border-slate-300">
-        <?php foreach ($allSlots as $s): ?>
-          <option value="<?= e($s) ?>" <?= ($banner['slot'] ?? '') === $s ? 'selected' : '' ?>><?= e(($labels[$s] ?? $s) . ' ('.$s.')') ?></option>
-        <?php endforeach; ?>
+        <?php if (!empty($bSlots)): ?>
+        <optgroup label="ช่อง Banner หน้าแรก B01–B10">
+          <?php foreach ($bSlots as $s): ?>
+            <option value="<?= e($s) ?>" <?= ($banner['slot'] ?? '') === $s ? 'selected' : '' ?>><?= e($labels[$s] ?? $s) ?></option>
+          <?php endforeach; ?>
+        </optgroup>
+        <?php endif; ?>
+        <optgroup label="ช่องอื่น (Hero / คูปอง / ที่เที่ยว)">
+          <?php foreach ($allSlots as $s):
+            if (!empty($bSlots) && in_array($s, $bSlots, true)) continue; ?>
+            <option value="<?= e($s) ?>" <?= ($banner['slot'] ?? '') === $s ? 'selected' : '' ?>><?= e(($labels[$s] ?? $s) . ' ('.$s.')') ?></option>
+          <?php endforeach; ?>
+        </optgroup>
       </select>
       <p class="mt-2 text-[11px] text-slate-600 leading-relaxed rounded-lg border border-sky-100 bg-sky-50 px-3 py-2" x-show="specs[slot]" x-cloak>
         <span class="font-semibold text-sky-900">ขนาดภาพแนะนำ:</span>
@@ -57,6 +67,10 @@ $xDataJson = htmlspecialchars(json_encode([
     </div>
 
     <div>
+      <label class="text-sm font-medium mb-1 block">ชื่อผู้ลงโฆษณา / แบรนด์</label>
+      <input type="text" name="advertiser_name" value="<?= e($banner['advertiser_name'] ?? '') ?>" maxlength="160" class="w-full px-3 py-2.5 rounded-xl border border-slate-300" placeholder="เช่น ร้าน ABC">
+    </div>
+    <div>
       <label class="text-sm font-medium mb-1 block">หัวข้อหลัก</label>
       <input type="text" name="title" value="<?= e($banner['title'] ?? '') ?>" maxlength="180" class="w-full px-3 py-2.5 rounded-xl border border-slate-300" placeholder="เช่น โปรหน้าร้อน">
     </div>
@@ -77,7 +91,7 @@ $xDataJson = htmlspecialchars(json_encode([
     </div>
 
     <div class="border border-dashed border-slate-300 rounded-xl p-4 space-y-3 bg-slate-50/50">
-      <label class="text-sm font-medium block">รูปภาพ *</label>
+      <label class="text-sm font-medium block">รูป Desktop *</label>
       <?php if ($isEdit && !empty($banner['image_path'])): ?>
         <div class="flex gap-3 items-start">
           <img src="<?= e(upload_url($banner['image_path'])) ?>" alt="" class="w-40 h-24 object-cover rounded-lg border border-slate-200">
@@ -85,8 +99,21 @@ $xDataJson = htmlspecialchars(json_encode([
         </div>
       <?php endif; ?>
       <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" class="block w-full text-sm">
-      <div class="text-xs text-slate-500">หรือ URL รูปภาพ (Unsplash / CDN)</div>
-      <input type="text" name="image_url" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs" placeholder="https://...">
+      <input type="text" name="image_url" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs" placeholder="URL รูป Desktop https://...">
+    </div>
+
+    <div class="border border-dashed border-slate-300 rounded-xl p-4 space-y-3 bg-slate-50/50">
+      <label class="text-sm font-medium block">รูป Mobile (ถ้าไม่ใส่จะใช้ Desktop)</label>
+      <?php if ($isEdit && !empty($banner['mobile_image_path'])): ?>
+        <img src="<?= e(upload_url($banner['mobile_image_path'])) ?>" alt="" class="w-32 h-32 object-cover rounded-lg border border-slate-200">
+      <?php endif; ?>
+      <input type="file" name="mobile_image" accept="image/jpeg,image/png,image/webp,image/gif" class="block w-full text-sm">
+      <input type="text" name="mobile_image_url" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs" placeholder="URL รูป Mobile https://...">
+    </div>
+
+    <div>
+      <label class="text-sm font-medium mb-1 block">Alt text (SEO / accessibility)</label>
+      <input type="text" name="alt_text" value="<?= e($banner['alt_text'] ?? '') ?>" maxlength="255" class="w-full px-3 py-2.5 rounded-xl border border-slate-300" placeholder="คำอธิบายรูปสำหรับ screen reader">
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -94,10 +121,18 @@ $xDataJson = htmlspecialchars(json_encode([
         <label class="text-sm font-medium mb-1 block">ลำดับ (sort)</label>
         <input type="number" name="sort_order" value="<?= e((string)($banner['sort_order'] ?? 0)) ?>" class="w-full px-3 py-2 rounded-xl border border-slate-300">
       </div>
-      <div class="md:col-span-2 flex items-end">
+      <div>
+        <label class="text-sm font-medium mb-1 block">Priority (สูง = แสดงก่อน)</label>
+        <input type="number" name="priority" min="0" value="<?= e((string)($banner['priority'] ?? 0)) ?>" class="w-full px-3 py-2 rounded-xl border border-slate-300">
+      </div>
+      <div class="flex flex-col justify-end gap-2">
         <label class="inline-flex items-center gap-2 cursor-pointer">
           <input type="checkbox" name="is_active" value="1" <?= !isset($banner['is_active']) || $banner['is_active'] ? 'checked' : '' ?> class="rounded border-slate-300">
           <span class="text-sm font-medium">แสดงบนเว็บ</span>
+        </label>
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="open_new_tab" value="1" <?= !isset($banner['open_new_tab']) || $banner['open_new_tab'] ? 'checked' : '' ?> class="rounded border-slate-300">
+          <span class="text-sm font-medium">เปิดลิงก์แท็บใหม่</span>
         </label>
       </div>
     </div>

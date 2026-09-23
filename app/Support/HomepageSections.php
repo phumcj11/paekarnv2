@@ -95,17 +95,27 @@ class HomepageSections
         return $order;
     }
 
-    /** @return array<string,list<string>> */
+    /** @return array<string,list<string>> Banner B-slots ก่อน section */
     public static function bannerSlotsBeforeSection(): array
     {
         return [
-            'trust'            => ['home_after_stats', 'home_before_featured'],
-            'coupon-mobile'    => ['home_before_coupon'],
+            'featured-raft'    => ['home_b02'],
+            'trust'            => ['home_b03'],
+            'coupon-mobile'    => ['home_b04'],
             'zones-popular'    => ['home_before_zones'],
-            'newest-raft'      => ['home_before_newest'],
-            'reviews-youtube'  => ['home_before_reviews'],
-            'blog'             => ['home_before_blog'],
+            'newest-raft'      => ['home_b05'],
+            'activities'       => ['home_b08'],
+            'reviews-youtube'  => ['home_b09'],
+            'blog'             => ['home_b10'],
             'cta-bottom'       => ['home_before_cta'],
+        ];
+    }
+
+    /** @return array<string,list<string>> Banner B-slots หลัง section */
+    public static function bannerSlotsAfterSection(): array
+    {
+        return [
+            'newest-raft' => ['home_b07'],
         ];
     }
 
@@ -269,11 +279,12 @@ class HomepageSections
 
     /**
      * @param array<string,mixed> $sectionPayload keyed by section id
-     * @return list<array{id:string,type:string,banners_before:list<string>,payload:array<string,mixed>}>
+     * @return list<array{id:string,type:string,banners_before:list<string>,banners_after:list<string>,payload:array<string,mixed>}>
      */
     public static function buildRenderPlan(array $sectionPayload): array
     {
-        $bannerMap = self::bannerSlotsBeforeSection();
+        $bannerBefore = self::bannerSlotsBeforeSection();
+        $bannerAfter = self::bannerSlotsAfterSection();
         $plan = [];
         foreach (self::sectionsOrder() as $id) {
             if (!isset($sectionPayload[$id])) {
@@ -286,7 +297,8 @@ class HomepageSections
             $plan[] = [
                 'id'              => $id,
                 'type'            => (string) ($entry['type'] ?? 'unknown'),
-                'banners_before'  => $bannerMap[$id] ?? [],
+                'banners_before'  => $bannerBefore[$id] ?? [],
+                'banners_after'   => $bannerAfter[$id] ?? [],
                 'payload'         => $entry['payload'] ?? [],
             ];
         }

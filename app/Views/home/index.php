@@ -1145,6 +1145,14 @@ function paekanDesktopHeroSearch() {
   </div>
 </section>
 
+<?php
+$homeBanners = $homeBanners ?? [];
+\App\Core\View::partial('partials/banners/banner-slot', [
+    'slot' => 'home_b01',
+    'banner' => $homeBanners['home_b01'] ?? null,
+    'eagerLoad' => true,
+]);
+?>
 <div id="banner-slot-home-desktop-coupon-strip" class="scroll-mt-28 md:scroll-mt-36" aria-hidden="true"></div>
 <?php
 $couponStripDesktop = ($bannersBySlot['home_desktop_coupon_strip'] ?? [])[0] ?? null;
@@ -1153,4 +1161,5 @@ $couponStripDesktop = ($bannersBySlot['home_desktop_coupon_strip'] ?? [])[0] ?? 
 <?php \App\Core\View::partial('partials/home-sections-loop', [
     'homeSectionPlan' => $homeSectionPlan ?? [],
     'bannersBySlot'   => $bannersBySlot ?? [],
+    'homeBanners'     => $homeBanners,
 ]); ?>

@@ -12,6 +12,7 @@ use App\Models\BlogPost;
 use App\Models\Banner;
 use App\Models\Setting;
 use App\Models\ReviewVideo;
+use App\Services\BannerService;
 use App\Services\ZoneAdService;
 use App\Support\HomepageSections;
 
@@ -19,7 +20,7 @@ class HomeController extends Controller
 {
     public function index(): void
     {
-        $cacheKey = 'home_index_v3';
+        $cacheKey = 'home_index_v4';
         $cached = PageCache::get($cacheKey);
 
         if ($cached !== null) {
@@ -74,7 +75,16 @@ class HomeController extends Controller
             'coupons'    => (int) Database::fetch("SELECT COUNT(*) c FROM coupons")['c'],
         ];
 
-        $bannersBySlot = Banner::groupedForHome();
+        $bannersGrouped = BannerService::groupedForHome();
+        $homeBanners = [];
+        foreach (Banner::B_SLOTS as $slot) {
+            $homeBanners[$slot] = BannerService::pickBest($bannersGrouped[$slot] ?? []);
+        }
+        foreach (Banner::SPECIAL_HOME_SLOTS as $slot) {
+            $rows = $bannersGrouped[$slot] ?? [];
+            $homeBanners[$slot] = $rows !== [] ? $rows[0] : null;
+        }
+        $bannersBySlot = $bannersGrouped;
         $heroSlides = [];
         foreach (array_slice($bannersBySlot['hero'] ?? [], 0, 3) as $b) {
             $heroSlides[] = [
@@ -245,6 +255,7 @@ class HomeController extends Controller
             'stats'             => $stats,
             'heroSlides'        => $heroSlides,
             'bannersBySlot'     => $bannersBySlot,
+            'homeBanners'       => $homeBanners,
             'homeSectionPlan'   => $homeSectionPlan,
             'heroCopy'          => self::homeHeroCopy(),
         ];
