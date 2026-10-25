@@ -96,7 +96,7 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
         </a>
 
         <div class="max-lg:hidden relative flex min-w-0 flex-1 items-center py-0.5"
-             x-data="navOverflowMenu(<?= $navItemsJson ?>)"
+             x-data='navOverflowMenu(<?= $navItemsJson ?>)'
              x-init="init()"
              @keydown.escape.window="moreOpen = false">
           <div x-ref="measure" class="pointer-events-none absolute left-0 top-0 -z-10 flex max-w-none flex-nowrap gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5 opacity-0" aria-hidden="true">
@@ -112,16 +112,16 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
           </div>
 
           <nav x-ref="navRow" class="flex min-w-0 flex-1 items-center overflow-hidden flex-nowrap gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5 pr-0.5" aria-label="เมนูหลัก">
-            <template x-for="(item, index) in items" :key="item.href">
-              <a :href="item.href"
-                 x-show="index < visibleCount"
-                 x-cloak
-                 :class="item.active ? '<?= e($navLinkActiveClass) ?>' : '<?= e($navLinkIdleClass) ?>'"
-                 class="<?= e($navLinkBaseClass) ?>">
-                <span x-text="item.label"></span>
-                <span x-show="item.badge" x-cloak class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none" x-text="item.badge"></span>
+            <?php foreach ($navItems as $navIndex => $item): ?>
+              <a href="<?= e($item['href']) ?>"
+                 x-show="visibleCount > <?= (int)$navIndex ?>"
+                 class="<?= e($navLinkBaseClass) ?> <?= $item['active'] ? $navLinkActiveClass : $navLinkIdleClass ?>">
+                <?= e($item['label']) ?>
+                <?php if (!empty($item['badge'])): ?>
+                  <span class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none"><?= e($item['badge']) ?></span>
+                <?php endif; ?>
               </a>
-            </template>
+            <?php endforeach; ?>
 
             <div x-show="visibleCount < items.length" x-cloak class="relative shrink-0" @click.away="moreOpen = false">
               <button type="button"
@@ -138,17 +138,18 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
                    x-cloak
                    class="absolute left-0 top-full z-50 mt-1.5 min-w-[11rem] max-w-[16rem] rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-slate-100">
                 <p class="px-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">เมนูเพิ่มเติม</p>
-                <template x-for="(item, index) in items" :key="'more-' + item.href">
-                  <a x-show="index >= visibleCount"
+                <?php foreach ($navItems as $navIndex => $item): ?>
+                  <a href="<?= e($item['href']) ?>"
+                     x-show="visibleCount <= <?= (int)$navIndex ?>"
                      x-cloak
-                     :href="item.href"
                      @click="moreOpen = false"
-                     :class="item.active ? 'bg-forest-50 text-forest-800 font-bold' : 'text-slate-800 font-semibold hover:bg-slate-50'"
-                     class="flex items-center gap-2 px-3 py-2.5 text-sm transition">
-                    <span class="min-w-0 flex-1" x-text="item.label"></span>
-                    <span x-show="item.badge" x-cloak class="shrink-0 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white" x-text="item.badge"></span>
+                     class="flex items-center gap-2 px-3 py-2.5 text-sm transition <?= $item['active'] ? 'bg-forest-50 text-forest-800 font-bold' : 'text-slate-800 font-semibold hover:bg-slate-50' ?>">
+                    <span class="min-w-0 flex-1"><?= e($item['label']) ?></span>
+                    <?php if (!empty($item['badge'])): ?>
+                      <span class="shrink-0 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white"><?= e($item['badge']) ?></span>
+                    <?php endif; ?>
                   </a>
-                </template>
+                <?php endforeach; ?>
               </div>
             </div>
           </nav>
@@ -300,65 +301,3 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
     </div>
   </div>
 </header>
-<script>
-document.addEventListener('alpine:init', () => {
-  Alpine.data('navOverflowMenu', (items) => ({
-    items: Array.isArray(items) ? items : [],
-    visibleCount: Array.isArray(items) ? items.length : 0,
-    moreOpen: false,
-    _ro: null,
-    get overflowHasActive() {
-      return this.items.some((item, index) => index >= this.visibleCount && item.active);
-    },
-    init() {
-      this.visibleCount = this.items.length;
-      this.$nextTick(() => {
-        this.measure();
-        if (typeof ResizeObserver !== 'undefined' && this.$refs.navRow) {
-          this._ro = new ResizeObserver(() => this.measure());
-          this._ro.observe(this.$refs.navRow);
-        }
-        window.addEventListener('resize', this.measure.bind(this), { passive: true });
-        if (window.lucide) window.lucide.createIcons();
-      });
-    },
-    measure() {
-      const row = this.$refs.navRow;
-      const measureEl = this.$refs.measure;
-      if (!row || !measureEl || this.items.length === 0) return;
-
-      const available = row.clientWidth;
-      if (available <= 0) return;
-
-      const links = measureEl.querySelectorAll('[data-nav-measure]');
-      const widths = Array.from(links, (el) => el.getBoundingClientRect().width);
-      const n = widths.length;
-      if (n === 0) return;
-
-      const gap = parseFloat(getComputedStyle(row).columnGap || getComputedStyle(row).gap) || 4;
-      const moreBtn = this.$refs.measureMore;
-      const moreW = moreBtn ? moreBtn.getBoundingClientRect().width : 36;
-
-      let best = n;
-      for (let k = n; k >= 1; k--) {
-        let width = 0;
-        for (let i = 0; i < k; i++) {
-          width += widths[i] + (i > 0 ? gap : 0);
-        }
-        if (k < n) {
-          width += gap + moreW;
-        }
-        if (width <= available) {
-          best = k;
-          break;
-        }
-      }
-
-      this.visibleCount = best;
-      if (this.visibleCount >= this.items.length) {
-        this.moreOpen = false;
-      }
-    },
-  }));
-});
-</script>

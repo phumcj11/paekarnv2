@@ -416,6 +416,65 @@ document.addEventListener('alpine:init', () => {
     }
   });
 
+  Alpine.data('navOverflowMenu', (items) => ({
+    items: Array.isArray(items) ? items : [],
+    visibleCount: Array.isArray(items) ? items.length : 0,
+    moreOpen: false,
+    _ro: null,
+    get overflowHasActive() {
+      return this.items.some((item, index) => index >= this.visibleCount && item.active);
+    },
+    init() {
+      this.visibleCount = this.items.length;
+      this.$nextTick(() => {
+        this.measure();
+        if (typeof ResizeObserver !== 'undefined' && this.$refs.navRow) {
+          this._ro = new ResizeObserver(() => this.measure());
+          this._ro.observe(this.$refs.navRow);
+        }
+        window.addEventListener('resize', this.measure.bind(this), { passive: true });
+        if (window.lucide) window.lucide.createIcons();
+      });
+    },
+    measure() {
+      const row = this.$refs.navRow;
+      const measureEl = this.$refs.measure;
+      if (!row || !measureEl || this.items.length === 0) return;
+
+      const available = row.clientWidth;
+      if (available <= 0) return;
+
+      const links = measureEl.querySelectorAll('[data-nav-measure]');
+      const widths = Array.from(links, (el) => el.getBoundingClientRect().width);
+      const n = widths.length;
+      if (n === 0) return;
+
+      const gap = parseFloat(getComputedStyle(row).columnGap || getComputedStyle(row).gap) || 4;
+      const moreBtn = this.$refs.measureMore;
+      const moreW = moreBtn ? moreBtn.getBoundingClientRect().width : 36;
+
+      let best = n;
+      for (let k = n; k >= 1; k--) {
+        let width = 0;
+        for (let i = 0; i < k; i++) {
+          width += widths[i] + (i > 0 ? gap : 0);
+        }
+        if (k < n) {
+          width += gap + moreW;
+        }
+        if (width <= available) {
+          best = k;
+          break;
+        }
+      }
+
+      this.visibleCount = best;
+      if (this.visibleCount >= this.items.length) {
+        this.moreOpen = false;
+      }
+    },
+  }));
+
   Alpine.data('paymentBlock', (endpoint, amountKey) => ({
     paymentAmount: 0,
     qrSrc: '',
