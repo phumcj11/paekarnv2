@@ -83,7 +83,7 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
     <div class="flex items-center gap-2 sm:gap-3 xl:gap-6 min-h-[56px] lg:min-h-[56px] py-1.5 lg:py-0 w-full min-w-0">
 
       <!-- ด้านซ้าย: Logo + เมนูหลัก (ชิดกัน — เมนูไม่ถูกดันไปกลางจอ) -->
-      <div class="flex min-w-0 flex-1 items-center gap-3 xl:gap-5 overflow-hidden">
+      <div class="flex min-w-0 flex-1 items-center gap-3 xl:gap-5">
         <a href="<?= url('/') ?>" class="flex items-center gap-2 xl:gap-2 min-w-0 shrink-0 max-w-[60%] sm:max-w-none group">
           <span class="relative block h-10 w-10 lg:h-9 lg:w-9 shrink-0 overflow-hidden rounded-full bg-white shadow-md shadow-primary-900/10 ring-2 ring-white">
             <img src="<?= asset('site-logo.png') ?>" alt="<?= e($siteName) ?>" width="88" height="88" decoding="async"
@@ -95,7 +95,7 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
           </div>
         </a>
 
-        <div class="max-lg:hidden relative flex min-w-0 flex-1 items-center py-0.5"
+        <div class="max-lg:hidden relative flex min-w-0 flex-1 items-center overflow-visible py-0.5"
              x-data='navOverflowMenu(<?= $navItemsJson ?>)'
              x-init="init()"
              @keydown.escape.window="moreOpen = false">
@@ -111,37 +111,39 @@ $navLinkIdleClass = 'text-slate-800 font-semibold hover:text-forest-800 hover:bg
             <span x-ref="measureMore" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600" aria-hidden="true">⋯</span>
           </div>
 
-          <nav x-ref="navRow" class="flex min-w-0 flex-1 items-center overflow-hidden flex-nowrap gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5 pr-0.5" aria-label="เมนูหลัก">
-            <?php foreach ($navItems as $navIndex => $item): ?>
-              <a href="<?= e($item['href']) ?>"
-                 x-show="visibleCount > <?= (int)$navIndex ?>"
-                 class="<?= e($navLinkBaseClass) ?> <?= $item['active'] ? $navLinkActiveClass : $navLinkIdleClass ?>">
-                <?= e($item['label']) ?>
-                <?php if (!empty($item['badge'])): ?>
-                  <span class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none"><?= e($item['badge']) ?></span>
-                <?php endif; ?>
-              </a>
-            <?php endforeach; ?>
+          <nav class="flex min-w-0 flex-1 items-center gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5" aria-label="เมนูหลัก">
+            <div x-ref="navRow" class="flex min-w-0 flex-1 items-center overflow-hidden flex-nowrap gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5">
+              <?php foreach ($navItems as $navIndex => $item): ?>
+                <a href="<?= e($item['href']) ?>"
+                   x-show="visibleCount > <?= (int)$navIndex ?>"
+                   class="<?= e($navLinkBaseClass) ?> <?= $item['active'] ? $navLinkActiveClass : $navLinkIdleClass ?>">
+                  <?= e($item['label']) ?>
+                  <?php if (!empty($item['badge'])): ?>
+                    <span class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none"><?= e($item['badge']) ?></span>
+                  <?php endif; ?>
+                </a>
+              <?php endforeach; ?>
+            </div>
 
-            <div x-show="visibleCount < items.length" x-cloak class="relative shrink-0" @click.away="moreOpen = false">
+            <div x-show="visibleCount < items.length" x-cloak class="relative z-[60] shrink-0" @click.outside="moreOpen = false">
               <button type="button"
-                      @click="moreOpen = !moreOpen"
-                      class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-forest-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest-400"
+                      @click.stop="moreOpen = !moreOpen; $nextTick(() => window.lucide && window.lucide.createIcons())"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-slate-600 hover:bg-slate-100 hover:text-forest-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest-400"
                       :class="[(moreOpen ? 'bg-slate-100 text-forest-800' : ''), (overflowHasActive && !moreOpen ? 'ring-2 ring-forest-300/80 text-forest-800' : '')]"
-                      aria-haspopup="true"
+                      aria-haspopup="menu"
                       :aria-expanded="moreOpen ? 'true' : 'false'"
                       aria-label="เมนูเพิ่มเติม">
-                <i data-lucide="ellipsis" class="h-5 w-5"></i>
+                <span aria-hidden="true">⋯</span>
               </button>
               <div x-show="moreOpen"
-                   x-transition
-                   x-cloak
-                   class="absolute left-0 top-full z-50 mt-1.5 min-w-[11rem] max-w-[16rem] rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-slate-100">
+                   x-transition.opacity.duration.150ms
+                   role="menu"
+                   class="absolute right-0 top-full mt-1.5 min-w-[12rem] max-w-[16rem] rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-slate-100">
                 <p class="px-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">เมนูเพิ่มเติม</p>
                 <?php foreach ($navItems as $navIndex => $item): ?>
                   <a href="<?= e($item['href']) ?>"
+                     role="menuitem"
                      x-show="visibleCount <= <?= (int)$navIndex ?>"
-                     x-cloak
                      @click="moreOpen = false"
                      class="flex items-center gap-2 px-3 py-2.5 text-sm transition <?= $item['active'] ? 'bg-forest-50 text-forest-800 font-bold' : 'text-slate-800 font-semibold hover:bg-slate-50' ?>">
                     <span class="min-w-0 flex-1"><?= e($item['label']) ?></span>
