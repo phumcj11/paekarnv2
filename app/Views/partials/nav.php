@@ -67,8 +67,8 @@ $guestSeekCtaClass = $guestSeekActive
     <div class="flex items-center gap-2 sm:gap-3 xl:gap-6 min-h-[56px] lg:min-h-[56px] py-1.5 lg:py-0 w-full min-w-0">
 
       <!-- ด้านซ้าย: Logo + เมนูหลัก (ชิดกัน — เมนูไม่ถูกดันไปกลางจอ) -->
-      <div class="flex min-w-0 flex-1 items-center gap-3 xl:gap-5">
-        <a href="<?= url('/') ?>" class="flex items-center gap-2 lg:gap-2 min-w-0 shrink-0 max-w-[60%] sm:max-w-none group">
+      <div class="flex min-w-0 flex-1 items-center gap-3 xl:gap-5 overflow-hidden">
+        <a href="<?= url('/') ?>" class="flex items-center gap-2 xl:gap-2 min-w-0 shrink-0 max-w-[60%] sm:max-w-none group">
           <span class="relative block h-10 w-10 lg:h-9 lg:w-9 shrink-0 overflow-hidden rounded-full bg-white shadow-md shadow-primary-900/10 ring-2 ring-white">
             <img src="<?= asset('site-logo.png') ?>" alt="<?= e($siteName) ?>" width="88" height="88" decoding="async"
                  class="absolute inset-0 h-full w-full object-contain p-0.5 transition group-hover:scale-[1.03]">
@@ -79,21 +79,23 @@ $guestSeekCtaClass = $guestSeekActive
           </div>
         </a>
 
-        <nav class="hidden lg:flex items-center justify-start gap-x-0.5 xl:gap-x-1 2xl:gap-x-1.5 gap-y-1 min-w-0 py-0.5 flex-wrap xl:flex-nowrap" aria-label="เมนูหลัก">
+        <div class="hidden xl:block min-w-0 flex-1 overflow-x-auto no-scrollbar overscroll-x-contain" aria-label="เมนูหลัก — เลื่อนซ้ายขวาได้ถ้ารายการเยอะ">
+          <nav class="flex w-max max-w-none items-center justify-start gap-x-0.5 2xl:gap-x-1.5 py-0.5 pr-1">
             <?php foreach ($navItems as $item): ?>
               <a href="<?= e($item['href']) ?>"
-                 class="relative px-2 py-2 rounded-lg text-[11px] xl:text-[12px] 2xl:text-[13px] whitespace-nowrap shrink-0 transition <?= $item['active'] ? 'text-forest-700 font-bold bg-forest-50/90 ring-1 ring-forest-200/70' : 'text-slate-800 font-semibold hover:text-forest-800 hover:bg-slate-50' ?>">
+                 class="relative px-1.5 xl:px-2 py-2 rounded-lg text-[11px] 2xl:text-[13px] whitespace-nowrap shrink-0 transition <?= $item['active'] ? 'text-forest-700 font-bold bg-forest-50/90 ring-1 ring-forest-200/70' : 'text-slate-800 font-semibold hover:text-forest-800 hover:bg-slate-50' ?>">
                 <?= e($item['label']) ?>
                 <?php if (!empty($item['badge'])): ?>
                 <span class="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold bg-emerald-500 text-white rounded-full leading-none"><?= e($item['badge']) ?></span>
                 <?php endif; ?>
               </a>
             <?php endforeach; ?>
-        </nav>
+          </nav>
+        </div>
       </div>
 
       <!-- เดสก์ท็อป: หาที่พัก CTA / ภาษา / คูปอง / ไอคอน / โปรไฟล์ — ชิดขวา ขนาดย่อ -->
-      <div class="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0 ml-auto">
+      <div class="hidden xl:flex items-center gap-1 2xl:gap-1.5 shrink-0 ml-auto pl-1 bg-white">
         <a href="<?= url('/guest-seek') ?>"
            class="hidden xl:inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition shadow-sm <?= $guestSeekCtaClass ?>"
            title="ให้ทีมช่วยหาที่พักตามงบและโซน">
@@ -173,8 +175,8 @@ $guestSeekCtaClass = $guestSeekActive
         <?php endif; ?>
       </div>
 
-      <!-- Mobile -->
-      <div class="flex lg:hidden items-center gap-2 shrink-0">
+      <!-- Mobile + แท็บเล็ต (จอแคบกว่า xl) -->
+      <div class="flex xl:hidden items-center gap-2 shrink-0">
         <a href="<?= url('/coupons/buy') ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-accent-500 text-white shadow-md" aria-label="<?= e(__('buy_coupon')) ?>">
           <i data-lucide="gift" class="w-[18px] h-[18px]"></i>
         </a>
@@ -189,7 +191,7 @@ $guestSeekCtaClass = $guestSeekActive
     </div>
 
     <!-- Mobile drawer — เมนูหลัก -->
-    <div x-show="open" x-transition x-cloak class="lg:hidden pb-4 border-t border-slate-100 mt-1 pt-3">
+    <div x-show="open" x-transition x-cloak class="xl:hidden pb-4 border-t border-slate-100 mt-1 pt-3">
       <a href="<?= url('/guest-seek') ?>"
          class="flex items-center gap-3 px-4 py-3 mb-3 rounded-xl border-2 border-dashed transition <?= $guestSeekActive ? 'border-forest-300 bg-forest-50' : 'border-accent-200 bg-accent-50/80 hover:bg-accent-50' ?>">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm ring-1 ring-accent-200/70">
